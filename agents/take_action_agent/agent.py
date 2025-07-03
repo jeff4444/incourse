@@ -1,15 +1,21 @@
 import asyncio
+import os
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from typing import List, Dict
-from pydantic_ai import Agent, RunContext
-import random
+from pydantic_ai import Agent, Tool
+from pydantic_ai.models.bedrock import BedrockConverseModel
+from pydantic_ai.providers.bedrock import BedrockProvider
 from shared.prompts.take_action_agent import TAKE_ACTION_PROMPT
 from dotenv import load_dotenv
+from shared.agents.tools import get_chat_history_summary, get_course_grade_details, get_course_quiz_history, get_file_content_summaries, get_overall_course_performance
 
 load_dotenv()
 
-MODEL = "google-gla:gemini-2.0-flash"
+ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
+SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+DEFAULT_LOCATION = os.getenv("AWS_DEFAULT_REGION")
+MODEL_ARN = os.getenv("AWS_MODEL_ARN")
 
 class RouteOutput(BaseModel):
     """
@@ -50,45 +56,39 @@ class RouteOutput(BaseModel):
         
 @dataclass
 class Deps:
-    api_key: str
- 
-    
-take_action_agent = Agent[
-    Deps,
-    RouteOutput,
-](
-    MODEL,
-    output_type=RouteOutput,
-    system_prompt=TAKE_ACTION_PROMPT
-)
-
-
-@take_action_agent.tool
-async def fetch_calendar_events(
-    ctx: RunContext[Deps],
     user_id: str
-) -> List[Dict[str, str]]:
-    """
-    Fetch calendar events for the user.
-    """
-    # Simulate fetching calendar events
-    await asyncio.sleep(1)
-    return [
-        {"event": "Math Exam", "date": "2023-10-01"},
-        {"event": "Science Project Due", "date": "2023-10-05"},
-        {"event": "History Presentation", "date": "2023-10-10"}
-    ]
+    lms_api_key: str
     
-@take_action_agent.tool
-async def edit_calendar_event(
-    ctx: RunContext[Deps],
-    user_id: str,
-    event_id: str,
-    new_details: Dict[str, str]
-) -> bool:
+    
+def get_take_action_agent(**kwargs) -> Agent[Deps, RouteOutput]:
     """
-    Edit a calendar event for the user.
+    Get an agent for processing user input and determining appropriate actions.
     """
-    # Simulate editing a calendar event
-    await asyncio.sleep(1)
-    return random.choice([True, False])
+    system_prompt = kwargs.get("prompt", None)
+    if system_prompt is None:
+        system_prompt = TAKE_ACTION_PROMPT
+        
+    model = BedrockConverseModel(
+        MODEL_ARN,
+        provider=BedrockProvider(
+            region_name=DEFAULT_LOCATION,
+            aws_access_key_id=ACCESS_KEY,
+            aws_secret_access_key=SECRET_KEY,
+        ),
+    )
+    
+    return Agent[
+        Deps,
+        RouteOutput,
+    ](
+        model,
+        output_type=RouteOutput,
+        system_prompt=system_prompt,
+        tools=[  
+            Tool(get_overall_course_performance, takes_ctx=True),
+            Tool(get_chat_history_summary, takes_ctx=True),
+            Tool(get_course_quiz_history, takes_ctx=True),
+            Tool(get_course_grade_details, takes_ctx=True),
+            Tool(get_file_content_summaries, takes_ctx=True),
+        ],
+    )

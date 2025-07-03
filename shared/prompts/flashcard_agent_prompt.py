@@ -25,10 +25,11 @@ You also have access to tools:
 - `get_file_content_summaries(ctx)` : Use this tool to fetch summaries of the course files to understand the concepts being covered.
 
 [OUTPUT REQUIREMENTS]
-Generate a list of 5 `Flashcard` objects with:
+Generate a list of `Flashcard` objects with:
 - `question` (str): The flashcard question.
 - `answer` (str): The correct, concise response.
 - `image_prompt` (str): Optional; a prompt for generating an image related to the card.
+- `hint` (str): Optional; a hint for the flashcard question.
 
 Your output must be a valid JSON array of Flashcard objects. Do not include markdown, explanations, or comments.
 

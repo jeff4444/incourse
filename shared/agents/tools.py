@@ -80,6 +80,6 @@ async def get_file_content_summaries(
     
     # For demonstration purposes, return a random file content summary
     file_content_summary = {
-        file_id: f"Summary for file {file_id}" for file_id in ctx.deps.file_ids
+        "file_id": f"Summary for file"
     }
     return file_content_summary
