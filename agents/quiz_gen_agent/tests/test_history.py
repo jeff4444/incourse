@@ -13,7 +13,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 def test_student_failing_hist101():
     async def run():
         agent = get_quiz_agent()
-        deps = Deps(api_key=API_KEY, course_id="HIST101", file_ids=["file1", "file2"])
+        deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com", course_id="HIST101", file_ids=["file1", "file2"])
 
         with patch("agents.quiz_gen_agent.agent.get_overall_course_performance", new_callable=AsyncMock) as mock_perf, \
             patch("agents.quiz_gen_agent.agent.get_chat_history_summary", new_callable=AsyncMock) as mock_chat, \
@@ -35,7 +35,7 @@ def test_student_failing_hist101():
 def test_student_struggles_chapter1_hist101():
     async def run():
         agent = get_quiz_agent()
-        deps = Deps(api_key=API_KEY, course_id="HIST101", file_ids=["file1", "file2"])
+        deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com", course_id="HIST101", file_ids=["file1", "file2"])
 
         with patch("agents.quiz_gen_agent.agent.get_overall_course_performance", new_callable=AsyncMock) as mock_perf, \
             patch("agents.quiz_gen_agent.agent.get_chat_history_summary", new_callable=AsyncMock) as mock_chat, \
@@ -56,7 +56,7 @@ def test_student_struggles_chapter1_hist101():
 def test_student_excels_hist101():
     async def run():
         agent = get_quiz_agent()
-        deps = Deps(api_key=API_KEY, course_id="HIST101", file_ids=["file1", "file2"])
+        deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com", course_id="HIST101", file_ids=["file1", "file2"])
 
         with patch("shared.agents.tools.get_overall_course_performance", new_callable=AsyncMock) as mock_perf, \
             patch("shared.agents.tools.get_chat_history_summary", new_callable=AsyncMock) as mock_chat, \

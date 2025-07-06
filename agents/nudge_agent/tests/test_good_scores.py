@@ -48,7 +48,7 @@ def test_nudge_agent_for_high_scores_with_assignment_and_confusion():
             mock_announcements.return_value = {"CS101": []}
             mock_grades.return_value = {"CS101": []}
 
-            deps = Deps(api_key=API_KEY)
+            deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com")
             result = await generate_nudges_agent.run("Generate nudges for user.", deps=deps)
 
             labels = [nudge.label for nudge in result.output]

@@ -58,6 +58,7 @@ class RouteOutput(BaseModel):
 class Deps:
     user_id: str
     lms_api_key: str
+    lms_base_url: str
     
     
 def get_take_action_agent(**kwargs) -> Agent[Deps, RouteOutput]:

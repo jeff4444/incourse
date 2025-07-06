@@ -77,11 +77,14 @@ class TakeActionResponse(BaseModel):
     message: str
     
     
-def get_user_lms_api_key(user_id: str) -> str:
+def get_user_lms_info(user_id: str) -> str:
     """
     Get the LMS API key for the user.
     """
-    return os.getenv("CANVAS_API_TOKEN")
+    return {
+        "api_key": os.getenv("CANVAS_API_TOKEN"),
+        "base_url": os.getenv("CANVAS_BASE_URL")
+    }
 
 # Health check endpoint
 @app.get("/")
@@ -100,13 +103,14 @@ async def generate_flashcards(request: FlashcardRequest):
     """
     try:
         # Create dependencies
-        api_key = get_user_lms_api_key(request.user_id)
+        lms_info = get_user_lms_info(request.user_id)
         
         deps = FlashcardDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
-            lms_api_key=api_key
+            lms_api_key=lms_info["api_key"],
+            lms_base_url=lms_info["base_url"]
         )
         
         # Get the flashcard agent
@@ -136,13 +140,14 @@ async def generate_quiz(request: QuizRequest):
     """
     try:
         # Create dependencies
-        api_key = get_user_lms_api_key(request.user_id)
+        lms_info = get_user_lms_info(request.user_id)
         
         deps = QuizDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
-            lms_api_key=api_key
+            lms_api_key=lms_info["api_key"],
+            lms_base_url=lms_info["base_url"]
         )
         
         # Get the quiz agent
@@ -171,11 +176,12 @@ async def generate_nudges(request: NudgeRequest):
     """
     try:
         # Create dependencies
-        api_key = get_user_lms_api_key(request.user_id)
+        lms_info = get_user_lms_info(request.user_id)
         
         deps = NudgeDeps(
             user_id=request.user_id,
-            lms_api_key=api_key
+            lms_api_key=lms_info["api_key"],
+            lms_base_url=lms_info["base_url"]
         )
         
         # Get the nudge agent
@@ -204,11 +210,12 @@ async def take_action(request: TakeActionRequest):
     """
     try:
         # Create dependencies
-        api_key = get_user_lms_api_key(request.user_id)
+        lms_info = get_user_lms_info(request.user_id)
         
         deps = TakeActionDeps(
             user_id=request.user_id,
-            lms_api_key=api_key
+            lms_api_key=lms_info["api_key"],
+            lms_base_url=lms_info["base_url"]
         )
         
         # Get the take action agent

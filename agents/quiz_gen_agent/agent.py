@@ -59,6 +59,7 @@ class Quiz(BaseModel):
 class Deps:
     user_id: str
     lms_api_key: str
+    lms_base_url: str
     course_id: str
     file_ids: List[str]
     

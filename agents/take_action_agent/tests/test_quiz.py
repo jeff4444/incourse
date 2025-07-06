@@ -11,7 +11,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 
 def test_create_new_quiz_routing():
     async def run():
-        deps = Deps(api_key=API_KEY)
+        deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com")
         nudge = "label: Create quiz, action: Create and take a new quiz to review linked lists for CSCI 201"
 
         result = await take_action_agent.run(nudge, deps=deps)
@@ -27,7 +27,7 @@ def test_create_new_quiz_routing():
 
 def test_retake_existing_quiz_routing():
     async def run():
-        deps = Deps(api_key=API_KEY)
+        deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com")
         nudge = "label: Retake quiz, action: Try quiz 3 of CSCI 101 again to improve your score"
 
         result = await take_action_agent.run(nudge, deps=deps)

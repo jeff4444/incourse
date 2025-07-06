@@ -43,7 +43,7 @@ def test_nudge_agent_recommends_for_poor_quizzes():
             mock_grades.return_value = {"CS101": []}
 
             # Run the agent
-            deps = Deps(api_key=API_KEY)
+            deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com")
             result = await generate_nudges_agent.run("Generate nudges for user.", deps=deps)
 
             # Assertions: at least one nudge should suggest retaking quiz or studying

@@ -14,7 +14,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 def test_flashcard_agent_generates_five_flashcards():
     async def run():
         agent = get_flashcard_agent()
-        deps = Deps(api_key=API_KEY, course_id="PHYS101", file_ids=["file1", "file2"])
+        deps = Deps(lms_api_key=API_KEY, lms_base_url="https://canvas.instructure.com", course_id="PHYS101", file_ids=["file1", "file2"])
         
         with patch("shared.agents.tools.get_overall_course_performance", new_callable=AsyncMock) as mock_perf, \
             patch("shared.agents.tools.get_chat_history_summary", new_callable=AsyncMock) as mock_chat, \
