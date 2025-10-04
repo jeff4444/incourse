@@ -1,4 +1,4 @@
-import { Course, FileDetails, Module, ModuleItem } from "../types/course";
+import { Course, FileDetails, Module, ModuleItem, DiscussionTopic, Page } from "../types/course";
 import { validateFileForProcessing } from "../utils/fileValidation";
 import LMSProvider from "./lms-provider";
 
@@ -47,7 +47,7 @@ class CanvasProvider extends LMSProvider {
     }
 
     const course: Course = {
-      id: null,
+      id: courseData.id,
       lmsId: courseData.id,
       lmsProvider: "canvas",
       name: courseData.name,
@@ -62,7 +62,7 @@ class CanvasProvider extends LMSProvider {
 
   convertCanvasModule(moduleData: any, courseId: string): Module {
     const module: Module = {
-      id: null,
+      id: moduleData.id,
       lmsId: moduleData.id,
       courseId: courseId,
       name: moduleData.name,
@@ -79,15 +79,21 @@ class CanvasProvider extends LMSProvider {
     moduleId: string,
     courseId: string
   ): ModuleItem {
+
+    // For Page type, use page_url as lmsContentId, otherwise use content_id
+    const lmsContentId = moduleItemData.type === 'Page' 
+      ? moduleItemData.page_url 
+      : moduleItemData.content_id;
+
     const moduleItem: ModuleItem = {
-      id: null,
+      id: moduleItemData.id,
       lmsId: moduleItemData.id,
       name: moduleItemData.title,
       moduleId: moduleId,
       courseId: courseId,
       type: moduleItemData.type,
       url: moduleItemData.url,
-      lmsContentId: moduleItemData.content_id,
+      lmsContentId: lmsContentId,
       position: moduleItemData.position || null,
     };
     return moduleItem;
@@ -106,7 +112,7 @@ class CanvasProvider extends LMSProvider {
     );
 
     const fileDetails: FileDetails = {
-      id: null,
+      id: fileDetailsData.id,
       canvasId: fileDetailsData.id,
       name: fileName,
       url: fileDetailsData.url,
@@ -130,7 +136,7 @@ class CanvasProvider extends LMSProvider {
       }
     );
     if (!coursesResponse.ok) {
-      throw new Error("Failed to fetch courses");
+      throw new Error(`Failed to fetch courses`);
     }
     const coursesData = await coursesResponse.json();
 
@@ -201,9 +207,16 @@ class CanvasProvider extends LMSProvider {
       throw new Error("Failed to fetch module items");
     }
     const moduleItemsData = await moduleItemsResponse.json();
-    return moduleItemsData.map((moduleItem: any) =>
-      this.convertCanvasModuleItem(moduleItem, moduleId, courseId)
-    );
+    const moduleItems = moduleItemsData.map((moduleItemData: any) => {
+      try {
+      const moduleItem = this.convertCanvasModuleItem(moduleItemData, moduleId, courseId);
+        return moduleItem;
+      } catch (error) {
+        console.error(`Failed to convert module item ${moduleItemData.id}: ${error}`);
+        return null;
+      }
+    });
+    return moduleItems;
   }
 
   async getFileDetails(fileId: string, courseId: string): Promise<FileDetails> {
@@ -216,10 +229,42 @@ class CanvasProvider extends LMSProvider {
       },
     });
     if (!fileDetailsResponse.ok) {
-      throw new Error("Failed to fetch file details");
+      throw new Error(`Failed to fetch file details ${url}`);
     }
     const fileDetailsData = await fileDetailsResponse.json();
     return this.convertCanvasFileDetails(fileDetailsData);
+  }
+
+  async getDiscussionTopic(topicId: string, courseId: string): Promise<DiscussionTopic> {
+    const url = `${this.apiBaseUrl}/courses/${courseId}/discussion_topics/${topicId}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch discussion topic ${url}`);
+    }
+    const discussionData = await response.json();
+    return discussionData as DiscussionTopic;
+  }
+
+  async getPage(pageUrl: string, courseId: string): Promise<Page> {
+    const url = `${this.apiBaseUrl}/courses/${courseId}/pages/${pageUrl}`;
+
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch page ${url}`);
+    }
+    const pageData = await response.json();
+    return pageData as Page;
   }
 }
 

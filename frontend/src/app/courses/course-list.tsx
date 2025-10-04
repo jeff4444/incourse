@@ -56,11 +56,11 @@ export function CourseList() {
   const filteredCourses = courses.filter((course) => {
     const matchesSearchTerm =
       course.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.course_code.toLowerCase().includes(searchTerm.toLowerCase());
+      course.code.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesSemester =
       selectedSemester === "All Courses" ||
-      course.term?.name === selectedSemester;
+      (course.semester && course.year && `${course.semester} ${course.year}` === selectedSemester);
 
     return matchesSearchTerm && matchesSemester;
   });

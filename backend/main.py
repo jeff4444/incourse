@@ -83,7 +83,7 @@ def get_user_lms_info(user_id: str) -> str:
     """
     return {
         "api_key": os.getenv("CANVAS_API_TOKEN"),
-        "base_url": os.getenv("CANVAS_BASE_URL")
+        "base_url": os.getenv("CANVAS_API_URL")
     }
 
 # Health check endpoint

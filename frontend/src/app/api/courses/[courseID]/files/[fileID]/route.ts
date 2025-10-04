@@ -6,6 +6,8 @@ export async function GET(request: NextRequest, { params }: { params: { courseID
     const lms = (await params).courseID.split('-')[0];
     const fileID = (await params).fileID;
 
+    console.log(`courseID: ${courseID}, lms: ${lms}, fileID: ${fileID}`);
+
     const apiBaseUrl = process.env.CANVAS_API_BASE_URL ?? '';
     const apiKey = process.env.CANVAS_API_KEY ?? '';
     const lmsFactory = new LMSFactory(apiBaseUrl, apiKey);

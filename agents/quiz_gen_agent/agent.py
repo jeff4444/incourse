@@ -8,7 +8,25 @@ from pydantic_ai.models.bedrock import BedrockConverseModel
 from pydantic_ai.providers.bedrock import BedrockProvider
 from shared.prompts.quiz_agent_prompt import QUIZ_AGENT_PROMPT
 from dotenv import load_dotenv
-from shared.agents.tools import get_chat_history_summary, get_course_grade_details, get_course_quiz_history, get_file_content_summaries, get_overall_course_performance
+from shared.agents.tools import (
+    get_chat_history_summary, 
+    get_course_grade_details, 
+    get_course_quiz_history, 
+    get_file_content_summaries, 
+    get_overall_course_performance,
+    get_assignment_grades,
+    get_all_grades,
+    get_some_grades,
+    get_course_analytics,
+    get_student_analytics,
+    get_canvas_courses,
+    get_canvas_course,
+    get_canvas_course_modules,
+    get_canvas_module_items,
+    get_canvas_file_details,
+    get_canvas_files_details,
+    get_canvas_course_assignments
+)
 
 load_dotenv()
 
@@ -96,5 +114,17 @@ def get_quiz_agent(**kwargs) -> Agent[Deps, List[Quiz]]:
             Tool(get_course_quiz_history, takes_ctx=True),
             Tool(get_course_grade_details, takes_ctx=True),
             Tool(get_file_content_summaries, takes_ctx=True),
+            Tool(get_assignment_grades, takes_ctx=True),
+            Tool(get_all_grades, takes_ctx=True),
+            Tool(get_some_grades, takes_ctx=True),
+            Tool(get_course_analytics, takes_ctx=True),
+            Tool(get_student_analytics, takes_ctx=True),
+            Tool(get_canvas_courses, takes_ctx=True),
+            Tool(get_canvas_course, takes_ctx=True),
+            Tool(get_canvas_course_modules, takes_ctx=True),
+            Tool(get_canvas_module_items, takes_ctx=True),
+            Tool(get_canvas_file_details, takes_ctx=True),
+            Tool(get_canvas_files_details, takes_ctx=True),
+            Tool(get_canvas_course_assignments, takes_ctx=True),
         ],
     )

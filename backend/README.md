@@ -172,10 +172,6 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 Once the server is running, you can access:
 
-- **Interactive API Docs**: http://localhost:8000/docs (Swagger UI)
-- **ReDoc Documentation**: http://localhost:8000/redoc
-- **OpenAPI Schema**: http://localhost:8000/openapi.json
-
 ## Development
 
 ### Running in Development Mode

@@ -13,6 +13,8 @@ async def get_overall_course_performance(
     Get overall course performance for a specific course or all courses.
     Returns performance data including current/final scores and grades.
     """
+    print(f"calling get_overall_course_performance with course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -81,6 +83,8 @@ async def get_course_grade_details(
     """
     Get detailed grade information for a specific course including all assignments.
     """
+    print(f"calling get_course_grade_details with course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -159,6 +163,8 @@ async def get_assignment_grades(
     """
     Get assignment grades for a specific course, optionally for a specific assignment.
     """
+    print(f"calling get_assignment_grades with course_id={course_id}, assignment_id={assignment_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -220,6 +226,8 @@ async def get_all_grades(
     """
     Get comprehensive grade information for all courses and their assignments.
     """
+    print("calling get_all_grades")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -281,6 +289,8 @@ async def get_some_grades(
     """
     Get grade information for specific courses by their IDs.
     """
+    print(f"calling get_some_grades with course_ids={course_ids}, include_assignments={include_assignments}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -345,6 +355,8 @@ async def get_course_analytics(
     """
     Get analytics data for a specific course including participation and performance metrics.
     """
+    print(f"calling get_course_analytics with course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -374,6 +386,8 @@ async def get_student_analytics(
     """
     Get student analytics for a specific course, optionally for a specific student.
     """
+    print(f"calling get_student_analytics with course_id={course_id}, student_id={student_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -405,6 +419,8 @@ async def get_chat_history_summary(
     """
     Get chat history for the list of course IDs.
     """
+    print("calling get_chat_history_summary")
+    
     # Simulate a call to an external API to get chat history
     await asyncio.sleep(1)
     
@@ -417,6 +433,8 @@ async def get_course_quiz_history(
     """
     Get quiz history for the list of course IDs.
     """
+    print("calling get_course_quiz_history")
+    
     # Simulate a call to an external API to get quiz history
     await asyncio.sleep(1)
     
@@ -437,6 +455,8 @@ async def get_file_content_summaries(
     """
     Get file content summary for the list of file IDs.
     """
+    print("calling get_file_content_summaries")
+    
     # Simulate a call to an external API to get file content summary
     await asyncio.sleep(1)
     
@@ -452,6 +472,8 @@ async def get_canvas_courses(
     """
     Get all courses from Canvas API.
     """
+    print("calling get_canvas_courses")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -479,11 +501,13 @@ async def get_canvas_courses(
 
 async def get_canvas_course(
     ctx: RunContext,
-    course_id: str
 ) -> Dict:
     """
     Get a specific course from Canvas API.
     """
+    course_id = ctx.deps.course_id
+    print(f"calling get_canvas_course with course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -504,11 +528,13 @@ async def get_canvas_course(
 
 async def get_canvas_course_modules(
     ctx: RunContext,
-    course_id: str
 ) -> List[Dict]:
     """
     Get all modules for a specific course from Canvas API.
     """
+    course_id = ctx.deps.course_id
+    print(f"calling get_canvas_course_modules with course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -530,11 +556,13 @@ async def get_canvas_course_modules(
 async def get_canvas_module_items(
     ctx: RunContext,
     module_id: str,
-    course_id: str
 ) -> List[Dict]:
     """
     Get all items for a specific module from Canvas API.
     """
+    course_id = ctx.deps.course_id
+    print(f"calling get_canvas_module_items with module_id={module_id}, course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -552,15 +580,35 @@ async def get_canvas_module_items(
             module_items_data = await response.json()
             return module_items_data
 
+async def get_canvas_files_details(
+    ctx: RunContext,
+) -> List[Dict]:
+    """
+    Get all files for a specific course from Canvas API.
+    """
+    course_id = ctx.deps.course_id
+    file_ids = ctx.deps.file_ids
+    print(f"calling get_canvas_files_details with course_id={course_id}, file_ids={file_ids}")
+    
+    file_details_list = []
+    
+    for file_id in file_ids:
+        file_details = await get_canvas_file_details(ctx, file_id)
+        file_details_list.append(file_details)
+    
+    return file_details_list
 
 async def get_canvas_file_details(
     ctx: RunContext,
     file_id: str,
-    course_id: str
 ) -> Dict:
     """
     Get file details for a specific file from Canvas API.
     """
+    
+    course_id = ctx.deps.course_id
+    print(f"calling get_canvas_file_details with file_id={file_id}, course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
@@ -586,6 +634,8 @@ async def get_canvas_course_assignments(
     """
     Get all assignments for a specific course from Canvas API.
     """
+    print(f"calling get_canvas_course_assignments with course_id={course_id}")
+    
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     
