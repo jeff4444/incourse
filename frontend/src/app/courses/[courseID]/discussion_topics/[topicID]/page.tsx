@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DiscussionTopic } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
+import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
 function transformCanvasFileUrls(html: string, courseID: string): string {
@@ -25,14 +26,7 @@ export default async function DiscussionTopicPage({
   const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/discussion_topics/${topicID}`;
   
   try {
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch discussion topic: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    discussionTopic = data as DiscussionTopic;
+    discussionTopic = await serverAuthenticatedFetchJson<DiscussionTopic>(url);
   } catch (error) {
     console.error('Error fetching discussion topic:', error);
     return (

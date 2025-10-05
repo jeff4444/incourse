@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookOpen, Search } from "lucide-react";
+import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 
 export function CourseList() {
   const [courses, setCourses] = useState<Course[]>([]);
@@ -23,10 +24,15 @@ export function CourseList() {
   useEffect(() => {
     const fetchCourses = async () => {
       setLoading(true);
-      const response = await fetch("/api/courses");
-      const data = await response.json();
-      setCourses(data);
-      setLoading(false);
+      try {
+        const data = await authenticatedFetchJson<Course[]>("/api/courses");
+        setCourses(data);
+      } catch (error) {
+        console.error('Error fetching courses:', error);
+        setCourses([]);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchCourses();

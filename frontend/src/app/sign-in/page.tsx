@@ -16,20 +16,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { FcGoogle } from "react-icons/fc";
 
 export default function SignInPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [showConfirmMessage, setShowConfirmMessage] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message === 'confirm-email') {
+      setShowConfirmMessage(true);
+    }
+  }, [searchParams]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +54,15 @@ export default function SignInPage() {
       if (error) {
         setError(error.message);
       } else {
-        router.push("/dashboard");
+        // Check if user has completed onboarding
+        const { data: { user } } = await supabase.auth.getUser();
+        const passedOnboarding = user?.user_metadata?.passed_onboarding;
+        
+        if (passedOnboarding === false) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
       }
     } catch (e) {
       if (e instanceof Error) {
@@ -102,7 +119,14 @@ export default function SignInPage() {
         if (error) {
           setError(error.message);
         } else if (session) {
-          router.push("/dashboard");
+          // Check if user has completed onboarding
+          const passedOnboarding = session.user?.user_metadata?.passed_onboarding;
+          
+          if (passedOnboarding === false) {
+            router.push("/onboarding");
+          } else {
+            router.push("/dashboard");
+          }
         }
       } catch (e) {
         if (e instanceof Error) {
@@ -356,6 +380,27 @@ export default function SignInPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {showConfirmMessage && (
+                <motion.div
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="bg-blue-50 text-blue-700 p-4 rounded-lg border border-blue-200 text-sm"
+                >
+                  <div className="flex items-start space-x-2">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="font-medium">Check your email</p>
+                      <p className="mt-1">
+                        We've sent you a confirmation link. Please check your email and click the link to verify your account, then sign in below.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}

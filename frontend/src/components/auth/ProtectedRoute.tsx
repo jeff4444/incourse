@@ -15,6 +15,14 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   useEffect(() => {
     if (!loading && !user) {
       router.push("/sign-in");
+    } else if (!loading && user) {
+      // Check if user has completed onboarding
+      const passedOnboarding = user.user_metadata?.passed_onboarding;
+      
+      // Only redirect to onboarding if they haven't completed it and we're not already on onboarding
+      if (passedOnboarding === false && !window.location.pathname.includes('/onboarding')) {
+        router.push("/onboarding");
+      }
     }
   }, [user, loading, router]);
 

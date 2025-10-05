@@ -8,6 +8,7 @@ import { Navbar } from "@/components/navbar"
 import { SummaryViewer } from "@/components/summary-viewer"
 import { ModuleList } from "@/components/module-list"
 import { Course, Module } from "@/lib/types/course"
+import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth"
 
 export default async function CoursePage({
   params,
@@ -16,10 +17,11 @@ export default async function CoursePage({
 }) {
     const courseID = (await params).courseID;
 
-  const course = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}`).then(res => res.json()) as Course;
-  const modules = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/modules`).then(res => res.json()) as Module[];
+  try {
+    const course = await serverAuthenticatedFetchJson<Course>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}`);
+    const modules = await serverAuthenticatedFetchJson<Module[]>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/modules`);
 
-  return (
+    return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="container mx-auto py-6 px-4 md:px-6">
@@ -258,4 +260,18 @@ By the end of this course, you will have developed a comprehensive understanding
       </div>
     </div>
   );
+  } catch (error) {
+    console.error('Error loading course:', error);
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+        <Navbar />
+        <div className="container mx-auto py-6 px-4 md:px-6">
+          <div className="text-center text-red-500 mt-8">
+            <h2 className="text-xl font-semibold mb-2">Failed to load course</h2>
+            <p>The course you're looking for could not be found or there was an error loading it.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }

@@ -1,19 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LMSFactory } from "@/lib/api";
+import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 
 export async function GET(request: NextRequest, { params }: { params: { courseID: string, topicID: string } }) {
-    const courseID = (await params).courseID.split('-')[1];
-    const lms = (await params).courseID.split('-')[0];
-    const topicID = (await params).topicID;
+    try {
+        const courseID = (await params).courseID.split('-')[1];
+        const lms = (await params).courseID.split('-')[0];
+        const topicID = (await params).topicID;
 
-    console.log(`courseID: ${courseID}, lms: ${lms}, topicID: ${topicID}`);
+        console.log(`courseID: ${courseID}, lms: ${lms}, topicID: ${topicID}`);
 
-    const apiBaseUrl = process.env.CANVAS_API_BASE_URL ?? '';
-    const apiKey = process.env.CANVAS_API_KEY ?? '';
-    const lmsFactory = new LMSFactory(apiBaseUrl, apiKey);
-    const lmsProvider = lmsFactory.createLMSProvider(lms);
+        // Create LMS provider with user credentials
+        const result = await createLMSProviderWithUserCredentials(request, lms);
+        if (result instanceof NextResponse) {
+            return result; // Return error response
+        }
 
-    const discussionTopic = await lmsProvider.getDiscussionTopic(topicID, courseID);
-    console.log(discussionTopic);
-    return NextResponse.json(discussionTopic);
+        const { lmsProvider } = result;
+        const discussionTopic = await lmsProvider.getDiscussionTopic(topicID, courseID);
+        console.log(discussionTopic);
+        return NextResponse.json(discussionTopic);
+    } catch (error) {
+        console.error('Error in discussion topic API:', error);
+        return NextResponse.json(
+            { error: "Internal server error" },
+            { status: 500 }
+        );
+    }
 }

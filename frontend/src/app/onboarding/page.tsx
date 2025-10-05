@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabase } from "@/lib/supabase";
+import { encryptApiKey } from "@/lib/utils/encryption";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,7 +17,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   ArrowLeft,
   ArrowRight,
@@ -27,15 +28,127 @@ import {
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(0); // -1 for back, 1 for forward
-  const totalSteps = 3;
+  const totalSteps = 2;
+  const [canvasUrl, setCanvasUrl] = useState("");
+  const [urlError, setUrlError] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [apiKeyError, setApiKeyError] = useState("");
 
-  const nextStep = () => {
+  // Canvas URL validation and formatting
+  const validateAndFormatCanvasUrl = (url: string): { isValid: boolean; formattedUrl: string; error: string } => {
+    if (!url.trim()) {
+      return { isValid: false, formattedUrl: "", error: "Canvas URL is required" };
+    }
+
+    let formattedUrl = url.trim();
+    
+    // Add https:// if not present
+    if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
+      formattedUrl = "https://" + formattedUrl;
+    }
+
+    // Validate the format: https://canvas.{university}.edu
+    const canvasUrlRegex = /^https:\/\/canvas\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.edu(\/.*)?$/;
+    
+    if (!canvasUrlRegex.test(formattedUrl)) {
+      return { 
+        isValid: false, 
+        formattedUrl: "", 
+        error: "Please enter a valid Canvas URL in the format: https://canvas.university.edu" 
+      };
+    }
+
+    return { isValid: true, formattedUrl, error: "" };
+  };
+
+  const handleUrlChange = (value: string) => {
+    setCanvasUrl(value);
+    setUrlError(""); // Clear error when user types
+  };
+
+  const handleApiKeyChange = (value: string) => {
+    setApiKey(value);
+    setApiKeyError(""); // Clear error when user types
+  };
+
+  // Store Canvas credentials to database
+  const storeCanvasCredentials = async (url: string, key: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      const encryptedApiKey = encryptApiKey(key);
+
+      const { error } = await supabase
+        .from('user_api_keys')
+        .upsert({
+          user_id: user.id,
+          lms_provider: 'canvas',
+          encrypted_api_key: encryptedApiKey,
+          api_base_url: url,
+          is_active: true
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error storing Canvas credentials:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+    }
+  };
+
+  const nextStep = async () => {
+    // Validate Canvas URL and API key on step 1
+    if (step === 1) {
+      const validation = validateAndFormatCanvasUrl(canvasUrl);
+      if (!validation.isValid) {
+        setUrlError(validation.error);
+        return; // Don't proceed to next step if validation fails
+      }
+
+      // Validate API key
+      if (!apiKey.trim()) {
+        setApiKeyError("API key is required");
+        return;
+      }
+
+      // Update the URL with the formatted version
+      setCanvasUrl(validation.formattedUrl);
+
+      // Store credentials to database
+      const storeResult = await storeCanvasCredentials(validation.formattedUrl, apiKey);
+      if (!storeResult.success) {
+        setApiKeyError(`Failed to save credentials: ${storeResult.error}`);
+        return;
+      }
+    }
+
     setDirection(1);
     if (step < totalSteps) {
       setStep(step + 1);
     } else {
-      // Navigate to dashboard when completed
-      window.location.href = "/dashboard";
+      // Complete onboarding and update user metadata
+      try {
+        const { error } = await supabase.auth.updateUser({
+          data: { passed_onboarding: true }
+        });
+        
+        if (error) {
+          console.error('Error updating user metadata:', error);
+        }
+        
+        // Navigate to dashboard when completed
+        window.location.href = "/dashboard";
+      } catch (error) {
+        console.error('Error completing onboarding:', error);
+        // Still navigate to dashboard even if metadata update fails
+        window.location.href = "/dashboard";
+      }
     }
   };
 
@@ -129,8 +242,6 @@ export default function OnboardingPage() {
                 >
                   {index === 0
                     ? "Connect LMS"
-                    : index === 1
-                    ? "Select Courses"
                     : "Learning Preferences"}
                 </span>
               </div>
@@ -183,48 +294,39 @@ export default function OnboardingPage() {
                       </CardHeader>
                       <CardContent className="space-y-6">
                         <motion.div variants={itemVariants}>
-                          <Tabs defaultValue="oauth" className="w-full">
-                            <TabsList className="grid w-full grid-cols-2">
-                              <TabsTrigger value="oauth">OAuth</TabsTrigger>
-                              <TabsTrigger value="api">API Token</TabsTrigger>
-                            </TabsList>
-                            <TabsContent value="oauth" className="space-y-4">
-                              <div className="flex items-center justify-center p-6 border rounded-lg bg-gray-50">
-                                <Button className="w-full max-w-sm">
-                                  <svg
-                                    className="mr-2 h-4 w-4"
-                                    viewBox="0 0 24 24"
-                                  >
-                                    <path
-                                      d="M11.4 24H0V12.6h11.4V24zM24 24H12.6V12.6H24V24zM11.4 11.4H0V0h11.4v11.4zm12.6 0H12.6V0H24v11.4z"
-                                      fill="#F25022"
-                                    />
-                                  </svg>
-                                  Connect with Canvas
-                                </Button>
-                              </div>
-                            </TabsContent>
-                            <TabsContent value="api" className="space-y-4">
-                              <div className="grid gap-4">
-                                <div className="grid gap-2">
-                                  <Label htmlFor="canvas-url">Canvas URL</Label>
-                                  <Input
-                                    id="canvas-url"
-                                    placeholder="https://canvas.university.edu"
-                                  />
-                                </div>
-                                <div className="grid gap-2">
-                                  <Label htmlFor="api-token">API Token</Label>
-                                  <Input id="api-token" type="password" />
-                                  <p className="text-sm text-muted-foreground">
-                                    You can find your API token in Canvas under
-                                    Account &gt; Settings &gt; Approved
-                                    Integrations
-                                  </p>
-                                </div>
-                              </div>
-                            </TabsContent>
-                          </Tabs>
+                          <div className="grid gap-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="canvas-url">Canvas URL</Label>
+                              <Input
+                                id="canvas-url"
+                                placeholder="https://canvas.university.edu"
+                                value={canvasUrl}
+                                onChange={(e) => handleUrlChange(e.target.value)}
+                                className={urlError ? "border-red-500 focus:border-red-500" : ""}
+                              />
+                              {urlError && (
+                                <p className="text-sm text-red-500 mt-1">{urlError}</p>
+                              )}
+                            </div>
+                            <div className="grid gap-2">
+                              <Label htmlFor="api-token">API Token</Label>
+                              <Input 
+                                id="api-token" 
+                                type="password"
+                                value={apiKey}
+                                onChange={(e) => handleApiKeyChange(e.target.value)}
+                                className={apiKeyError ? "border-red-500 focus:border-red-500" : ""}
+                              />
+                              {apiKeyError && (
+                                <p className="text-sm text-red-500 mt-1">{apiKeyError}</p>
+                              )}
+                              <p className="text-sm text-muted-foreground">
+                                You can find your API token in Canvas under
+                                Account &gt; Settings &gt; Approved
+                                Integrations
+                              </p>
+                            </div>
+                          </div>
                         </motion.div>
                         <motion.div variants={itemVariants}>
                           <div className="flex items-start space-x-2 p-4 bg-gray-50 rounded-lg">
@@ -245,86 +347,10 @@ export default function OnboardingPage() {
                     </motion.div>
                   )}
 
+
                   {step === 2 && (
                     <motion.div
                       key="step2"
-                      variants={contentVariants}
-                      initial="hidden"
-                      animate="visible"
-                    >
-                      <CardHeader>
-                        <motion.div variants={itemVariants}>
-                          <CardTitle className="text-2xl font-bold">
-                            Select your courses
-                          </CardTitle>
-                          <CardDescription>
-                            Choose which courses you want to use with InCourse
-                          </CardDescription>
-                        </motion.div>
-                      </CardHeader>
-                      <CardContent>
-                        <motion.div
-                          variants={itemVariants}
-                          className="space-y-4"
-                        >
-                          {[
-                            {
-                              id: "course1",
-                              name: "CS 101: Introduction to Computer Science",
-                              instructor: "Dr. Smith",
-                              term: "Fall 2023",
-                            },
-                            {
-                              id: "course2",
-                              name: "ECON 201: Macroeconomics",
-                              instructor: "Prof. Johnson",
-                              term: "Fall 2023",
-                            },
-                            {
-                              id: "course3",
-                              name: "PSYCH 110: Introduction to Psychology",
-                              instructor: "Dr. Williams",
-                              term: "Fall 2023",
-                            },
-                            {
-                              id: "course4",
-                              name: "MATH 220: Calculus I",
-                              instructor: "Prof. Garcia",
-                              term: "Fall 2023",
-                            },
-                          ].map((course) => (
-                            <motion.div
-                              key={course.id}
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              whileHover={{ scale: 1.02 }}
-                              className="flex items-start space-x-3 p-4 rounded-lg border hover:bg-gray-50 transition-colors"
-                            >
-                              <Checkbox
-                                id={course.id}
-                                defaultChecked={course.id !== "course4"}
-                              />
-                              <div className="grid gap-1.5">
-                                <Label
-                                  htmlFor={course.id}
-                                  className="font-medium"
-                                >
-                                  {course.name}
-                                </Label>
-                                <p className="text-sm text-muted-foreground">
-                                  {course.instructor} • {course.term}
-                                </p>
-                              </div>
-                            </motion.div>
-                          ))}
-                        </motion.div>
-                      </CardContent>
-                    </motion.div>
-                  )}
-
-                  {step === 3 && (
-                    <motion.div
-                      key="step3"
                       variants={contentVariants}
                       initial="hidden"
                       animate="visible"

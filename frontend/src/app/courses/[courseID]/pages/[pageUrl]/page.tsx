@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Page } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
+import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
 function transformCanvasFileUrls(html: string, courseID: string): string {
@@ -25,14 +26,7 @@ export default async function PageViewer({
   const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/pages/${pageUrl}`;
   
   try {
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch page: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    page = data as Page;
+    page = await serverAuthenticatedFetchJson<Page>(url);
   } catch (error) {
     console.error('Error fetching page:', error);
     return (

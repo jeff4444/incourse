@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
 import { FileDetails } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
+import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth";
 
 function getViewer(fileDetails: FileDetails) {
   if (fileDetails.type === "application/pdf") {
@@ -29,14 +30,7 @@ export default async function FileViewPage({
   const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/files/${fileID}`;
   
   try {
-    const response = await fetch(url);
-    
-    if (!response.ok) {
-      throw new Error(`Failed to fetch file details: ${response.status} ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    fileDetails = data as FileDetails;
+    fileDetails = await serverAuthenticatedFetchJson<FileDetails>(url);
   } catch (error) {
     console.error('Error fetching file details:', error);
     return (

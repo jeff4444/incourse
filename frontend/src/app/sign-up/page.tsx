@@ -44,6 +44,7 @@ export default function SignUpPage() {
         options: {
           data: {
             full_name: fullName,
+            passed_onboarding: false,
           },
         },
       });
@@ -52,9 +53,8 @@ export default function SignUpPage() {
         setError(error.message);
       } else if (data.user) {
         // Since email confirmation is enabled, Supabase sends a confirmation link.
-        // The user is technically signed up but needs to confirm.
-        // We can proceed to onboarding.
-        router.push("/onboarding");
+        // Redirect to sign-in page with confirmation message
+        router.push("/sign-in?message=confirm-email");
       }
     } catch (e) {
       if (e instanceof Error) {
