@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 
-export async function GET(request: NextRequest, { params }: { params: { courseID: string, fileID: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ courseID: string, fileID: string }> }) {
     try {
         const courseID = (await params).courseID.split('-')[1];
         const lms = (await params).courseID.split('-')[0];

@@ -21,7 +21,7 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
 function DiscussionTopicPage({
   params,
 }: {
-  params: { topicID: string, courseID: string };
+  params: Promise<{ topicID: string, courseID: string }>;
 }) {
   const [topicID, setTopicID] = useState<string>("");
   const [courseID, setCourseID] = useState<string>("");
@@ -167,7 +167,7 @@ function DiscussionTopicPage({
 export default function WrappedDiscussionTopicPage({
   params,
 }: {
-  params: { topicID: string, courseID: string };
+  params: Promise<{ topicID: string, courseID: string }>;
 }) {
   return (
     <ProtectedRoute>

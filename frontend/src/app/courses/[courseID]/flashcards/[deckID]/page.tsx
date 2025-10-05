@@ -80,17 +80,27 @@ const sampleFlashcardDecks = {
   },
 }
 
-export default function FlashcardPage({ params }: { params: { courseID: string; deckID: string } }) {
+export default function FlashcardPage({ params }: { params: Promise<{ courseID: string; deckID: string }> }) {
   const router = useRouter()
-  const { courseID, deckID } = params
+  const [courseID, setCourseID] = useState<string>("")
+  const [deckID, setDeckID] = useState<string>("")
   const [deckData, setDeckData] = useState<any>(null)
+
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setCourseID(resolvedParams.courseID);
+      setDeckID(resolvedParams.deckID);
+    };
+    getParams();
+  }, [params]);
 
   useEffect(() => {
     // In a real app, fetch flashcard data from an API
     // For now, use our sample data
-    if (sampleFlashcardDecks[deckID as keyof typeof sampleFlashcardDecks]) {
+    if (deckID && sampleFlashcardDecks[deckID as keyof typeof sampleFlashcardDecks]) {
       setDeckData(sampleFlashcardDecks[deckID as keyof typeof sampleFlashcardDecks])
-    } else {
+    } else if (deckID && courseID) {
       // If no deck data for this ID, redirect back to course page
       router.push(`/courses/${courseID}`)
     }

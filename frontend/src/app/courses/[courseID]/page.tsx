@@ -18,7 +18,7 @@ import { useModules } from "@/lib/hooks/useModules"
 function CoursePage({
   params,
 }: {
-  params: { courseID: string }
+  params: Promise<{ courseID: string }>
 }) {
   const [courseID, setCourseID] = useState<string>("");
 
@@ -298,7 +298,7 @@ By the end of this course, you will have developed a comprehensive understanding
 export default function WrappedCoursePage({
   params,
 }: {
-  params: { courseID: string }
+  params: Promise<{ courseID: string }>
 }) {
   return (
     <ProtectedRoute>

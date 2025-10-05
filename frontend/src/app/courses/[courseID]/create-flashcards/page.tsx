@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -13,14 +13,22 @@ import { Navbar } from "@/components/navbar"
 import { Brain, ChevronLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 
-export default function CreateFlashcardsPage({ params }: { params: { courseID: string } }) {
+export default function CreateFlashcardsPage({ params }: { params: Promise<{ courseID: string }> }) {
   const router = useRouter()
-  const courseID = params.courseID
+  const [courseID, setCourseID] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
   const [cardCount, setCardCount] = useState(10)
   const [cardType, setCardType] = useState("term-definition")
+
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setCourseID(resolvedParams.courseID);
+    };
+    getParams();
+  }, [params]);
 
   const handleGenerate = () => {
     setIsGenerating(true)

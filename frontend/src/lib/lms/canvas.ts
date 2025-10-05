@@ -187,6 +187,43 @@ class CanvasProvider extends LMSProvider {
       const moduleItems = await this.getModuleItems(module.lmsId, courseId);
       module.moduleItems = moduleItems;
     }
+
+    // Fetch all course files and create "All files" module
+    try {
+      const courseFiles = await this.getCourseFiles(courseId);
+      if (courseFiles.length > 0) {
+        const allFilesModule: Module = {
+          id: "all-files",
+          lmsId: "all-files",
+          courseId: courseId,
+          name: "All files",
+          description: "All course files",
+          itemsCount: courseFiles.length,
+          moduleItems: [],
+          prerequisites: null,
+        };
+
+        // Convert files to module items
+        const fileModuleItems: ModuleItem[] = courseFiles.map((file, index) => ({
+          id: `file-${file.id}`,
+          lmsId: `file-${file.id}`,
+          lmsContentId: file.id,
+          name: file.name,
+          moduleId: "all-files",
+          courseId: courseId,
+          type: "File",
+          url: file.url,
+          position: index + 1,
+        }));
+
+        allFilesModule.moduleItems = fileModuleItems;
+        modules.push(allFilesModule);
+      }
+    } catch (error) {
+      console.error("Failed to fetch course files:", error);
+      // Continue without the "All files" module if file fetching fails
+    }
+
     return modules;
   }
 
@@ -249,6 +286,23 @@ class CanvasProvider extends LMSProvider {
     }
     const discussionData = await response.json();
     return discussionData as DiscussionTopic;
+  }
+
+  async getCourseFiles(courseId: string): Promise<FileDetails[]> {
+    const filesResponse = await fetch(
+      `${this.apiBaseUrl}/courses/${courseId}/files?per_page=100`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (!filesResponse.ok) {
+      throw new Error("Failed to fetch course files");
+    }
+    const filesData = await filesResponse.json();
+    return filesData.map((fileData: any) => this.convertCanvasFileDetails(fileData));
   }
 
   async getPage(pageUrl: string, courseId: string): Promise<Page> {

@@ -52,13 +52,13 @@ export function ModuleList({ modules, courseID }: ModuleListProps) {
             
             <div
               className={cn(
-                "grid gap-2 border-t overflow-hidden transition-all duration-500 ease-in-out",
+                "border-t overflow-hidden transition-all duration-500 ease-in-out",
                 expandedModules.has(module.lmsId || '') 
                   ? "max-h-[500px] opacity-100" 
                   : "max-h-0 opacity-0"
               )}
             >
-              <div className="p-4 space-y-4">
+              <div className="p-4 space-y-4 max-h-[460px] overflow-y-auto">
                 {module.moduleItems.map((item) => (
                   <ReadingTile 
                     key={item.lmsId || item.id}

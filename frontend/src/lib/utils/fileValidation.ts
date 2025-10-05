@@ -108,7 +108,7 @@ export function validateFileForProcessing(
 
   return {
     isValid: true,
-    fileTypeName: getFileTypeName(contentType),
+    fileTypeName: getFileTypeName(contentType) || undefined,
   };
 }
 

@@ -90,10 +90,18 @@ const sampleQuizzes = {
   },
 }
 
-export default function QuizPage({ params }: { params: { courseID: string } }) {
+export default function QuizPage({ params }: { params: Promise<{ courseID: string }> }) {
   const router = useRouter()
-  const courseID = "cs101"
+  const [courseID, setCourseID] = useState<string>("cs101")
   const [quizData, setQuizData] = useState<any>(null)
+
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setCourseID(resolvedParams.courseID);
+    };
+    getParams();
+  }, [params]);
 
   useEffect(() => {
     // In a real app, fetch quiz data from an API

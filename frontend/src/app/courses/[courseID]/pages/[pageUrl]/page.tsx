@@ -20,7 +20,7 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
 function PageViewer({
   params,
 }: {
-  params: { pageUrl: string, courseID: string };
+  params: Promise<{ pageUrl: string, courseID: string }>;
 }) {
   const [pageUrl, setPageUrl] = useState<string>("");
   const [courseID, setCourseID] = useState<string>("");
@@ -134,7 +134,7 @@ function PageViewer({
 export default function WrappedPageViewer({
   params,
 }: {
-  params: { pageUrl: string, courseID: string };
+  params: Promise<{ pageUrl: string, courseID: string }>;
 }) {
   return (
     <ProtectedRoute>
