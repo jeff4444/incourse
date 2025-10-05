@@ -1,3 +1,6 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,21 +10,51 @@ import { BookOpen, ChevronLeft, Clock, Download, Play, Plus, ThumbsUp, Brain, Fl
 import { Navbar } from "@/components/navbar"
 import { SummaryViewer } from "@/components/summary-viewer"
 import { ModuleList } from "@/components/module-list"
-import { Course, Module } from "@/lib/types/course"
-import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth"
+import { CourseSkeleton } from "@/components/course-skeleton"
+import ProtectedRoute from "@/components/auth/ProtectedRoute"
+import { useCourse } from "@/lib/hooks/useCourses"
+import { useModules } from "@/lib/hooks/useModules"
 
-export default async function CoursePage({
+function CoursePage({
   params,
 }: {
   params: { courseID: string }
 }) {
-    const courseID = (await params).courseID;
+  const [courseID, setCourseID] = useState<string>("");
 
-  try {
-    const course = await serverAuthenticatedFetchJson<Course>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}`);
-    const modules = await serverAuthenticatedFetchJson<Module[]>(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/modules`);
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setCourseID(resolvedParams.courseID);
+    };
+    getParams();
+  }, [params]);
 
+  const { data: course, isLoading: courseLoading, error: courseError } = useCourse(courseID);
+  const { data: modules = [], isLoading: modulesLoading, error: modulesError } = useModules(courseID);
+
+  const loading = courseLoading || modulesLoading;
+  const error = courseError || modulesError;
+
+  if (loading) {
+    return <CourseSkeleton />;
+  }
+
+  if (error || !course) {
     return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+        <Navbar />
+        <div className="container mx-auto py-6 px-4 md:px-6">
+          <div className="text-center text-red-500 mt-8">
+            <h2 className="text-xl font-semibold mb-2">Failed to load course</h2>
+            <p>The course you're looking for could not be found or there was an error loading it.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="container mx-auto py-6 px-4 md:px-6">
@@ -260,18 +293,16 @@ By the end of this course, you will have developed a comprehensive understanding
       </div>
     </div>
   );
-  } catch (error) {
-    console.error('Error loading course:', error);
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-        <Navbar />
-        <div className="container mx-auto py-6 px-4 md:px-6">
-          <div className="text-center text-red-500 mt-8">
-            <h2 className="text-xl font-semibold mb-2">Failed to load course</h2>
-            <p>The course you're looking for could not be found or there was an error loading it.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+}
+
+export default function WrappedCoursePage({
+  params,
+}: {
+  params: { courseID: string }
+}) {
+  return (
+    <ProtectedRoute>
+      <CoursePage params={params} />
+    </ProtectedRoute>
+  );
 }

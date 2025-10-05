@@ -1,8 +1,12 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { DiscussionTopic } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
-import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth";
+import { authenticatedFetchJson } from "@/lib/utils/apiClient";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
 function transformCanvasFileUrls(html: string, courseID: string): string {
@@ -14,21 +18,67 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
   });
 }
 
-export default async function DiscussionTopicPage({
+function DiscussionTopicPage({
   params,
 }: {
   params: { topicID: string, courseID: string };
 }) {
-  const topicID = (await params).topicID;
-  const courseID = (await params).courseID;
+  const [topicID, setTopicID] = useState<string>("");
+  const [courseID, setCourseID] = useState<string>("");
+  const [discussionTopic, setDiscussionTopic] = useState<DiscussionTopic | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  let discussionTopic: DiscussionTopic;
-  const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/discussion_topics/${topicID}`;
-  
-  try {
-    discussionTopic = await serverAuthenticatedFetchJson<DiscussionTopic>(url);
-  } catch (error) {
-    console.error('Error fetching discussion topic:', error);
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setTopicID(resolvedParams.topicID);
+      setCourseID(resolvedParams.courseID);
+    };
+    getParams();
+  }, [params]);
+
+  useEffect(() => {
+    if (!topicID || !courseID) return;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await authenticatedFetchJson<DiscussionTopic>(`/api/courses/${courseID}/discussion_topics/${topicID}`);
+        setDiscussionTopic(data);
+      } catch (error) {
+        console.error('Error fetching discussion topic:', error);
+        setError('Failed to load discussion');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [topicID, courseID]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+        <div className="flex items-center gap-2 mb-6">
+          <BackButtonClient />
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="space-y-4">
+              <div className="h-6 w-64 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !discussionTopic) {
     return (
       <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
         <div className="flex items-center gap-2 mb-2">
@@ -111,5 +161,17 @@ export default async function DiscussionTopicPage({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WrappedDiscussionTopicPage({
+  params,
+}: {
+  params: { topicID: string, courseID: string };
+}) {
+  return (
+    <ProtectedRoute>
+      <DiscussionTopicPage params={params} />
+    </ProtectedRoute>
   );
 }

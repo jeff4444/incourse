@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Course } from "@/lib/types/course";
+import { useState } from "react";
 import { CourseCard } from "@/components/course-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,37 +12,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { BookOpen, Search } from "lucide-react";
-import { authenticatedFetchJson } from "@/lib/utils/apiClient";
+import { useCourses } from "@/lib/hooks/useCourses";
 
 export function CourseList() {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: courses = [], isLoading: loading, error } = useCourses();
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedSemester, setSelectedSemester] = useState("All Courses");
-
-  useEffect(() => {
-    const fetchCourses = async () => {
-      setLoading(true);
-      try {
-        const data = await authenticatedFetchJson<Course[]>("/api/courses");
-        setCourses(data);
-      } catch (error) {
-        console.error('Error fetching courses:', error);
-        setCourses([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchCourses();
-  }, []);
-
-  // Generate semester options for the last 6 semesters
+  // Calculate current semester and year for default filter
   const currentDate = new Date();
   const currentYear = currentDate.getFullYear();
   const currentMonth = currentDate.getMonth();
   const currentSemester = currentMonth >= 7 ? "Fall" : "Spring";
+  const currentSemesterYear = `${currentSemester} ${currentYear}`;
+  
+  const [selectedSemester, setSelectedSemester] = useState(currentSemesterYear);
 
+  // Generate semester options for the last 6 semesters
   const semesterOptions = [];
   let year = currentYear;
   let semester = currentSemester;
@@ -70,6 +53,20 @@ export function CourseList() {
 
     return matchesSearchTerm && matchesSemester;
   });
+
+  if (error) {
+    return (
+      <div className="text-center py-12">
+        <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          Failed to load courses
+        </h2>
+        <p className="text-muted-foreground">
+          There was an error loading your courses. Please try again later.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

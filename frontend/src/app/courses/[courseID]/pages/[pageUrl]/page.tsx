@@ -1,8 +1,11 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Page } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
-import { serverAuthenticatedFetchJson } from "@/lib/utils/serverAuth";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { usePage } from "@/lib/hooks/usePages";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
 function transformCanvasFileUrls(html: string, courseID: string): string {
@@ -14,21 +17,47 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
   });
 }
 
-export default async function PageViewer({
+function PageViewer({
   params,
 }: {
   params: { pageUrl: string, courseID: string };
 }) {
-  const pageUrl = (await params).pageUrl;
-  const courseID = (await params).courseID;
+  const [pageUrl, setPageUrl] = useState<string>("");
+  const [courseID, setCourseID] = useState<string>("");
 
-  let page: Page;
-  const url = `${process.env.NEXT_PUBLIC_API_BASE_URL}/api/courses/${courseID}/pages/${pageUrl}`;
-  
-  try {
-    page = await serverAuthenticatedFetchJson<Page>(url);
-  } catch (error) {
-    console.error('Error fetching page:', error);
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setPageUrl(resolvedParams.pageUrl);
+      setCourseID(resolvedParams.courseID);
+    };
+    getParams();
+  }, [params]);
+
+  const { data: page, isLoading: loading, error } = usePage(courseID, pageUrl);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+        <div className="flex items-center gap-2 mb-6">
+          <BackButtonClient />
+          <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
+        </div>
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-lg shadow-sm border p-6">
+            <div className="space-y-4">
+              <div className="h-6 w-64 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-full bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-3/4 bg-gray-200 rounded animate-pulse"></div>
+              <div className="h-4 w-5/6 bg-gray-200 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !page) {
     return (
       <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
         <div className="flex items-center gap-2 mb-2">
@@ -99,5 +128,17 @@ export default async function PageViewer({
         </div>
       </div>
     </div>
+  );
+}
+
+export default function WrappedPageViewer({
+  params,
+}: {
+  params: { pageUrl: string, courseID: string };
+}) {
+  return (
+    <ProtectedRoute>
+      <PageViewer params={params} />
+    </ProtectedRoute>
   );
 }
