@@ -7,8 +7,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const lms = (await params).courseID.split('-')[0];
         const fileID = (await params).fileID;
 
-        console.log(`courseID: ${courseID}, lms: ${lms}, fileID: ${fileID}`);
-
         // Create LMS provider with user credentials
         const result = await createLMSProviderWithUserCredentials(request, lms);
         if (result instanceof NextResponse) {
@@ -17,7 +15,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const { lmsProvider } = result;
         const fileDetails = await lmsProvider.getFileDetails(fileID, courseID);
-        console.log(fileDetails);
         return NextResponse.json(fileDetails);
     } catch (error) {
         console.error('Error in file details API:', error);

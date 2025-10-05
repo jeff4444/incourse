@@ -7,8 +7,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const lms = (await params).courseID.split('-')[0];
         const pageUrl = (await params).pageUrl;
 
-        console.log(`courseID: ${courseID}, lms: ${lms}, pageUrl: ${pageUrl}`);
-
         // Create LMS provider with user credentials
         const result = await createLMSProviderWithUserCredentials(request, lms);
         if (result instanceof NextResponse) {
@@ -17,7 +15,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const { lmsProvider } = result;
         const page = await lmsProvider.getPage(pageUrl, courseID);
-        console.log(page);
         return NextResponse.json(page);
     } catch (error) {
         console.error('Error in page API:', error);

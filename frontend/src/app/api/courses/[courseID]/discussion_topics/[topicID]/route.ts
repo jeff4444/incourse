@@ -7,8 +7,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const lms = (await params).courseID.split('-')[0];
         const topicID = (await params).topicID;
 
-        console.log(`courseID: ${courseID}, lms: ${lms}, topicID: ${topicID}`);
-
         // Create LMS provider with user credentials
         const result = await createLMSProviderWithUserCredentials(request, lms);
         if (result instanceof NextResponse) {
@@ -17,7 +15,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         const { lmsProvider } = result;
         const discussionTopic = await lmsProvider.getDiscussionTopic(topicID, courseID);
-        console.log(discussionTopic);
         return NextResponse.json(discussionTopic);
     } catch (error) {
         console.error('Error in discussion topic API:', error);
