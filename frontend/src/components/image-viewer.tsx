@@ -4,7 +4,8 @@ import type React from "react"
 import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { ZoomIn, ZoomOut, Download, Image as ImageIcon, Loader2, Maximize2, Minimize2, RotateCw, Move } from "lucide-react"
+import { ZoomIn, ZoomOut, Download, Image as ImageIcon, Loader2, Maximize2, Minimize2, RotateCw, Move, MessageSquare } from "lucide-react"
+import { ChatPanel } from "./ai-chat-panel"
 import { FileDetails } from "@/lib/types/course"
 
 const maxZoom = 5
@@ -22,6 +23,11 @@ export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails 
   const [rotation, setRotation] = useState(0)
   const [zenMode, setZenMode] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
+  const [showChat, setShowChat] = useState(true)
+  const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat")
+  type ContextItem = { id: string; text: string; source: string; pageNumber: number }
+  const [contextItems, setContextItems] = useState<ContextItem[]>([])
+  const [selectedContextItem, setSelectedContextItem] = useState<ContextItem | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
 
@@ -47,6 +53,17 @@ export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails 
 
   const toggleZenMode = () => {
     setZenMode(!zenMode)
+  }
+
+  const toggleChat = () => {
+    setShowChat(!showChat)
+  }
+
+  const removeContextItem = (id: string) => {
+    setContextItems(contextItems.filter((item) => item.id !== id))
+    if (selectedContextItem?.id === id) {
+      setSelectedContextItem(null)
+    }
   }
 
   const rotateImage = () => {
@@ -218,6 +235,16 @@ export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails 
 
               {/* Right side controls */}
               <div className="flex items-center gap-2">
+                {!zenMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleChat}
+                    className={`h-8 w-8 p-0 ${showChat ? "bg-blue-100 text-blue-600" : ""}`}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -285,6 +312,16 @@ export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails 
             </CardContent>
           </Card>
         </div>
+
+        {!zenMode && showChat && (
+          <ChatPanel
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            contextItems={contextItems}
+            selectedContextItem={selectedContextItem}
+            onRemoveContextItem={removeContextItem}
+          />
+        )}
       </div>
 
       {/* Instructions overlay */}

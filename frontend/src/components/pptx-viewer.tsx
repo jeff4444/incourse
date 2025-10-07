@@ -6,7 +6,8 @@ import { useResizeObserver } from "@wojtekmaj/react-hooks"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { ZoomIn, ZoomOut, Download, FileSliders, Loader2, Maximize2, Minimize2, ChevronLeft, ChevronRight } from "lucide-react"
+import { ZoomIn, ZoomOut, Download, FileSliders, Loader2, Maximize2, Minimize2, ChevronLeft, ChevronRight, MessageSquare } from "lucide-react"
+import { ChatPanel } from "./ai-chat-panel"
 import { FileDetails } from "@/lib/types/course"
 import JSZip from 'jszip'
 
@@ -28,6 +29,11 @@ export default function PPTXViewer({ fileDetails }: { fileDetails: FileDetails }
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [zenMode, setZenMode] = useState(false)
+  const [showChat, setShowChat] = useState(true)
+  const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat")
+  type ContextItem = { id: string; text: string; source: string; pageNumber: number }
+  const [contextItems, setContextItems] = useState<ContextItem[]>([])
+  const [selectedContextItem, setSelectedContextItem] = useState<ContextItem | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [containerWidth, setContainerWidth] = useState<number>()
 
@@ -61,6 +67,17 @@ export default function PPTXViewer({ fileDetails }: { fileDetails: FileDetails }
 
   const toggleZenMode = () => {
     setZenMode(!zenMode)
+  }
+
+  const toggleChat = () => {
+    setShowChat(!showChat)
+  }
+
+  const removeContextItem = (id: string) => {
+    setContextItems(contextItems.filter((item) => item.id !== id))
+    if (selectedContextItem?.id === id) {
+      setSelectedContextItem(null)
+    }
   }
 
   const handleSlideInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -393,6 +410,16 @@ export default function PPTXViewer({ fileDetails }: { fileDetails: FileDetails }
 
               {/* Right side controls */}
               <div className="flex items-center gap-2">
+                {!zenMode && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleChat}
+                    className={`h-8 w-8 p-0 ${showChat ? "bg-blue-100 text-blue-600" : ""}`}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -466,6 +493,16 @@ export default function PPTXViewer({ fileDetails }: { fileDetails: FileDetails }
             </CardContent>
           </Card>
         </div>
+
+        {!zenMode && showChat && (
+          <ChatPanel
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            contextItems={contextItems}
+            selectedContextItem={selectedContextItem}
+            onRemoveContextItem={removeContextItem}
+          />
+        )}
       </div>
     </div>
   )
