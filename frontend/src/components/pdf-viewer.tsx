@@ -53,7 +53,7 @@ export type ContextItem = {
   pageNumber: number
 }
 
-export default function PDFViewer({ fileDetails }: { fileDetails: FileDetails }) {
+export default function PDFViewer({ fileDetails, courseId }: { fileDetails: FileDetails, courseId?: string }) {
   const [file, setFile] = useState<PDFFile>(null)
   const [numPages, setNumPages] = useState<number>()
   const [containerRef, setContainerRef] = useState<HTMLElement | null>(null)
@@ -587,6 +587,8 @@ export default function PDFViewer({ fileDetails }: { fileDetails: FileDetails })
             contextItems={contextItems}
             selectedContextItem={selectedContextItem}
             onRemoveContextItem={removeContextItem}
+            courseId={courseId || ''}
+            fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
           />
         )}
       </div>

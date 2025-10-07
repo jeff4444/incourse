@@ -11,6 +11,7 @@ from agents.flashcard_gen_agent.agent import get_flashcard_agent, Flashcard, Dep
 from agents.quiz_gen_agent.agent import get_quiz_agent, Quiz, Deps as QuizDeps
 from agents.nudge_agent.agent import get_nudge_agent, Nudge, Deps as NudgeDeps
 from agents.take_action_agent.agent import get_take_action_agent, RouteOutput, Deps as TakeActionDeps
+from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps
 
 load_dotenv()
 
@@ -73,6 +74,18 @@ class TakeActionResponse(BaseModel):
     quiz_or_flashcard_to_open: str
     quiz_or_flashcard_to_create: str
     course_id: str
+    success: bool
+    message: str
+
+class ChatRequest(BaseModel):
+    user_id: str
+    course_id: str
+    file_ids: List[str]
+    message: str
+    prompt: Optional[str] = None
+
+class ChatResponse(BaseModel):
+    answer: str
     success: bool
     message: str
     
@@ -249,6 +262,36 @@ async def get_agents_status():
         "nudge_agent": "ready",
         "take_action_agent": "ready"
     }
+
+# Chat Agent Endpoint
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """
+    Chat with an AI assistant in the context of a course and selected files.
+    """
+    try:
+        lms_info = get_user_lms_info(request.user_id)
+
+        deps = ChatDeps(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            file_ids=request.file_ids,
+            lms_api_key=lms_info["api_key"],
+            lms_base_url=lms_info["base_url"],
+        )
+
+        agent = get_chat_agent()
+        user_prompt = request.prompt or request.message
+        result = await agent.run(user_prompt, deps=deps)
+
+        print(f"Chat response: {result.output.answer}")
+        return ChatResponse(
+            answer=result.output.answer,
+            success=True,
+            message="OK",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error chatting: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

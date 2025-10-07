@@ -6,8 +6,11 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MessageSquare, Lightbulb, Send, X } from "lucide-react"
+import { MessageSquare, Lightbulb, Send, X, Loader2 } from "lucide-react"
+import ReactMarkdown from "react-markdown"
+import type { ReactNode } from "react"
 import type { ContextItem } from "./pdf-viewer"
+import { authenticatedFetchJson } from "@/lib/utils/apiClient"
 
 interface ChatPanelProps {
   activeTab: "chat" | "suggestions"
@@ -15,6 +18,8 @@ interface ChatPanelProps {
   contextItems: ContextItem[]
   selectedContextItem: ContextItem | null
   onRemoveContextItem: (id: string) => void
+  courseId: string
+  fileIdList: string[]
 }
 
 export function ChatPanel({
@@ -23,8 +28,10 @@ export function ChatPanel({
   contextItems,
   selectedContextItem,
   onRemoveContextItem,
+  courseId,
+  fileIdList,
 }: ChatPanelProps) {
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: Date }[]>([
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]>([
     {
       role: "assistant",
       content: "Hi there! I'm your AI learning assistant. How can I help you with this document?",
@@ -32,6 +39,7 @@ export function ChatPanel({
     },
   ])
   const [inputValue, setInputValue] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const suggestions = [
@@ -53,34 +61,72 @@ export function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim()) return
+    if (!inputValue.trim() || isLoading) return
 
     // Add user message
+    const contextText = selectedContextItem?.text
+    const contextPreview = contextText
+      ? (selectedContextItem.text.length > 160
+          ? `${selectedContextItem.text.slice(0, 160)}…`
+          : selectedContextItem.text)
+      : undefined
+
     const newMessages = [
       ...messages,
       {
         role: "user" as const,
         content: inputValue,
         timestamp: new Date(),
+        contextPreview,
       },
     ]
 
     setMessages(newMessages)
     setInputValue("")
+    setIsLoading(true)
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Optimistically clear the tagged context from the UI BEFORE the network call
+      if (selectedContextItem) {
+        onRemoveContextItem(selectedContextItem.id)
+      }
+
+      const data = await authenticatedFetchJson<{ answer?: string }>(
+        '/api/agents/chat',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            courseId,
+            fileIds: fileIdList,
+            message: inputValue,
+            context: contextText,
+          }),
+        }
+      )
+      const answer = data?.answer ?? 'Sorry, I could not get a response.'
       setMessages([
         ...newMessages,
         {
           role: "assistant",
-          content: `I'll help you with "${inputValue}". This is a simulated response.`,
+            content: answer,
           timestamp: new Date(),
         },
       ])
-    }, 1000)
+    } catch (err) {
+      setMessages([
+        ...newMessages,
+        {
+          role: "assistant",
+          content: 'There was an error contacting the assistant.',
+          timestamp: new Date(),
+        },
+      ])
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleSuggestionClick = (suggestion: string) => {
@@ -93,11 +139,11 @@ export function ChatPanel({
   }
 
   return (
-    <div className="w-[30vw] bg-white border border-gray-200 flex flex-col m-10 rounded-xl overflow-hidden shadow-sm">
+    <div className="w-[30vw] h-[85vh] bg-white border border-gray-200 flex flex-col m-10 rounded-xl overflow-hidden shadow-sm">
       <Tabs
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as "chat" | "suggestions")}
-        className="flex-1 flex flex-col"
+        className="flex-1 flex flex-col overflow-hidden"
       >
         <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-none border-b">
           <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-white">
@@ -110,7 +156,7 @@ export function ChatPanel({
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0">
+        <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 overflow-hidden">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4">
             {messages.map((message, index) => (
@@ -122,13 +168,53 @@ export function ChatPanel({
                       : "bg-blue-500 text-white rounded-tl-none ml-auto"
                   }`}
                 >
-                  {message.content}
+                  {message.contextPreview && (
+                    <div className={`${message.role === "assistant" ? "bg-blue-50 text-blue-700" : "bg-blue-400/40 text-white"} border border-blue-200 rounded px-2 py-1 text-xs mb-2`}>
+                      {message.contextPreview}
+                    </div>
+                  )}
+                  {message.role === "assistant" ? (
+                    <div className="prose prose-sm max-w-none">
+                      <ReactMarkdown
+                        components={{
+                          p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
+                          ul: ({ children }: any) => <ul className="mb-2 list-disc list-inside space-y-1">{children}</ul>,
+                          ol: ({ children }: any) => <ol className="mb-2 list-decimal list-inside space-y-1">{children}</ol>,
+                          li: ({ children }: any) => <li className="text-sm">{children}</li>,
+                          h1: ({ children }: any) => <h1 className="text-lg font-bold mb-2 text-gray-900">{children}</h1>,
+                          h2: ({ children }: any) => <h2 className="text-base font-semibold mb-2 text-gray-900">{children}</h2>,
+                          h3: ({ children }: any) => <h3 className="text-sm font-medium mb-1 text-gray-900">{children}</h3>,
+                          code: ({ children }: any) => <code className="bg-blue-50 text-blue-600 px-1 py-0.5 rounded text-xs">{children}</code>,
+                          pre: ({ children }: any) => <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">{children}</pre>,
+                          blockquote: ({ children }: any) => <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 mb-2 italic">{children}</blockquote>,
+                          strong: ({ children }: any) => <strong className="font-semibold text-gray-900">{children}</strong>,
+                          em: ({ children }: any) => <em className="italic">{children}</em>,
+                        }}
+                      >
+                        {message.content}
+                      </ReactMarkdown>
+                    </div>
+                  ) : (
+                    message.content
+                  )}
                 </div>
                 <div className={`text-xs text-gray-500 mt-1 ${message.role === "assistant" ? "" : "text-right"}`}>
                   {formatTime(message.timestamp)}
                 </div>
               </div>
             ))}
+            
+            {/* Thinking indicator */}
+            {isLoading && (
+              <div className="mb-4 pr-8">
+                <div className="p-3 rounded-lg bg-gray-100 rounded-tr-none">
+                  <div className="flex items-center gap-2 text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span className="text-sm">Thinking...</span>
+                  </div>
+                </div>
+              </div>
+            )}
             <div ref={messagesEndRef} />
           </div>
 
@@ -158,9 +244,14 @@ export function ChatPanel({
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 className="flex-1"
+                disabled={isLoading}
               />
-              <Button type="submit" size="icon" disabled={!inputValue.trim()}>
-                <Send className="h-4 w-4" />
+              <Button type="submit" size="icon" disabled={!inputValue.trim() || isLoading}>
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </form>

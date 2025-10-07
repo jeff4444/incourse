@@ -4,6 +4,13 @@ import random
 from typing import List, Dict, Optional
 import aiohttp
 import json
+import io
+import mimetypes
+import tempfile
+import os
+import pymupdf4llm
+from docx import Document
+from pptx import Presentation
 
 async def get_overall_course_performance(
     ctx: RunContext,
@@ -584,7 +591,7 @@ async def get_canvas_files_details(
     ctx: RunContext,
 ) -> List[Dict]:
     """
-    Get all files for a specific course from Canvas API.
+    Get all files for a specific course from Canvas API. YOU MUST CALL THIS TOOL WHEN VERY LITTLE CONTEXT IS PROVIDED.
     """
     course_id = ctx.deps.course_id
     file_ids = ctx.deps.file_ids
@@ -598,12 +605,64 @@ async def get_canvas_files_details(
     
     return file_details_list
 
+async def parse_file_content(file_path: str, content_type: str, filename: str) -> str:
+    """
+    Parse file content based on file type and return text content from local file.
+    """
+    try:
+        if content_type == 'application/pdf':
+            return await parse_pdf_content(file_path)
+        elif content_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']:
+            return await parse_docx_content(file_path)
+        elif content_type in ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']:
+            return await parse_pptx_content(file_path)
+        elif content_type in ['text/plain', 'text/html']:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        else:
+            return f"[File type {content_type} not supported for text extraction]"
+    except Exception as e:
+        return f"[Error parsing file content: {str(e)}]"
+
+async def parse_pdf_content(file_path: str) -> str:
+    """Parse PDF content and extract text using pymupdf4llm from local file."""
+    try:
+        # Use pymupdf4llm to extract text with better formatting from local file
+        text = pymupdf4llm.to_markdown(file_path)
+        return text.strip()
+    except Exception as e:
+        return f"[Error parsing PDF: {str(e)}]"
+
+async def parse_docx_content(file_path: str) -> str:
+    """Parse DOCX content and extract text from local file."""
+    try:
+        doc = Document(file_path)
+        text = ""
+        for paragraph in doc.paragraphs:
+            text += paragraph.text + "\n"
+        return text.strip()
+    except Exception as e:
+        return f"[Error parsing DOCX: {str(e)}]"
+
+async def parse_pptx_content(file_path: str) -> str:
+    """Parse PPTX content and extract text from local file."""
+    try:
+        prs = Presentation(file_path)
+        text = ""
+        for slide in prs.slides:
+            for shape in slide.shapes:
+                if hasattr(shape, "text"):
+                    text += shape.text + "\n"
+        return text.strip()
+    except Exception as e:
+        return f"[Error parsing PPTX: {str(e)}]"
+
 async def get_canvas_file_details(
     ctx: RunContext,
     file_id: str,
 ) -> Dict:
     """
-    Get file details for a specific file from Canvas API.
+    Get file details and content for a specific file from Canvas API.
     """
     
     course_id = ctx.deps.course_id
@@ -611,8 +670,9 @@ async def get_canvas_file_details(
     
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
-    
+
     async with aiohttp.ClientSession() as session:
+        # First, get file metadata
         async with session.get(
             f"{api_base_url}/courses/{course_id}/files/{file_id}",
             headers={
@@ -624,7 +684,40 @@ async def get_canvas_file_details(
                 raise Exception("Failed to fetch file details")
             
             file_details_data = await response.json()
-            return file_details_data
+        
+        # Try to fetch and parse the actual file content
+        file_url = file_details_data.get('url')
+        content_type = file_details_data.get('content-type', '')
+        filename = file_details_data.get('filename', '')
+        
+        if file_url and content_type:
+            try:
+                async with session.get(file_url) as file_response:
+                    if file_response.ok:
+                        file_content = await file_response.read()
+                        # Only parse if file is not too large (limit to 10MB)
+                        if len(file_content) < 10 * 1024 * 1024:
+                            # Create a temporary local file
+                            file_extension = filename.split('.')[-1] if '.' in filename else 'tmp'
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                                temp_file.write(file_content)
+                                temp_file_path = temp_file.name
+                            try:
+                                parsed_content = await parse_file_content(temp_file_path, content_type, filename)
+                                file_details_data['parsed_content'] = parsed_content
+                            finally:
+                                # Clean up the temporary file
+                                os.unlink(temp_file_path)
+                        else:
+                            file_details_data['parsed_content'] = f"[File too large to parse ({len(file_content)} bytes)]"
+                    else:
+                        file_details_data['parsed_content'] = f"[Could not download file content: HTTP {file_response.status}]"
+            except Exception as e:
+                file_details_data['parsed_content'] = f"[Error fetching file content: {str(e)}]"
+        else:
+            file_details_data['parsed_content'] = "[No file URL or content type available]"
+
+        return file_details_data
 
 
 async def get_canvas_course_assignments(

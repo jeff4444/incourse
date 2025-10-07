@@ -11,10 +11,10 @@ import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
-function getViewer(fileDetails: FileDetails) {
+function getViewer(fileDetails: FileDetails, courseID?: string) {
   // PDF files
   if (fileDetails.type === "application/pdf") {
-    return <PDFViewer fileDetails={fileDetails} />;
+    return <PDFViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // PowerPoint files
@@ -133,7 +133,7 @@ function FileViewPage({
         <BackButtonClient />
         <h1 className="text-xl font-semibold">{fileDetails.name}</h1>
       </div>
-      {getViewer(fileDetails)}
+      {getViewer(fileDetails, courseID)}
     </div>
   );
 }
