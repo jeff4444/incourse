@@ -84,60 +84,17 @@ export interface FileDetails {
 export interface DiscussionTopic {
   id: number;
   title: string;
-  last_reply_at: string;
   created_at: string;
-  delayed_post_at: string | null;
-  posted_at: string;
-  assignment_id: number | null;
-  root_topic_id: number | null;
-  position: number | null;
-  podcast_has_student_posts: boolean;
-  discussion_type: string;
-  lock_at: string | null;
-  allow_rating: boolean;
-  only_graders_can_rate: boolean;
-  sort_by_rating: boolean;
-  is_section_specific: boolean;
-  anonymous_state: string | null;
-  summary_enabled: boolean;
-  user_name: string | null;
+  last_reply_at: string;
+  message: string;
   discussion_subentry_count: number;
+  subscribed: boolean;
+  read_state: string;
+  html_url: string;
   permissions: {
     attach: boolean;
-    update: boolean;
     reply: boolean;
-    delete: boolean;
-    manage_assign_to: boolean;
   };
-  require_initial_post: boolean | null;
-  user_can_see_posts: boolean;
-  podcast_url: string | null;
-  read_state: string;
-  unread_count: number;
-  subscribed: boolean;
-  attachments: any[];
-  published: boolean;
-  can_unpublish: boolean;
-  locked: boolean;
-  can_lock: boolean;
-  comments_disabled: boolean;
-  author: any;
-  html_url: string;
-  url: string;
-  pinned: boolean;
-  group_category_id: number | null;
-  can_group: boolean;
-  topic_children: any[];
-  group_topic_children: any[];
-  ungraded_discussion_overrides: any[];
-  locked_for_user: boolean;
-  message: string;
-  todo_date: string | null;
-  is_announcement: boolean;
-  sort_order: string;
-  sort_order_locked: boolean;
-  expanded: boolean;
-  expanded_locked: boolean;
 }
 
 export interface Page {
