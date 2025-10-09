@@ -62,6 +62,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
   const [pageInput, setPageInput] = useState("1")
   const [zoom, setZoom] = useState(1)
   const [isLoading, setIsLoading] = useState(true)
+  const [isPdfVisible, setIsPdfVisible] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const pageRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
   const textLayerRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
@@ -363,8 +364,16 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
     return () => scrollContainer.removeEventListener("scroll", handleScroll)
   }, [numPages, currentPage])
 
-  // Add useEffect to fetch the PDF when component mounts
+  // Add useEffect to fetch the PDF when component mounts or fileDetails change
   useEffect(() => {
+    // Reset visibility and clear state when fileDetails change
+    setIsPdfVisible(false)
+    setFile(null)
+    setNumPages(undefined)
+    setCurrentPage(1)
+    setPageInput("1")
+    setIsLoading(true)
+    
     const fetchPDF = async () => {
       try {
         const response = await fetch(fileDetails.url)
@@ -375,9 +384,12 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
         // Convert blob to File object
         const file = new File([blob], fileDetails.name, { type: 'application/pdf' })
         setFile(file)
+        // Short delay to ensure component has reset before showing PDF
+        setTimeout(() => {
+          setIsPdfVisible(true)
+        }, 50)
       } catch (error) {
         console.error('Error loading PDF:', error)
-      } finally {
         setIsLoading(false)
       }
     }
@@ -491,14 +503,14 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
                 className={`h-full overflow-y-auto ${zenMode ? "bg-gray-900" : "bg-gray-100"} flex flex-col items-center`}
               >
                 <div ref={setContainerRef} className="w-full flex flex-col items-center py-4">
-                  {isLoading && (
+                  {isLoading && !isPdfVisible && (
                     <div className="flex items-center gap-2 text-gray-600 py-8">
                       <Loader2 className="h-5 w-5 animate-spin" />
                       Loading PDF...
                     </div>
                   )}
 
-                  {file ? (
+                  {file && isPdfVisible ? (
                     <Document
                       file={file}
                       onLoadSuccess={onDocumentLoadSuccess}
@@ -510,6 +522,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
                           Loading document...
                         </div>
                       }
+                      key={fileDetails.canvasId || fileDetails.id || 'a'}
                     >
                       {numPages &&
                         Array.from({ length: numPages }, (_, index) => {
