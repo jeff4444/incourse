@@ -39,7 +39,7 @@ export function CourseCard({ course }: { course: Course }) {
   
   return (
     <Link href={{
-      pathname: `/courses/${course.lmsProvider}-${course.lmsId}`,
+      pathname: `/courses/${course.id}`,
     }}>
       <Card className="h-full overflow-hidden card-hover pb-0 justify-between">
         <CardContent className="p-6">

@@ -23,6 +23,7 @@ import {
   CheckCircle2,
   Sparkles,
   Lock,
+  Loader2,
 } from "lucide-react";
 
 const supabase = createClient();
@@ -35,6 +36,15 @@ export default function OnboardingPage() {
   const [urlError, setUrlError] = useState("");
   const [apiKey, setApiKey] = useState("");
   const [apiKeyError, setApiKeyError] = useState("");
+  
+  // Syncing state
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStage, setSyncStage] = useState<string>("");
+  const [syncProgress, setSyncProgress] = useState<{
+    stage: string;
+    status: 'pending' | 'loading' | 'complete' | 'error';
+    detail?: string;
+  }[]>([]);
 
   // Canvas URL validation and formatting
   const validateAndFormatCanvasUrl = (url: string): { isValid: boolean; formattedUrl: string; error: string } => {
@@ -73,9 +83,24 @@ export default function OnboardingPage() {
     setApiKeyError(""); // Clear error when user types
   };
 
+  // Update sync progress helper
+  const updateSyncProgress = (stage: string, status: 'pending' | 'loading' | 'complete' | 'error', detail?: string) => {
+    setSyncProgress(prev => {
+      const existingIndex = prev.findIndex(p => p.stage === stage);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = { stage, status, detail };
+        return updated;
+      }
+      return [...prev, { stage, status, detail }];
+    });
+  };
+
   // Store Canvas credentials to database
   const storeCanvasCredentials = async (url: string, key: string) => {
     try {
+      updateSyncProgress('Saving credentials', 'loading');
+      
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("User not authenticated");
@@ -97,9 +122,11 @@ export default function OnboardingPage() {
         throw error;
       }
 
+      updateSyncProgress('Saving credentials', 'complete');
       return { success: true };
     } catch (error) {
       console.error('Error storing Canvas credentials:', error);
+      updateSyncProgress('Saving credentials', 'error', error instanceof Error ? error.message : 'Unknown error');
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
     }
   };
@@ -107,6 +134,7 @@ export default function OnboardingPage() {
   // Fetch and sync courses to database
   const syncCoursesToDatabase = async (apiBaseUrl: string, apiKey: string) => {
     try {
+      updateSyncProgress('Connecting to Canvas', 'loading');
       console.log('Syncing courses to database...');
       
       // Get session for authentication
@@ -114,6 +142,9 @@ export default function OnboardingPage() {
       if (!session) {
         throw new Error("No active session");
       }
+
+      updateSyncProgress('Connecting to Canvas', 'complete');
+      updateSyncProgress('Syncing courses', 'loading');
 
       // Send API credentials to server - it will fetch courses and sync them
       const response = await fetch('/api/courses/sync', {
@@ -135,9 +166,26 @@ export default function OnboardingPage() {
 
       const result = await response.json();
       console.log('Courses synced successfully:', result);
+      
+      // Update progress based on results
+      const { results } = result;
+      updateSyncProgress('Syncing courses', 'complete', `${results.coursesCreated} courses synced`);
+      
+      if (results.modulesCreated > 0) {
+        updateSyncProgress('Syncing modules', 'complete', `${results.modulesCreated} modules synced`);
+      }
+      
+      if (results.moduleItemsCreated > 0) {
+        updateSyncProgress('Syncing module items', 'complete', `${results.moduleItemsCreated} items synced`);
+      }
+      
+      updateSyncProgress('Completing setup', 'complete');
+      
       return { success: true };
     } catch (error) {
       console.error('Error syncing courses:', error);
+      const currentStage = syncProgress[syncProgress.length - 1]?.stage || 'Syncing courses';
+      updateSyncProgress(currentStage, 'error', error instanceof Error ? error.message : 'Unknown error');
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
     }
   };
@@ -160,10 +208,15 @@ export default function OnboardingPage() {
       // Update the URL with the formatted version
       setCanvasUrl(validation.formattedUrl);
 
+      // Start syncing process
+      setIsSyncing(true);
+      setSyncProgress([]);
+
       // Store credentials to database
       const storeResult = await storeCanvasCredentials(validation.formattedUrl, apiKey);
       if (!storeResult.success) {
         setApiKeyError(`Failed to save credentials: ${storeResult.error}`);
+        setIsSyncing(false);
         return;
       }
 
@@ -175,6 +228,10 @@ export default function OnboardingPage() {
         console.error('Failed to sync courses during onboarding:', syncResult.error);
         // Continue with onboarding even if course sync fails
       }
+      
+      // Wait a moment to show completion state
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsSyncing(false);
     }
 
     setDirection(1);
@@ -246,6 +303,93 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-orange-50 to-pink-50">
+      {/* Syncing Modal Overlay */}
+      <AnimatePresence>
+        {isSyncing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full"
+            >
+              <div className="flex flex-col items-center mb-6">
+                <div className="relative">
+                  <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
+                  <Sparkles className="h-6 w-6 text-pink-500 absolute -top-1 -right-1" />
+                </div>
+                <h2 className="text-2xl font-bold mt-4 bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+                  Setting up your account
+                </h2>
+                <p className="text-gray-600 text-center mt-2">
+                  Please wait while we sync your courses and materials
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {syncProgress.map((progress, index) => (
+                  <motion.div
+                    key={progress.stage}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: index * 0.1 }}
+                    className="flex items-start gap-3 p-3 rounded-lg bg-gray-50"
+                  >
+                    <div className="mt-0.5">
+                      {progress.status === 'loading' && (
+                        <Loader2 className="h-5 w-5 text-orange-500 animate-spin" />
+                      )}
+                      {progress.status === 'complete' && (
+                        <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      )}
+                      {progress.status === 'error' && (
+                        <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">
+                          !
+                        </div>
+                      )}
+                      {progress.status === 'pending' && (
+                        <div className="h-5 w-5 rounded-full bg-gray-300" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium ${
+                        progress.status === 'error' ? 'text-red-600' : 'text-gray-900'
+                      }`}>
+                        {progress.stage}
+                      </p>
+                      {progress.detail && (
+                        <p className={`text-sm mt-0.5 ${
+                          progress.status === 'error' ? 'text-red-500' : 'text-gray-500'
+                        }`}>
+                          {progress.detail}
+                        </p>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {syncProgress.length > 0 && syncProgress[syncProgress.length - 1].status === 'complete' && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 text-center"
+                >
+                  <p className="text-sm text-gray-600">
+                    Almost done! Preparing your workspace...
+                  </p>
+                </motion.div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <div className="w-full max-w-3xl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -505,7 +649,7 @@ export default function OnboardingPage() {
                   <Button
                     variant="outline"
                     onClick={prevStep}
-                    disabled={step === 1}
+                    disabled={step === 1 || isSyncing}
                     className="hover:bg-gray-100"
                   >
                     <ArrowLeft className="mr-2 h-4 w-4" />
@@ -513,10 +657,20 @@ export default function OnboardingPage() {
                   </Button>
                   <Button
                     onClick={nextStep}
+                    disabled={isSyncing}
                     className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                   >
-                    {step === totalSteps ? "Finish" : "Continue"}
-                    <ArrowRight className="ml-2 h-4 w-4" />
+                    {isSyncing ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Syncing...
+                      </>
+                    ) : (
+                      <>
+                        {step === totalSteps ? "Finish" : "Continue"}
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </>
+                    )}
                   </Button>
                 </CardFooter>
               </Card>

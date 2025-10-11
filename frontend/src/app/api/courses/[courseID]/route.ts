@@ -1,19 +1,89 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
+import { createClient } from "@/lib/utils/supabase/server";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
+import { Course } from "@/lib/types/course";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ courseID: string }> }) {
     try {
-        const courseID = (await params).courseID.split('-')[1];
-        const lms = (await params).courseID.split('-')[0];
+        const courseID = (await params).courseID;
         
+        // Get user from request
+        const userData = await getUserFromRequest(request);
+        if (!userData) {
+            return NextResponse.json(
+                { error: "Unauthorized - No valid user token" },
+                { status: 401 }
+            );
+        }
+
+        // Try to fetch course from database first
+        try {
+            const supabase = await createClient();
+            
+            const { data: dbCourse, error: dbError } = await supabase
+                .from('courses')
+                .select(`
+                    id,
+                    lms_id,
+                    lms_provider,
+                    name,
+                    code,
+                    instructor,
+                    description,
+                    semester,
+                    year
+                `)
+                .eq('id', courseID)
+                .single();
+
+            if (!dbError && dbCourse) {
+                // Transform database record to Course interface
+                const course: Course = {
+                    id: dbCourse.id,
+                    lmsId: dbCourse.lms_id,
+                    lmsProvider: dbCourse.lms_provider,
+                    name: dbCourse.name,
+                    code: dbCourse.code,
+                    instructor: dbCourse.instructor,
+                    description: dbCourse.description,
+                    semester: dbCourse.semester,
+                    year: dbCourse.year,
+                };
+
+                console.log('Fetched course from database');
+                return NextResponse.json(course);
+            }
+
+            console.log('Course not found in database, falling back to LMS provider');
+        } catch (dbError) {
+            console.error('Database query error, falling back to LMS provider:', dbError);
+        }
+
+        // Fallback: Fetch course info from database to get lmsId and lmsProvider
+        const supabase = await createClient();
+        const { data: courseInfo, error: courseError } = await supabase
+            .from('courses')
+            .select('lms_id, lms_provider')
+            .eq('id', courseID)
+            .single();
+
+        if (courseError || !courseInfo) {
+            return NextResponse.json(
+                { error: "Course not found" },
+                { status: 404 }
+            );
+        }
+
         // Create LMS provider with user credentials
-        const result = await createLMSProviderWithUserCredentials(request, lms);
+        const result = await createLMSProviderWithUserCredentials(request, courseInfo.lms_provider);
         if (result instanceof NextResponse) {
             return result; // Return error response
         }
 
         const { lmsProvider } = result;
-        const course = await lmsProvider.getCourse(courseID);
+        console.log('Fetching course from LMS provider');
+        const course = await lmsProvider.getCourse(courseInfo.lms_id);
         return NextResponse.json(course);
     } catch (error) {
         console.error('Error in course API:', error);
