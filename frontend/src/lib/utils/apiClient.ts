@@ -1,4 +1,6 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/utils/supabase/client";
+
+const supabase = createClient();
 
 /**
  * Makes an authenticated API call with the user's session token

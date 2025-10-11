@@ -18,7 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/utils/supabase/client";
 import { FcGoogle } from "react-icons/fc";
 
 export default function SignUpPage() {
@@ -26,6 +26,8 @@ export default function SignUpPage() {
   const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const supabase = createClient();
 
   // State for email/password sign up
   const [fullName, setFullName] = useState("");

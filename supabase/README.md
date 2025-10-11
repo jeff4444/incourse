@@ -59,18 +59,20 @@ Create a `.env.local` file in the project root:
 
 ```env
 # Local Development (when using supabase start)
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_ANON_KEY=<your-local-anon-key>
+NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54321
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your-local-anon-key>
 
 # Production/Shared Cloud (for testing with shared data)
-# SUPABASE_URL=https://kcduzlbadhzeulhzslvj.supabase.co
-# SUPABASE_ANON_KEY=<shared-project-anon-key>
+# NEXT_PUBLIC_SUPABASE_URL=https://kcduzlbadhzeulhzslvj.supabase.co
+# NEXT_PUBLIC_SUPABASE_ANON_KEY=<shared-project-anon-key>
 
-# Optional: Service role key (keep secret!)
-# SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+# REQUIRED: Service role key for syncing courses during onboarding
+# WARNING: Keep this secret! Never commit to git or expose to client
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 ```
 
-The anon key will be displayed when you run `supabase start`.
+The anon key and service role key will be displayed when you run `supabase start`.
+Look for the output that says "service_role key" and "anon key".
 
 ## Daily Development Workflow
 
@@ -91,6 +93,23 @@ After starting `supabase start`, you'll have access to:
 - **API URL**: `http://127.0.0.1:54321`
 - **Studio**: `http://127.0.0.1:54323`
 - **Inbucket (Email testing)**: `http://127.0.0.1:54324`
+
+## Database Migrations
+
+This project uses Supabase migrations to manage schema changes. Current migrations:
+
+1. **20251009000000_initial_users_schema.sql** - Users and API keys tables
+2. **20251009000001_courses_and_enrollments.sql** - Courses and enrollments tables
+
+### Applying Migrations
+
+```bash
+# Apply all migrations to local database
+supabase db reset
+
+# Regenerate TypeScript types after migration
+supabase gen types typescript --local > types/supabase.ts
+```
 
 ## Staying in Sync with Team Changes
 

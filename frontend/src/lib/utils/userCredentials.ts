@@ -1,6 +1,5 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/utils/supabase/client";
 import { decryptApiKey } from "./encryption";
-import { createClient } from '@supabase/supabase-js';
 
 export interface UserCredentials {
   apiKey: string;
@@ -8,6 +7,7 @@ export interface UserCredentials {
   lmsProvider: string;
 }
 
+const supabaseClient = createClient();
 /**
  * Fetches and decrypts user's LMS credentials from the database
  * @param userId - The user ID to fetch credentials for
@@ -15,22 +15,9 @@ export interface UserCredentials {
  */
 export async function getUserCredentials(userId: string, accessToken?: string): Promise<UserCredentials | null> {
   try {
-    // Create a Supabase client with the user's access token for proper RLS context
-    const supabaseClient = accessToken ? 
-      createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-          global: {
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          },
-        }
-      ) : supabase;
-
+    
     const { data, error } = await supabaseClient
-      .from('user_api_keys')
+    .from('user_api_keys')
       .select('encrypted_api_key, api_base_url, lms_provider')
       .eq('user_id', userId)
       .eq('is_active', true);
@@ -77,7 +64,7 @@ export async function getUserFromRequest(request: Request): Promise<{userId: str
     const token = authHeader.replace('Bearer ', '');
     
     // Verify the token with Supabase and get user
-    const { data: { user }, error } = await supabase.auth.getUser(token);
+    const { data: { user }, error } = await supabaseClient.auth.getUser(token);
     
     if (error || !user) {
       return null;

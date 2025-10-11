@@ -18,8 +18,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/utils/supabase/client";
 import { FcGoogle } from "react-icons/fc";
+
+const supabase = createClient();
 
 function SignInContent() {
   const router = useRouter();

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/utils/supabase/client";
 import { encryptApiKey } from "@/lib/utils/encryption";
 import { Button } from "@/components/ui/button";
 import {
@@ -24,6 +24,8 @@ import {
   Sparkles,
   Lock,
 } from "lucide-react";
+
+const supabase = createClient();
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
@@ -102,6 +104,44 @@ export default function OnboardingPage() {
     }
   };
 
+  // Fetch and sync courses to database
+  const syncCoursesToDatabase = async (apiBaseUrl: string, apiKey: string) => {
+    try {
+      console.log('Syncing courses to database...');
+      
+      // Get session for authentication
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error("No active session");
+      }
+
+      // Send API credentials to server - it will fetch courses and sync them
+      const response = await fetch('/api/courses/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ 
+          apiKey,
+          apiBaseUrl: `${apiBaseUrl}/api/v1`
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to sync courses');
+      }
+
+      const result = await response.json();
+      console.log('Courses synced successfully:', result);
+      return { success: true };
+    } catch (error) {
+      console.error('Error syncing courses:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+    }
+  };
+
   const nextStep = async () => {
     // Validate Canvas URL and API key on step 1
     if (step === 1) {
@@ -125,6 +165,15 @@ export default function OnboardingPage() {
       if (!storeResult.success) {
         setApiKeyError(`Failed to save credentials: ${storeResult.error}`);
         return;
+      }
+
+      // Sync courses to database after storing credentials
+      // Use the API key and URL that were just entered
+      const syncResult = await syncCoursesToDatabase(validation.formattedUrl, apiKey);
+      if (!syncResult.success) {
+        // Log the error but don't block onboarding
+        console.error('Failed to sync courses during onboarding:', syncResult.error);
+        // Continue with onboarding even if course sync fails
       }
     }
 

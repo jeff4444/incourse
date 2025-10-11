@@ -26,14 +26,14 @@ import {
   User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/utils/supabase/client";
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading } = useAuth();
-
+  const supabase = createClient();
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     router.push("/sign-in");
