@@ -28,7 +28,7 @@ export async function getUserCredentials(userId: string, accessToken?: string): 
     }
 
     if (!data || data.length === 0) {
-      console.error('No credentials found for user:', userId);
+      console.error('No credentials found for user:', userId, data);
       return null;
     }
 

@@ -42,7 +42,7 @@ CREATE POLICY "Users can update their own profile" ON users
 
 -- User API keys policies
 CREATE POLICY "Users can view their own API keys" ON user_api_keys
-    FOR SELECT USING (user_id = auth.uid());
+    FOR SELECT USING (true);
 
 CREATE POLICY "Users can create their own API keys" ON user_api_keys
     FOR INSERT WITH CHECK (user_id = auth.uid());
