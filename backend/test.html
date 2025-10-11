@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InCourse AI Agents - API Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .endpoint {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #fafafa;
+        }
+        .endpoint h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        textarea {
+            height: 100px;
+            resize: vertical;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px 5px 5px 0;
+            position: relative;
+            min-width: 120px;
+        }
+        button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ffffff;
+            border-radius: 50%;
+            border-top-color: transparent;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .response {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 10px;
+            white-space: pre-wrap;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .error {
+            background: #f8d7da;
+            border-color: #f5c6cb;
+            color: #721c24;
+        }
+        .success {
+            background: #d4edda;
+            border-color: #c3e6cb;
+            color: #155724;
+        }
+        .status {
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status.healthy {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 InCourse AI Agents - API Test Interface</h1>
+    
+    <!-- Health Check -->
+    <div class="container">
+        <h2>🏥 Health Check</h2>
+        <div class="endpoint">
+            <h3>Server Status</h3>
+            <button id="healthBtn" onclick="checkHealth()">
+                <span id="healthBtnText">Check Health</span>
+            </button>
+            <div id="healthResponse" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Flashcard Generation -->
+    <div class="container">
+        <h2>📚 Flashcard Generation</h2>
+        <div class="endpoint">
+            <h3>Generate Flashcards</h3>
+            <label>User ID:</label>
+            <input type="text" id="flashcardUserId" placeholder="Enter user ID" value="test_user">
+            
+            <label>Course ID:</label>
+            <input type="text" id="flashcardCourseId" placeholder="Enter course ID" value="test_course">
+            
+            <label>File IDs (comma-separated):</label>
+            <input type="text" id="flashcardFileIds" placeholder="file1,file2,file3" value="file1,file2">
+            
+            <label>Number of Flashcards:</label>
+            <input type="number" id="flashcardNum" placeholder="Number of flashcards" value="5" min="1" max="50">
+            
+            <label>Custom Prompt (optional):</label>
+            <textarea id="flashcardPrompt" placeholder="Enter a custom prompt for flashcard generation...">Generate flashcards about basic physics concepts</textarea>
+            
+            <button id="flashcardBtn" onclick="generateFlashcards()">
+                <span id="flashcardBtnText">Generate Flashcards</span>
+            </button>
+            <div id="flashcardResponse" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Quiz Generation -->
+    <div class="container">
+        <h2>📝 Quiz Generation</h2>
+        <div class="endpoint">
+            <h3>Generate Quiz Questions</h3>
+            <label>User ID:</label>
+            <input type="text" id="quizUserId" placeholder="Enter user ID" value="test_user">
+            
+            <label>Course ID:</label>
+            <input type="text" id="quizCourseId" placeholder="Enter course ID" value="test_course">
+            
+            <label>File IDs (comma-separated):</label>
+            <input type="text" id="quizFileIds" placeholder="file1,file2,file3" value="file1,file2">
+            
+            <label>Number of Quiz Questions:</label>
+            <input type="number" id="quizNum" placeholder="Number of quiz questions" value="3" min="1" max="50">
+            
+            <label>Custom Prompt (optional):</label>
+            <textarea id="quizPrompt" placeholder="Enter a custom prompt for quiz generation...">Generate multiple choice questions about chemistry</textarea>
+            
+            <button id="quizBtn" onclick="generateQuiz()">
+                <span id="quizBtnText">Generate Quiz</span>
+            </button>
+            <div id="quizResponse" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Nudge Generation -->
+    <div class="container">
+        <h2>🔔 Nudge Generation</h2>
+        <div class="endpoint">
+            <h3>Generate Nudges</h3>
+            <label>User ID:</label>
+            <input type="text" id="nudgeUserId" placeholder="Enter user ID" value="test_user">
+            
+            <label>Custom Prompt (optional):</label>
+            <textarea id="nudgePrompt" placeholder="Enter a custom prompt for nudge generation...">Generate a motivational nudge for studying</textarea>
+            
+            <button id="nudgeBtn" onclick="generateNudges()">
+                <span id="nudgeBtnText">Generate Nudges</span>
+            </button>
+            <div id="nudgeResponse" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <!-- Take Action -->
+    <div class="container">
+        <h2>🎯 Take Action</h2>
+        <div class="endpoint">
+            <h3>Process User Input</h3>
+            <label>User ID:</label>
+            <input type="text" id="actionUserId" placeholder="Enter user ID" value="test_user">
+            
+            <label>User Input:</label>
+            <textarea id="userInput" placeholder="Enter what you want to do...">I want to study for my math exam tomorrow</textarea>
+            
+            <button id="actionBtn" onclick="takeAction()">
+                <span id="actionBtnText">Process Action</span>
+            </button>
+            <div id="actionResponse" class="response" style="display: none;"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+
+        function setLoading(buttonId, textId, isLoading, loadingText = 'Loading...') {
+            const button = document.getElementById(buttonId);
+            const text = document.getElementById(textId);
+            
+            if (isLoading) {
+                button.disabled = true;
+                text.innerHTML = `<span class="spinner"></span>${loadingText}`;
+            } else {
+                button.disabled = false;
+                text.innerHTML = text.innerHTML.replace(/<span class="spinner"><\/span>/, '');
+            }
+        }
+
+        async function makeRequest(endpoint, method = 'GET', data = null) {
+            try {
+                const options = {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                };
+                
+                if (data) {
+                    options.body = JSON.stringify(data);
+                }
+
+                const response = await fetch(`${API_BASE}${endpoint}`, options);
+                const result = await response.json();
+                
+                return {
+                    success: response.ok,
+                    status: response.status,
+                    data: result
+                };
+            } catch (error) {
+                return {
+                    success: false,
+                    status: 0,
+                    data: { error: error.message }
+                };
+            }
+        }
+
+        function displayResponse(elementId, result) {
+            const element = document.getElementById(elementId);
+            element.style.display = 'block';
+            element.className = 'response ' + (result.success ? 'success' : 'error');
+            element.textContent = JSON.stringify(result.data, null, 2);
+        }
+
+        async function checkHealth() {
+            setLoading('healthBtn', 'healthBtnText', true, 'Checking...');
+            const result = await makeRequest('/health');
+            displayResponse('healthResponse', result);
+            setLoading('healthBtn', 'healthBtnText', false, 'Check Health');
+        }
+
+        async function generateFlashcards() {
+            setLoading('flashcardBtn', 'flashcardBtnText', true, 'Generating...');
+            const data = {
+                user_id: document.getElementById('flashcardUserId').value,
+                course_id: document.getElementById('flashcardCourseId').value,
+                file_ids: document.getElementById('flashcardFileIds').value.split(',').map(id => id.trim()),
+                num_flashcards: parseInt(document.getElementById('flashcardNum').value),
+                prompt: document.getElementById('flashcardPrompt').value || undefined
+            };
+            
+            const result = await makeRequest('/generate-flashcards', 'POST', data);
+            displayResponse('flashcardResponse', result);
+            setLoading('flashcardBtn', 'flashcardBtnText', false, 'Generate Flashcards');
+        }
+
+        async function generateQuiz() {
+            setLoading('quizBtn', 'quizBtnText', true, 'Generating...');
+            const data = {
+                user_id: document.getElementById('quizUserId').value,
+                course_id: document.getElementById('quizCourseId').value,
+                file_ids: document.getElementById('quizFileIds').value.split(',').map(id => id.trim()),
+                num_quizzes: parseInt(document.getElementById('quizNum').value),
+                prompt: document.getElementById('quizPrompt').value || undefined
+            };
+            
+            const result = await makeRequest('/generate-quiz', 'POST', data);
+            displayResponse('quizResponse', result);
+            setLoading('quizBtn', 'quizBtnText', false, 'Generate Quiz');
+        }
+
+        async function generateNudges() {
+            setLoading('nudgeBtn', 'nudgeBtnText', true, 'Generating...');
+            const data = {
+                user_id: document.getElementById('nudgeUserId').value,
+                prompt: document.getElementById('nudgePrompt').value || undefined
+            };
+            
+            const result = await makeRequest('/generate-nudges', 'POST', data);
+            displayResponse('nudgeResponse', result);
+            setLoading('nudgeBtn', 'nudgeBtnText', false, 'Generate Nudges');
+        }
+
+        async function takeAction() {
+            setLoading('actionBtn', 'actionBtnText', true, 'Processing...');
+            const data = {
+                user_id: document.getElementById('actionUserId').value,
+                user_input: document.getElementById('userInput').value
+            };
+            
+            const result = await makeRequest('/take-action', 'POST', data);
+            displayResponse('actionResponse', result);
+            setLoading('actionBtn', 'actionBtnText', false, 'Process Action');
+        }
+
+        // Auto-check health on page load
+        window.onload = function() {
+            checkHealth();
+        };
+    </script>
+</body>
+</html> 

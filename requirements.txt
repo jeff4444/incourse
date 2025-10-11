@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+google-generativeai
+python-multipart
+python-dotenv 
+pydantic
+pydantic_ai
+pytest
+pytest-asyncio
+aiohttp
+pymupdf4llm
+python-docx
+python-pptx
