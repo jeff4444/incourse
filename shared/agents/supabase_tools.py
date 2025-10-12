@@ -474,7 +474,7 @@ async def get_module_items_by_course_id(
     response = (
         supabase.table("module_items")
         .select("*")
-        .eq("lms_id", lms_id)
+        .eq("lms_content_id", lms_id)
         .eq("course_id", course_id)
         .execute()
     )

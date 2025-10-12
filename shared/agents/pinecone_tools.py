@@ -133,6 +133,7 @@ async def get_file_details(
     file_id: str
 ) -> Dict[str, Any]:
     """Fetch file details and content from the API."""
+    print(f"calling get_file_details with file_id={file_id}, course_id={course_id}")
     async with aiohttp.ClientSession() as session:
         # Get file metadata
         async with session.get(
@@ -289,7 +290,7 @@ async def search_file_with_query(
     api_base_url = ctx.deps.lms_base_url
     course_id = ctx.deps.course_info["lms_id"]
     course_name = ctx.deps.course_info["name"]
-    file_id = ctx.deps.file_info["id"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["lms_id"]
+    file_id = ctx.deps.file_info["id"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["lms_content_id"]
     filename = ctx.deps.file_info["display_name"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["name"]
     print(f"search_file_with_query called with file_id={file_id}, query='{query}'")
     
