@@ -16,8 +16,8 @@ from agents.nudge_agent.agent import get_nudge_agent, Nudge, Deps as NudgeDeps
 from agents.take_action_agent.agent import get_take_action_agent, RouteOutput, Deps as TakeActionDeps
 from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps
 
-from shared.agents.supabase_tools import get_user_api_keys
-from shared.agents.supabase_tools import get_course
+from shared.agents.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
+from shared.agents.pinecone_tools import get_file_details
 
 load_dotenv()
 
@@ -329,16 +329,23 @@ async def chat(request: ChatRequest):
         lms_info = await get_user_lms_info(request.user_id)
         
         course_info = await get_course(ctx=None, course_id=request.course_id)
-        course_id = course_info["lms_id"]
         
-        print(lms_info, request.user_id, course_id, request.file_ids)
-
+        
+        try:
+            file_info = await get_module_items_by_course_id(ctx=None, course_id=course_info["id"], lms_id=request.file_ids[0])
+            is_file_from_lms = False
+        except Exception as e:
+            file_info = await get_file_details(api_key=lms_info["api_key"], api_base_url=lms_info["base_url"], course_id=course_info["lms_id"], file_id=request.file_ids[0])
+            is_file_from_lms = True
+            
+    
         deps = ChatDeps(
             user_id=request.user_id,
-            course_id=course_id,
-            file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
             lms_base_url=lms_info["base_url"],
+            course_info=course_info,
+            file_info=file_info,
+            is_file_from_lms=is_file_from_lms
         )
 
         agent = get_chat_agent()

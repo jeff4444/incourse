@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, Tool
 from shared.prompts.chat_agent_prompt import CHAT_AGENT_PROMPT
@@ -19,9 +19,9 @@ class Deps:
     user_id: str
     lms_api_key: str
     lms_base_url: str
-    course_id: str
-    file_ids: List[str]
-
+    course_info: Dict[str, Any]
+    file_info: Dict[str, Any]
+    is_file_from_lms: bool
 
 SYSTEM_PROMPT = CHAT_AGENT_PROMPT
 

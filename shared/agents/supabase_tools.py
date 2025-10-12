@@ -426,6 +426,62 @@ async def get_module_items(
     
     return response.data
 
+async def get_module_item_by_lms_id(
+    ctx: RunContext,
+    lms_id: str,
+    module_id: str
+) -> Dict[str, Any]:
+    """
+    Get a module item by its LMS ID and module ID.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        lms_id: LMS module item ID
+        module_id: Module ID
+    
+    Returns:
+        Module item data dictionary
+    
+    Raises:
+        Exception: If module item is not found or query fails
+    """
+    print(f"calling get_module_item_by_lms_id with lms_id={lms_id}, module_id={module_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("module_items")
+        .select("*")
+        .eq("lms_id", lms_id)
+        .eq("module_id", module_id)
+        .execute()
+    )
+    
+    return response.data[0]
+
+async def get_module_items_by_course_id(
+    ctx: RunContext,
+    course_id: str,
+    lms_id: str
+) -> List[Dict[str, Any]]:
+    """
+    Get a module item by its LMS ID and course ID.
+    """
+    print(f"calling get_module_items_by_course_id with course_id={course_id} and lms_id={lms_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("module_items")
+        .select("*")
+        .eq("lms_id", lms_id)
+        .eq("course_id", course_id)
+        .execute()
+    )
+    if not response.data:
+        raise Exception(f"Module item not found with lms_id={lms_id}, course_id={course_id}")
+    
+    return response.data[0]
 
 async def get_module_items_by_type(
     ctx: RunContext,

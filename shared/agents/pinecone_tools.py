@@ -283,15 +283,15 @@ async def search_file_with_query(
         - created_new_index: Whether a new index was created
         - created_new_namespace: Whether a new namespace was created
     """
-    file_id = ctx.deps.file_ids[0]
-    
-    print(f"search_file_with_query called with file_id={file_id}, query='{query}'")
-    
     
     # Get API credentials from context
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
-    course_id = ctx.deps.course_id
+    course_id = ctx.deps.course_info["lms_id"]
+    course_name = ctx.deps.course_info["name"]
+    file_id = ctx.deps.file_info["id"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["lms_id"]
+    filename = ctx.deps.file_info["display_name"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["name"]
+    print(f"search_file_with_query called with file_id={file_id}, query='{query}'")
     
     # Get Pinecone API key
     pinecone_api_key = os.getenv("PINECONE_API_KEY")
@@ -300,16 +300,6 @@ async def search_file_with_query(
     
     # Initialize Pinecone client
     pc = Pinecone(api_key=pinecone_api_key)
-    
-    # Fetch course and file details
-    print("Fetching course details...")
-    course_details = await get_course_details(api_key, api_base_url, course_id)
-    course_name = course_details.get('name', 'unknown')
-    
-    print("Fetching file details...")
-    file_details = await get_file_details(api_key, api_base_url, course_id, file_id)
-    filename = file_details.get('filename', file_details.get('display_name', 'unknown'))
-    file_content = file_details.get('parsed_content', '')
     
     # Generate index and namespace names
     index_name = sanitize_index_name(f"{course_id}-{course_name}")
@@ -327,7 +317,7 @@ async def search_file_with_query(
     
     # Create index if it doesn't exist
     create_index_if_not_exists(pc, index_name)
-    
+        
     # Connect to index
     index = pc.Index(index_name)
     
@@ -337,6 +327,11 @@ async def search_file_with_query(
     if not namespace_exists:
         print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
         created_new_namespace = True
+        if ctx.deps.is_file_from_lms:
+            file_details = await get_file_details(api_key, api_base_url, course_id, file_id)
+        else:
+            file_details = ctx.deps.file_info
+        file_content = file_details.get('parsed_content', '')
         
         # Validate we have content to index
         if not file_content or file_content.startswith("[Error") or file_content.startswith("[File too large"):
