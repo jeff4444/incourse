@@ -1,21 +1,10 @@
-import asyncio
-import os
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from typing import List, Dict
 from pydantic_ai import Agent, Tool
-from pydantic_ai.models.bedrock import BedrockConverseModel
-from pydantic_ai.providers.bedrock import BedrockProvider
 from shared.prompts.nudge_agent_prompt import NUDGE_AGENT_PROMPT
-from dotenv import load_dotenv
+from shared.agents.model import get_model
 from shared.agents.tools import get_chat_history_summary, get_course_grade_details, get_course_quiz_history, get_file_content_summaries, get_overall_course_performance
-
-load_dotenv()
-
-ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
-SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-DEFAULT_LOCATION = os.getenv("AWS_DEFAULT_REGION")
-MODEL_ARN = os.getenv("AWS_MODEL_ARN")
 
 class Nudge(BaseModel):
     """
@@ -58,14 +47,7 @@ def get_nudge_agent(**kwargs) -> Agent[Deps, List[Nudge]]:
     if system_prompt is None:
         system_prompt = NUDGE_AGENT_PROMPT
         
-    model = BedrockConverseModel(
-        MODEL_ARN,
-        provider=BedrockProvider(
-            region_name=DEFAULT_LOCATION,
-            aws_access_key_id=ACCESS_KEY,
-            aws_secret_access_key=SECRET_KEY,
-        ),
-    )
+    model = get_model()
     
     return Agent[
         Deps,

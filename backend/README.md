@@ -18,6 +18,7 @@ This is the backend API for InCourse AI agents, providing endpoints for flashcar
 1. Python 3.8+
 2. AWS credentials configured for Bedrock access
 3. Required environment variables
+4. **LibreOffice** (required for PPTX to PDF conversion)
 
 ### Environment Variables
 
@@ -43,7 +44,28 @@ LOG_LEVEL=info
 pip install -r requirements.txt
 ```
 
-2. Run the server:
+2. Install LibreOffice (required for PPTX to PDF conversion):
+
+**macOS:**
+```bash
+brew install --cask libreoffice
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install libreoffice
+```
+
+**Windows:**
+Download and install from [LibreOffice.org](https://www.libreoffice.org/download/download/)
+
+**Verify installation:**
+```bash
+soffice --version
+```
+
+3. Run the server:
 ```bash
 # Option 1: Using the run script
 cd backend
@@ -168,6 +190,52 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 }
 ```
 
+### Office to PDF Conversion
+- `POST /convert-office-to-pdf` - Convert Office files (PowerPoint, Excel, Word) to PDF
+- `POST /convert-pptx-to-pdf` - Legacy endpoint for PowerPoint files (use `/convert-office-to-pdf` instead)
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com/document.docx",
+  "format": "docx"
+}
+```
+
+**Supported Formats:**
+- PowerPoint: `pptx`, `ppt`
+- Excel: `xlsx`, `xls`
+- Word: `docx`, `doc`
+
+**Response:**
+Returns the converted PDF file as `application/pdf` with filename `converted.pdf`
+
+**Requirements:**
+- LibreOffice must be installed on the server
+- The endpoint tries multiple possible LibreOffice installation paths automatically
+- Conversion timeout: 60 seconds
+
+**Examples:**
+```bash
+# Convert PowerPoint
+curl -X POST http://localhost:8000/convert-office-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/slides.pptx", "format": "pptx"}' \
+  --output converted.pdf
+
+# Convert Excel
+curl -X POST http://localhost:8000/convert-office-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/data.xlsx", "format": "xlsx"}' \
+  --output converted.pdf
+
+# Convert Word
+curl -X POST http://localhost:8000/convert-office-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/report.docx", "format": "docx"}' \
+  --output converted.pdf
+```
+
 ## API Documentation
 
 Once the server is running, you can access:
@@ -213,4 +281,126 @@ The backend uses:
 - **Pydantic**: Data validation and settings management
 - **AWS Bedrock**: AI model provider for all agents
 
-All agents are converted to use AWS Bedrock with Claude Sonnet 4 for consistent AI capabilities across the platform. 
+All agents are converted to use AWS Bedrock with Claude Sonnet 4 for consistent AI capabilities across the platform.
+
+## Pinecone File Search
+
+### Overview
+
+The `pinecone_tools.py` module provides semantic search capabilities over course files using Pinecone's vector database with integrated inference. This allows AI agents to find relevant content within course documents by understanding the meaning of queries, not just matching keywords.
+
+### Setup
+
+1. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Set environment variables:**
+   Add to your `.env` file:
+   ```env
+   PINECONE_API_KEY=your_pinecone_api_key_here
+   CANVAS_API_KEY=your_canvas_api_key
+   CANVAS_BASE_URL=https://canvas.instructure.com/api/v1
+   ```
+
+### Usage
+
+#### From Python Code
+
+```python
+from shared.agents.pinecone_tools import search_file_with_query
+from pydantic_ai import RunContext
+
+# Create context with dependencies
+class Deps:
+    def __init__(self):
+        self.lms_api_key = "your_canvas_key"
+        self.lms_base_url = "https://canvas.instructure.com/api/v1"
+        self.course_id = "12345"
+
+ctx = RunContext(deps=Deps(), retry=0)
+
+# Search a file
+results = await search_file_with_query(
+    ctx=ctx,
+    file_id="67890",
+    query="What are the key concepts in chapter 3?"
+)
+
+# Access results
+for chunk in results['chunks']:
+    print(f"Score: {chunk['score']:.4f}")
+    print(f"Text: {chunk['text']}")
+```
+
+#### From Command Line
+
+Use the test script to search files:
+
+```bash
+cd backend
+
+# Set environment variables
+export PINECONE_API_KEY="your_key"
+export CANVAS_API_KEY="your_key"
+export CANVAS_BASE_URL="https://canvas.instructure.com/api/v1"
+export TEST_COURSE_ID="12345"
+
+# Run search
+python test_pinecone_search.py <file_id> "your search query"
+```
+
+### How It Works
+
+1. **Automatic Index Creation**: The tool creates a Pinecone index for each course using the pattern `{course_id}-{course_name}`. Indexes use integrated inference with the `multilingual-e5-large` embedding model.
+
+2. **Namespace Organization**: Each file gets its own namespace within the course index using the pattern `{file_id}-{filename}`. This keeps file content isolated and searchable.
+
+3. **Smart Chunking**: Files are automatically chunked into 500-character pieces with 50-character overlap to maintain context across chunks.
+
+4. **Lazy Indexing**: Files are only indexed when first searched. Subsequent searches use the existing index for instant results.
+
+5. **Semantic Search**: Queries use Pinecone's integrated inference to find the most relevant chunks based on meaning, not just keyword matching.
+
+### Return Format
+
+```python
+{
+    "query": "your search query",
+    "file_id": "67890",
+    "file_name": "lecture_notes.pdf",
+    "chunks": [
+        {
+            "score": 0.8542,
+            "text": "Chapter 3 covers...",
+            "chunk_index": 5
+        },
+        # ... up to 3 chunks
+    ],
+    "created_new_index": False,
+    "created_new_namespace": True
+}
+```
+
+### Index Naming Convention
+
+- **Index**: `{course_id}-{course_name}` (sanitized to lowercase alphanumeric with hyphens)
+- **Namespace**: `{file_id}-{filename}` (sanitized to avoid special characters)
+
+### Supported File Types
+
+The tool supports the same file types as the Canvas file parser:
+- PDF (`.pdf`)
+- Word Documents (`.docx`)
+- PowerPoint (`.pptx`)
+- Text files (`.txt`)
+- Markdown (`.md`)
+
+### Cost Considerations
+
+- **Index Creation**: One-time cost per course
+- **Namespace Creation**: One-time cost per file (lazy indexing)
+- **Search**: Minimal cost per query using Pinecone's integrated inference
+
+Files are only indexed once and reused for all future queries, making this cost-effective for frequently accessed content.

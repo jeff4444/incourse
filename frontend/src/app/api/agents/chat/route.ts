@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function POST(request: NextRequest) {
@@ -12,19 +11,7 @@ export async function POST(request: NextRequest) {
       context?: string;
     };
 
-    // Determine LMS from courseId prefix (e.g., "canvas-12345"); fallback to 'canvas'
-    const parts = courseId.split('-');
-    const lms = parts.length > 1 ? parts[0] : 'canvas';
-    const rawCourseId = parts.length > 1 ? parts[1] : courseId;
-
-    // Validate user and get LMS credentials
-    const result = await createLMSProviderWithUserCredentials(request, lms);
-    if (result instanceof NextResponse) {
-      return result; // Unauthorized or bad request
-    }
-
-
-    // Get user id from request (helper above does not return it)
+    // Get user id from request
     const userData = await getUserFromRequest(request);
     if (!userData) {
       return NextResponse.json({ error: "Unauthorized - No valid user token" }, { status: 401 });
@@ -42,7 +29,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         user_id: userData.userId,
-        course_id: rawCourseId,
+        course_id: courseId,
         file_ids: (fileIds || []).map((id: string) => String(id)),
         message,
         ...(prompt ? { prompt } : {}),

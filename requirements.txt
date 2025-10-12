@@ -11,3 +11,6 @@ aiohttp
 pymupdf4llm
 python-docx
 python-pptx
+pinecone
+supabase
+pycryptodome

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import PDFViewer from "@/components/pdf-viewer";
 import PPTXViewer from "@/components/pptx-viewer";
+import XLSXViewer from "@/components/xlsx-viewer";
+import DOCXViewer from "@/components/docx-viewer";
 import ImageViewer from "@/components/image-viewer";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft } from "lucide-react";
@@ -20,7 +22,19 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
   // PowerPoint files
   if (fileDetails.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       fileDetails.type === "application/vnd.ms-powerpoint") {
-    return <PPTXViewer fileDetails={fileDetails} />;
+    return <PPTXViewer fileDetails={fileDetails} courseId={courseID} />;
+  }
+  
+  // Excel files
+  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      fileDetails.type === "application/vnd.ms-excel") {
+    return <XLSXViewer fileDetails={fileDetails} courseId={courseID} />;
+  }
+  
+  // Word files
+  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      fileDetails.type === "application/msword") {
+    return <DOCXViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // Image files
@@ -37,7 +51,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
           The file type "{fileDetails.type}" is not currently supported for viewing.
         </p>
         <p className="text-sm text-gray-500 mb-4">
-          Supported formats: PDF, PowerPoint (PPTX), Images (JPEG, PNG, GIF, WebP)
+          Supported formats: PDF, PowerPoint (PPTX/PPT), Excel (XLSX/XLS), Word (DOCX/DOC), Images (JPEG, PNG, GIF, WebP)
         </p>
         <Button 
           onClick={() => {
