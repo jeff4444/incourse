@@ -2,9 +2,14 @@ import os
 import asyncio
 import base64
 import hashlib
+import tempfile
+import subprocess
+import aiohttp
+from pathlib import Path
 from typing import List, Dict, Optional
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from Crypto.Cipher import AES
@@ -364,6 +369,123 @@ async def chat(request: ChatRequest):
         print(traceback.format_exc())
         print("=" * 80)
         raise HTTPException(status_code=500, detail=f"Error chatting: {str(e)}")
+
+# PPTX to PDF Conversion Endpoint
+class ConvertPPTXRequest(BaseModel):
+    url: str
+
+@app.post("/convert-pptx-to-pdf")
+async def convert_pptx_to_pdf(request: ConvertPPTXRequest):
+    """
+    Convert a PPTX file from a URL to PDF and return the PDF file.
+    Requires LibreOffice to be installed on the server.
+    """
+    temp_dir = None
+    try:
+        # Create temporary directory
+        temp_dir = tempfile.mkdtemp()
+        temp_path = Path(temp_dir)
+        
+        # Download the PPTX file
+        pptx_path = temp_path / "input.pptx"
+        
+        async with aiohttp.ClientSession() as session:
+            async with session.get(request.url) as response:
+                if response.status != 200:
+                    raise HTTPException(status_code=400, detail="Failed to download PPTX file")
+                
+                content = await response.read()
+                with open(pptx_path, 'wb') as f:
+                    f.write(content)
+        
+        # Convert PPTX to PDF using LibreOffice
+        # Try different possible LibreOffice executable names
+        libreoffice_commands = [
+            'soffice',
+            'libreoffice',
+            '/Applications/LibreOffice.app/Contents/MacOS/soffice',  # macOS
+            '/usr/bin/soffice',  # Linux
+            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',  # Windows
+        ]
+        
+        conversion_successful = False
+        error_messages = []
+        
+        for cmd in libreoffice_commands:
+            try:
+                # Run LibreOffice in headless mode to convert
+                process = subprocess.run(
+                    [
+                        cmd,
+                        '--headless',
+                        '--convert-to', 'pdf',
+                        '--outdir', str(temp_path),
+                        str(pptx_path)
+                    ],
+                    capture_output=True,
+                    text=True,
+                    timeout=60  # 60 second timeout
+                )
+                
+                if process.returncode == 0:
+                    conversion_successful = True
+                    break
+                else:
+                    error_messages.append(f"{cmd}: {process.stderr}")
+                    
+            except FileNotFoundError:
+                error_messages.append(f"{cmd}: Not found")
+                continue
+            except subprocess.TimeoutExpired:
+                error_messages.append(f"{cmd}: Conversion timeout")
+                continue
+            except Exception as e:
+                error_messages.append(f"{cmd}: {str(e)}")
+                continue
+        
+        if not conversion_successful:
+            raise HTTPException(
+                status_code=500, 
+                detail=f"LibreOffice not found or conversion failed. Please ensure LibreOffice is installed. Errors: {'; '.join(error_messages)}"
+            )
+        
+        # Find the converted PDF
+        pdf_path = temp_path / "input.pdf"
+        
+        if not pdf_path.exists():
+            raise HTTPException(status_code=500, detail="PDF conversion completed but output file not found")
+        
+        # Return the PDF file
+        return FileResponse(
+            path=str(pdf_path),
+            media_type='application/pdf',
+            filename='converted.pdf',
+            background=None  # Don't delete immediately, we'll handle cleanup
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        print("=" * 80)
+        print("ERROR IN /convert-pptx-to-pdf ENDPOINT:")
+        print(traceback.format_exc())
+        print("=" * 80)
+        raise HTTPException(status_code=500, detail=f"Error converting PPTX to PDF: {str(e)}")
+    finally:
+        # Cleanup will happen after response is sent
+        if temp_dir:
+            # Schedule cleanup after a delay to ensure file is sent
+            asyncio.create_task(cleanup_temp_dir(temp_dir))
+
+async def cleanup_temp_dir(temp_dir: str):
+    """Cleanup temporary directory after a delay"""
+    await asyncio.sleep(5)  # Wait 5 seconds before cleanup
+    try:
+        import shutil
+        shutil.rmtree(temp_dir, ignore_errors=True)
+    except Exception as e:
+        print(f"Error cleaning up temp directory: {e}")
 
 if __name__ == "__main__":
     import uvicorn

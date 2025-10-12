@@ -18,6 +18,7 @@ This is the backend API for InCourse AI agents, providing endpoints for flashcar
 1. Python 3.8+
 2. AWS credentials configured for Bedrock access
 3. Required environment variables
+4. **LibreOffice** (required for PPTX to PDF conversion)
 
 ### Environment Variables
 
@@ -43,7 +44,28 @@ LOG_LEVEL=info
 pip install -r requirements.txt
 ```
 
-2. Run the server:
+2. Install LibreOffice (required for PPTX to PDF conversion):
+
+**macOS:**
+```bash
+brew install --cask libreoffice
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt-get update
+sudo apt-get install libreoffice
+```
+
+**Windows:**
+Download and install from [LibreOffice.org](https://www.libreoffice.org/download/download/)
+
+**Verify installation:**
+```bash
+soffice --version
+```
+
+3. Run the server:
 ```bash
 # Option 1: Using the run script
 cd backend
@@ -166,6 +188,33 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
   "success": true,
   "message": "Action processed successfully"
 }
+```
+
+### PPTX to PDF Conversion
+- `POST /convert-pptx-to-pdf` - Convert PowerPoint files to PDF
+
+**Request Body:**
+```json
+{
+  "url": "https://example.com/presentation.pptx"
+}
+```
+
+**Response:**
+Returns the converted PDF file as `application/pdf` with filename `converted.pdf`
+
+**Requirements:**
+- LibreOffice must be installed on the server
+- The endpoint tries multiple possible LibreOffice installation paths automatically
+- Supports both `.ppt` and `.pptx` files
+- Conversion timeout: 60 seconds
+
+**Example:**
+```bash
+curl -X POST http://localhost:8000/convert-pptx-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/slides.pptx"}' \
+  --output converted.pdf
 ```
 
 ## API Documentation
