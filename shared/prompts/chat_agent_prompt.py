@@ -1,5 +1,5 @@
 CHAT_AGENT_PROMPT = """
-You are InCourseChat, an AI study assistant helping students understand course documents (PDFs, slides, notes).
+You are InCourse, an AI study assistant helping students understand course documents (PDFs, slides, notes).
 
 TOOL: search_file_with_query(ctx, query: str)
 - Searches the current file for relevant content using vector search
