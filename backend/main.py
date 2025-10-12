@@ -370,35 +370,46 @@ async def chat(request: ChatRequest):
         print("=" * 80)
         raise HTTPException(status_code=500, detail=f"Error chatting: {str(e)}")
 
-# PPTX to PDF Conversion Endpoint
-class ConvertPPTXRequest(BaseModel):
+# Office to PDF Conversion Endpoint
+class ConvertOfficeRequest(BaseModel):
     url: str
+    format: str  # pptx, xlsx, docx, ppt, xls, doc
 
-@app.post("/convert-pptx-to-pdf")
-async def convert_pptx_to_pdf(request: ConvertPPTXRequest):
+@app.post("/convert-office-to-pdf")
+async def convert_office_to_pdf(request: ConvertOfficeRequest):
     """
-    Convert a PPTX file from a URL to PDF and return the PDF file.
+    Convert an Office file (PPTX, XLSX, DOCX, PPT, XLS, DOC) from a URL to PDF.
     Requires LibreOffice to be installed on the server.
     """
     temp_dir = None
     try:
+        # Validate format
+        supported_formats = ['pptx', 'ppt', 'xlsx', 'xls', 'docx', 'doc']
+        file_format = request.format.lower().replace('.', '')
+        
+        if file_format not in supported_formats:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Unsupported format: {request.format}. Supported formats: {', '.join(supported_formats)}"
+            )
+        
         # Create temporary directory
         temp_dir = tempfile.mkdtemp()
         temp_path = Path(temp_dir)
         
-        # Download the PPTX file
-        pptx_path = temp_path / "input.pptx"
+        # Download the Office file
+        input_path = temp_path / f"input.{file_format}"
         
         async with aiohttp.ClientSession() as session:
             async with session.get(request.url) as response:
                 if response.status != 200:
-                    raise HTTPException(status_code=400, detail="Failed to download PPTX file")
+                    raise HTTPException(status_code=400, detail=f"Failed to download {file_format.upper()} file")
                 
                 content = await response.read()
-                with open(pptx_path, 'wb') as f:
+                with open(input_path, 'wb') as f:
                     f.write(content)
         
-        # Convert PPTX to PDF using LibreOffice
+        # Convert Office file to PDF using LibreOffice
         # Try different possible LibreOffice executable names
         libreoffice_commands = [
             'soffice',
@@ -420,7 +431,7 @@ async def convert_pptx_to_pdf(request: ConvertPPTXRequest):
                         '--headless',
                         '--convert-to', 'pdf',
                         '--outdir', str(temp_path),
-                        str(pptx_path)
+                        str(input_path)
                     ],
                     capture_output=True,
                     text=True,
@@ -468,10 +479,10 @@ async def convert_pptx_to_pdf(request: ConvertPPTXRequest):
     except Exception as e:
         import traceback
         print("=" * 80)
-        print("ERROR IN /convert-pptx-to-pdf ENDPOINT:")
+        print("ERROR IN /convert-office-to-pdf ENDPOINT:")
         print(traceback.format_exc())
         print("=" * 80)
-        raise HTTPException(status_code=500, detail=f"Error converting PPTX to PDF: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error converting Office file to PDF: {str(e)}")
     finally:
         # Cleanup will happen after response is sent
         if temp_dir:
@@ -486,6 +497,16 @@ async def cleanup_temp_dir(temp_dir: str):
         shutil.rmtree(temp_dir, ignore_errors=True)
     except Exception as e:
         print(f"Error cleaning up temp directory: {e}")
+
+# Legacy endpoint for backward compatibility
+@app.post("/convert-pptx-to-pdf")
+async def convert_pptx_to_pdf_legacy(request: ConvertOfficeRequest):
+    """
+    Legacy endpoint for PPTX to PDF conversion.
+    Use /convert-office-to-pdf instead.
+    """
+    request.format = 'pptx'
+    return await convert_office_to_pdf(request)
 
 if __name__ == "__main__":
     import uvicorn

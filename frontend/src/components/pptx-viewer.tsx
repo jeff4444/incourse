@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, FileSliders, AlertCircle } from "lucide-react"
+import { Loader2, FileSliders, AlertCircle, Download } from "lucide-react"
 import { FileDetails } from "@/lib/types/course"
 import PDFViewer from "./pdf-viewer"
 
@@ -24,13 +24,14 @@ export default function PPTXViewer({ fileDetails, courseId }: { fileDetails: Fil
         setError(null)
 
         // Call backend conversion endpoint
-        const response = await fetch(`${BACKEND_URL}/convert-pptx-to-pdf`, {
+        const response = await fetch(`${BACKEND_URL}/convert-office-to-pdf`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            url: fileDetails.url
+            url: fileDetails.url,
+            format: 'pptx'
           })
         })
 
@@ -84,77 +85,86 @@ export default function PPTXViewer({ fileDetails, courseId }: { fileDetails: Fil
     link.click()
   }
 
-  // Show loading state while converting
-  if (isConverting) {
-    return (
-      <div className="max-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-        <Card className="my-2">
-          <CardContent className="py-12 text-center">
-            <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-12 w-12 animate-spin text-blue-500" />
-              <div>
-                <p className="text-lg font-medium text-gray-700 mb-2">
-                  Converting PowerPoint to PDF...
-                </p>
-                <p className="text-sm text-gray-500">
-                  This may take a few moments
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Show error state if conversion failed
-  if (error) {
-    return (
-      <div className="max-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-        <Card className="my-2">
-          <CardContent className="py-12 text-center">
-            <AlertCircle className="h-16 w-16 text-red-400 mx-auto mb-4" />
-            <p className="text-red-600 text-lg font-medium mb-2">
-              Conversion Failed
-            </p>
-            <p className="text-gray-600 text-sm mb-4 max-w-md mx-auto">
-              {error}
-            </p>
-            <div className="flex gap-2 justify-center">
-              <Button onClick={handleDownload} variant="outline">
-                Download Original File
-              </Button>
-              <Button 
-                onClick={() => window.location.reload()} 
-                variant="default"
-              >
-                Try Again
-              </Button>
-            </div>
-            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg max-w-md mx-auto">
-              <p className="text-sm text-blue-800">
-                <strong>Note:</strong> This feature requires LibreOffice to be installed on the server.
-                Please contact your administrator if this issue persists.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // Show PDF viewer once conversion is complete
-  if (pdfFileDetails) {
+  // If PDF is ready, render the PDF viewer directly
+  if (pdfFileDetails && !isConverting && !error) {
     return <PDFViewer fileDetails={pdfFileDetails} courseId={courseId} />
   }
 
-  // Fallback (should not normally reach here)
+  // Otherwise render the conversion UI (loading or error)
   return (
     <div className="max-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-      <Card className="my-2">
-        <CardContent className="py-12 text-center">
-          <FileSliders className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500">Unable to load presentation</p>
+      <Card className="my-2 flex-shrink-0 py-1">
+        <CardContent className="flex items-center justify-between py-0">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">PowerPoint Presentation</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleDownload}
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card className="flex-1 overflow-hidden py-0">
+        <CardContent className="p-0 h-[85vh]">
+          <div className="h-full overflow-y-auto bg-gray-100 flex flex-col items-center justify-center">
+            {isConverting && (
+              <div className="flex flex-col items-center gap-4 py-12">
+                <Loader2 className="h-12 w-12 animate-spin text-orange-500" />
+                <div className="text-center">
+                  <p className="text-lg font-medium text-gray-700 mb-2">
+                    Converting PowerPoint to PDF...
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    This may take a few seconds
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="flex flex-col items-center gap-4 py-12 max-w-md mx-auto px-4">
+                <AlertCircle className="h-16 w-16 text-red-400" />
+                <div className="text-center">
+                  <p className="text-red-600 text-lg font-medium mb-2">
+                    Conversion Failed
+                  </p>
+                  <p className="text-gray-600 text-sm mb-4">
+                    {error}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={handleDownload} variant="outline" size="sm">
+                    Download Original File
+                  </Button>
+                  <Button 
+                    onClick={() => window.location.reload()} 
+                    variant="default"
+                    size="sm"
+                  >
+                    Try Again
+                  </Button>
+                </div>
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-800">
+                    <strong>Note:</strong> This feature requires LibreOffice to be installed on the server.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {!isConverting && !error && !pdfFileDetails && (
+              <div className="text-center py-12">
+                <FileSliders className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">Unable to load presentation</p>
+              </div>
+            )}
+          </div>
         </CardContent>
       </Card>
     </div>

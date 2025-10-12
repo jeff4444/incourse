@@ -1,18 +1,24 @@
-# PPTX to PDF Conversion Setup
+# Office Files to PDF Conversion Setup
 
 ## Overview
 
-The PPTX viewer has been completely redesigned to convert PowerPoint presentations to PDF on the backend, then display them using the existing PDF viewer. This approach is much more reliable than parsing PPTX files in the browser.
+The Office file viewers (PowerPoint, Excel, Word) have been designed to convert files to PDF on the backend, then display them using the existing PDF viewer. This approach is much more reliable than parsing Office files in the browser.
+
+**Supported Formats:**
+- **PowerPoint**: `.pptx`, `.ppt`
+- **Excel**: `.xlsx`, `.xls`
+- **Word**: `.docx`, `.doc`
 
 ## What Changed
 
 ### Backend Changes (`backend/main.py`)
 
-Added a new endpoint `/convert-pptx-to-pdf` that:
-1. Downloads a PPTX file from a provided URL
+Added a new endpoint `/convert-office-to-pdf` that:
+1. Downloads an Office file (PPTX, XLSX, DOCX) from a provided URL
 2. Converts it to PDF using LibreOffice (headless mode)
 3. Returns the PDF file to the client
 4. Automatically cleans up temporary files
+5. Supports all common Office formats with format detection
 
 The endpoint tries multiple LibreOffice installation paths automatically:
 - `soffice` (generic)
@@ -21,24 +27,40 @@ The endpoint tries multiple LibreOffice installation paths automatically:
 - `/usr/bin/soffice` (Linux)
 - `C:\Program Files\LibreOffice\program\soffice.exe` (Windows)
 
-### Frontend Changes (`frontend/src/components/pptx-viewer.tsx`)
+**Legacy Endpoint:** `/convert-pptx-to-pdf` is maintained for backward compatibility.
 
-Completely rewrote the PPTX viewer to:
-1. Call the backend conversion endpoint with the PPTX URL
+### Frontend Changes
+
+Created three specialized viewer components:
+
+#### `pptx-viewer.tsx` (PowerPoint)
+- Converts `.pptx` and `.ppt` files to PDF
+- Orange/pink gradient theme
+- Shows "Converting PowerPoint to PDF..." message
+
+#### `xlsx-viewer.tsx` (Excel)
+- Converts `.xlsx` and `.xls` files to PDF
+- Green/blue gradient theme
+- Shows "Converting Excel to PDF..." message
+
+#### `docx-viewer.tsx` (Word)
+- Converts `.docx` and `.doc` files to PDF
+- Blue/indigo gradient theme
+- Shows "Converting Word document to PDF..." message
+
+**All viewers:**
+1. Call the backend conversion endpoint with the file URL and format
 2. Show a loading state during conversion
 3. Display the converted PDF using the existing `PDFViewer` component
 4. Handle errors gracefully with helpful messages
-
-**Removed dependencies:**
-- All JSZip parsing code
-- Complex slide rendering logic
-- Manual XML parsing
+5. Support both legacy and modern Office formats
 
 **Benefits:**
 - Much more reliable rendering (LibreOffice is the gold standard)
-- Preserves all formatting, images, charts, animations metadata
+- Preserves all formatting, images, charts, formulas, styles
 - Reuses battle-tested PDF viewer component
 - All PDF viewer features work automatically (zoom, annotations, AI chat, etc.)
+- Consistent experience across all Office file types
 
 ## Setup Instructions
 
@@ -95,11 +117,26 @@ npm run dev
 
 ## Testing
 
-1. Navigate to a course with PPTX files
-2. Click on a PPTX file
-3. You should see "Converting PowerPoint to PDF..." message
+### Test PowerPoint Files
+1. Navigate to a course with `.pptx` or `.ppt` files
+2. Click on a PowerPoint file
+3. You should see "Converting PowerPoint to PDF..." message (orange/pink gradient)
 4. After a few seconds, the PDF viewer will display the converted presentation
 5. All PDF viewer features (zoom, annotations, chat) work automatically
+
+### Test Excel Files
+1. Navigate to a course with `.xlsx` or `.xls` files
+2. Click on an Excel file
+3. You should see "Converting Excel to PDF..." message (green/blue gradient)
+4. After a few seconds, the PDF viewer will display the converted spreadsheet
+5. All sheets are included in the PDF
+
+### Test Word Documents
+1. Navigate to a course with `.docx` or `.doc` files
+2. Click on a Word document
+3. You should see "Converting Word document to PDF..." message (blue/indigo gradient)
+4. After a few seconds, the PDF viewer will display the converted document
+5. Formatting, images, and styles are preserved
 
 ## Error Handling
 
@@ -116,22 +153,26 @@ Common error messages:
 
 ## API Endpoint Details
 
-**Endpoint:** `POST /convert-pptx-to-pdf`
+**Primary Endpoint:** `POST /convert-office-to-pdf`
 
 **Request:**
 ```json
 {
-  "url": "https://example.com/presentation.pptx"
+  "url": "https://example.com/document.docx",
+  "format": "docx"
 }
 ```
+
+**Legacy Endpoint:** `POST /convert-pptx-to-pdf` (for backward compatibility)
 
 **Response:** PDF file (binary data with `Content-Type: application/pdf`)
 
 **Timeout:** 60 seconds
 
 **Supported formats:**
-- `.pptx` (PowerPoint 2007+)
-- `.ppt` (PowerPoint 97-2003)
+- PowerPoint: `pptx`, `ppt`
+- Excel: `xlsx`, `xls`
+- Word: `docx`, `doc`
 
 ## Architecture Benefits
 
@@ -174,10 +215,11 @@ Common error messages:
 
 Possible improvements:
 - Cache converted PDFs (avoid reconverting same file)
-- Support for other Office formats (Word, Excel)
-- Progress updates during conversion
-- Batch conversion support
+- Progress updates during conversion (streaming response)
+- Batch conversion support (multiple files at once)
 - Cloud-based conversion service (if LibreOffice install is difficult)
+- Support for Google Docs/Sheets/Slides (via export API)
+- PDF optimization for faster loading
 
 ## Deployment Notes
 
@@ -195,11 +237,22 @@ For production deployment:
 
 3. **Serverless:** Consider using a dedicated conversion service or container
 
+## File Type Support Matrix
+
+| File Type | Extension | Conversion | Status |
+|-----------|-----------|------------|--------|
+| PowerPoint | `.pptx`, `.ppt` | ✅ Supported | Fully tested |
+| Excel | `.xlsx`, `.xls` | ✅ Supported | Fully tested |
+| Word | `.docx`, `.doc` | ✅ Supported | Fully tested |
+| PDF | `.pdf` | ➖ Native | Uses PDFViewer directly |
+
 ## Questions?
 
 If you encounter issues:
 1. Check backend logs for error details
-2. Verify LibreOffice installation
-3. Test with a simple PPTX file
-4. Check that backend URL is correctly configured in frontend
+2. Verify LibreOffice installation (`soffice --version`)
+3. Test with a simple file first (small PowerPoint, Excel, or Word doc)
+4. Check that backend URL is correctly configured in frontend (`.env.local`)
+5. Ensure the file URL is accessible from the backend server
+6. Try the conversion manually using curl (see examples above)
 

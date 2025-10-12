@@ -190,15 +190,22 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 }
 ```
 
-### PPTX to PDF Conversion
-- `POST /convert-pptx-to-pdf` - Convert PowerPoint files to PDF
+### Office to PDF Conversion
+- `POST /convert-office-to-pdf` - Convert Office files (PowerPoint, Excel, Word) to PDF
+- `POST /convert-pptx-to-pdf` - Legacy endpoint for PowerPoint files (use `/convert-office-to-pdf` instead)
 
 **Request Body:**
 ```json
 {
-  "url": "https://example.com/presentation.pptx"
+  "url": "https://example.com/document.docx",
+  "format": "docx"
 }
 ```
+
+**Supported Formats:**
+- PowerPoint: `pptx`, `ppt`
+- Excel: `xlsx`, `xls`
+- Word: `docx`, `doc`
 
 **Response:**
 Returns the converted PDF file as `application/pdf` with filename `converted.pdf`
@@ -206,14 +213,26 @@ Returns the converted PDF file as `application/pdf` with filename `converted.pdf
 **Requirements:**
 - LibreOffice must be installed on the server
 - The endpoint tries multiple possible LibreOffice installation paths automatically
-- Supports both `.ppt` and `.pptx` files
 - Conversion timeout: 60 seconds
 
-**Example:**
+**Examples:**
 ```bash
-curl -X POST http://localhost:8000/convert-pptx-to-pdf \
+# Convert PowerPoint
+curl -X POST http://localhost:8000/convert-office-to-pdf \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://example.com/slides.pptx"}' \
+  -d '{"url": "https://example.com/slides.pptx", "format": "pptx"}' \
+  --output converted.pdf
+
+# Convert Excel
+curl -X POST http://localhost:8000/convert-office-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/data.xlsx", "format": "xlsx"}' \
+  --output converted.pdf
+
+# Convert Word
+curl -X POST http://localhost:8000/convert-office-to-pdf \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com/report.docx", "format": "docx"}' \
   --output converted.pdf
 ```
 
