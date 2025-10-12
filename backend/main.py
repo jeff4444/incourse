@@ -349,11 +349,10 @@ async def chat(request: ChatRequest):
             document_id = request.file_ids[0]
         
         # Initialize session manager
-        session_manager = ChatSessionManager()
+        session_manager = ChatSessionManager(course_info=course_info, file_info=file_info)
         
         # Load chat context (session, history, summary)
         chat_context = await session_manager.load_chat_context(
-            ctx=None,
             user_id=request.user_id,
             document_id=document_id,
             session_id=request.session_id
@@ -394,14 +393,12 @@ async def chat(request: ChatRequest):
         
         # Add messages to buffer
         await session_manager.add_message_to_buffer(
-            ctx=None,
             chat_id=chat_context["chat_id"],
             sender="user",
             content=request.message
         )
         
         await session_manager.add_message_to_buffer(
-            ctx=None,
             chat_id=chat_context["chat_id"],
             sender="assistant",
             content=result.output.answer
@@ -409,14 +406,13 @@ async def chat(request: ChatRequest):
         
         # Check if we should create a summary
         await session_manager.check_and_create_summary(
-            ctx=None,
             chat_id=chat_context["chat_id"],
             user_message=request.message,
             assistant_response=result.output.answer
         )
         
         # Flush any remaining messages in buffer
-        await session_manager.flush_buffer(ctx=None, chat_id=chat_context["chat_id"])
+        await session_manager.flush_buffer(chat_id=chat_context["chat_id"])
         
         return ChatResponse(
             answer=result.output.answer,

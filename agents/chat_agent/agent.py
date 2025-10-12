@@ -13,6 +13,7 @@ from shared.agents.supabase_tools import (
     get_chat_message_count
 )
 from shared.agents.model import get_model
+from agents.summary_agent.agent import summarize_conversation_incremental
 
 
 class ChatAnswer(BaseModel):
@@ -63,17 +64,18 @@ class ChatSessionManager:
     Manages chat sessions, message buffering, and context summaries.
     """
     
-    def __init__(self):
+    def __init__(self, course_info: Dict[str, Any], file_info: Dict[str, Any]):
         self.message_buffer: List[Dict[str, Any]] = []
         self.buffer_limit = 5  # Batch save every 5 messages
         self.summary_interval = 10  # Create summary every 10 messages
+        self.course_info = course_info
+        self.file_info = file_info
     
-    async def load_chat_context(self, ctx, user_id: str, document_id: str, session_id: Optional[str] = None) -> Dict[str, Any]:
+    async def load_chat_context(self, user_id: str, document_id: str, session_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Load chat context including session, history, and latest summary.
         
         Args:
-            ctx: RunContext
             user_id: User ID
             document_id: Document ID
             session_id: Optional existing session ID
@@ -87,14 +89,14 @@ class ChatSessionManager:
             chat_id = session_id
         else:
             # Get or create new session
-            chat_session = await get_or_create_chat_session(ctx, user_id, document_id)
+            chat_session = await get_or_create_chat_session(user_id, document_id)
             chat_id = chat_session["id"]
         
         # Load recent messages (last 20 to keep context manageable)
-        chat_history = await get_chat_messages(ctx, chat_id, limit=20)
+        chat_history = await get_chat_messages(chat_id, limit=20)
         
         # Load latest context summary
-        context_snapshot = await get_latest_context_snapshot(ctx, chat_id)
+        context_snapshot = await get_latest_context_snapshot(chat_id)
         context_summary = context_snapshot["summary"] if context_snapshot else None
         
         return {
@@ -103,12 +105,11 @@ class ChatSessionManager:
             "context_summary": context_summary
         }
     
-    async def add_message_to_buffer(self, ctx, chat_id: str, sender: str, content: str, tokens: Optional[int] = None, metadata: Optional[Dict] = None):
+    async def add_message_to_buffer(self, chat_id: str, sender: str, content: str, tokens: Optional[int] = None, metadata: Optional[Dict] = None):
         """
         Add a message to the buffer.
         
         Args:
-            ctx: RunContext
             chat_id: Chat session ID
             sender: 'user' or 'assistant'
             content: Message content
@@ -126,94 +127,109 @@ class ChatSessionManager:
         
         # Check if we should batch save
         if len(self.message_buffer) >= self.buffer_limit:
-            await self.flush_buffer(ctx, chat_id)
+            await self.flush_buffer(chat_id)
     
-    async def flush_buffer(self, ctx, chat_id: str):
+    async def flush_buffer(self, chat_id: str):
         """
         Save all buffered messages to the database.
         
         Args:
-            ctx: RunContext
             chat_id: Chat session ID
         """
         if not self.message_buffer:
             return
         
         try:
-            await batch_save_messages(ctx, chat_id, self.message_buffer)
+            await batch_save_messages(chat_id, self.message_buffer)
             self.message_buffer.clear()
             print(f"Flushed {len(self.message_buffer)} messages to database")
         except Exception as e:
             print(f"Error flushing message buffer: {e}")
             # Keep messages in buffer for retry
     
-    async def check_and_create_summary(self, ctx, chat_id: str, user_message: str, assistant_response: str):
+    async def check_and_create_summary(self, chat_id: str, user_message: str, assistant_response: str):
         """
         Check if we should create a new context summary and do so if needed.
         
         Args:
-            ctx: RunContext
             chat_id: Chat session ID
             user_message: Latest user message
             assistant_response: Latest assistant response
         """
         try:
             # Get current message count
-            message_count = await get_chat_message_count(ctx, chat_id)
+            message_count = await get_chat_message_count(chat_id)
             
             # Check if we've reached a summary interval
             if message_count % self.summary_interval == 0 and message_count > 0:
-                await self.create_context_summary(ctx, chat_id, user_message, assistant_response)
+                await self.create_context_summary(chat_id, user_message, assistant_response)
         except Exception as e:
             print(f"Error checking summary creation: {e}")
     
-    async def create_context_summary(self, ctx, chat_id: str, user_message: str, assistant_response: str):
+    async def create_context_summary(self, chat_id: str, user_message: str, assistant_response: str):
         """
-        Create a new context summary for the chat session.
+        Create a new context summary for the chat session using the summary_agent.
         
         Args:
-            ctx: RunContext
             chat_id: Chat session ID
             user_message: Latest user message
             assistant_response: Latest assistant response
         """
         try:
             # Get recent messages for summarization
-            recent_messages = await get_chat_messages(ctx, chat_id, limit=20)
+            recent_messages = await get_chat_messages(chat_id, limit=20)
             
-            # Create summary prompt
-            conversation_text = ""
-            for msg in recent_messages:
-                role = "User" if msg["sender"] == "user" else "Assistant"
-                conversation_text += f"{role}: {msg['content']}\n"
+            # Add current conversation to messages
+            messages_to_summarize = recent_messages + [
+                {"sender": "user", "content": user_message},
+                {"sender": "assistant", "content": assistant_response}
+            ]
             
-            # Add current conversation
-            conversation_text += f"User: {user_message}\n"
-            conversation_text += f"Assistant: {assistant_response}\n"
+            # Get previous summary if it exists
+            previous_snapshot = await get_latest_context_snapshot(chat_id)
+            previous_summary = previous_snapshot["summary"] if previous_snapshot else None
             
-            summary_prompt = f"""
-            Please provide a concise summary of this conversation about the document. 
-            Focus on the key topics discussed, questions asked, and insights provided.
-            Keep the summary under 200 words and maintain context for future conversations.
+            # Get total message count
+            message_count = await get_chat_message_count(chat_id)
             
-            Conversation:
-            {conversation_text}
+            # Create additional context from deps
+            course_name = self.course_info.get("name", "Unknown Course") if self.course_info else "Unknown Course"
+            file_name = self.file_info.get("title", "Unknown Document") if self.file_info else "Unknown Document"
+            additional_context = f"Course: {course_name}, Document: {file_name}"
             
-            Summary:
-            """
+            # Use summary_agent to generate a structured summary
+            if previous_summary:
+                # Incremental summary building on previous context
+                summary_result = await summarize_conversation_incremental(
+                    new_messages=messages_to_summarize[-10:],  # Last 10 messages as "new"
+                    previous_summary=previous_summary,
+                    message_count=message_count,
+                    additional_context=additional_context
+                )
+            else:
+                # First summary for this session
+                from agents.summary_agent.agent import summarize_conversation
+                summary_result = await summarize_conversation(
+                    messages=messages_to_summarize,
+                    additional_context=additional_context
+                )
             
-            # Generate summary using the AI model
-            model = get_model()
-            summary_response = await model.run_sync(summary_prompt)
-            summary_text = summary_response.content if hasattr(summary_response, 'content') else str(summary_response)
+            # Format the summary with structured information
+            summary_text = summary_result.summary
+            if summary_result.main_topics:
+                summary_text += f"\n\nMain Topics: {', '.join(summary_result.main_topics)}"
+            if summary_result.key_insights:
+                summary_text += f"\n\nKey Insights:\n" + "\n".join(f"- {insight}" for insight in summary_result.key_insights)
             
             # Save the summary
-            message_count = await get_chat_message_count(ctx, chat_id)
-            await create_context_snapshot(ctx, chat_id, summary_text, message_count)
+            await create_context_snapshot(chat_id, summary_text, message_count)
             
             print(f"Created context summary for chat {chat_id} with {message_count} messages")
+            print(f"Topics covered: {', '.join(summary_result.main_topics) if summary_result.main_topics else 'None identified'}")
             
         except Exception as e:
             print(f"Error creating context summary: {e}")
+            import traceback
+            traceback.print_exc()
 
 
