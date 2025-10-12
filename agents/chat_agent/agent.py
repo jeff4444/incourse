@@ -1,25 +1,10 @@
-import os
 from dataclasses import dataclass
 from typing import List
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, Tool
-from pydantic_ai.models.bedrock import BedrockConverseModel
-from pydantic_ai.providers.bedrock import BedrockProvider
-from dotenv import load_dotenv
 from shared.prompts.chat_agent_prompt import CHAT_AGENT_PROMPT
-
-# Reuse existing tools for Canvas/content access
-from shared.agents.tools import (
-    get_canvas_course,
-    get_canvas_files_details,
-)
-
-load_dotenv()
-
-ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID")
-SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
-DEFAULT_LOCATION = os.getenv("AWS_DEFAULT_REGION")
-MODEL_ARN = os.getenv("AWS_MODEL_ARN")
+from shared.agents.pinecone_tools import search_file_with_query
+from shared.agents.model import get_model
 
 
 class ChatAnswer(BaseModel):
@@ -45,14 +30,7 @@ def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
     """
     Create a lightweight chat agent for file Q&A in viewers.
     """
-    model = BedrockConverseModel(
-        MODEL_ARN,
-        provider=BedrockProvider(
-            region_name=DEFAULT_LOCATION,
-            aws_access_key_id=ACCESS_KEY,
-            aws_secret_access_key=SECRET_KEY,
-        ),
-    )
+    model = get_model()
 
     return Agent[
         Deps,
@@ -62,9 +40,10 @@ def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
         output_type=ChatAnswer,
         system_prompt=SYSTEM_PROMPT,
         tools=[
-            Tool(get_canvas_course, takes_ctx=True),
-            Tool(get_canvas_files_details, takes_ctx=True),
+            Tool(search_file_with_query, takes_ctx=True),
         ],
+        retries=3,
+        output_retries=3,
     )
 
 

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
+import { createClient } from "@/lib/utils/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,22 +13,31 @@ export async function POST(request: NextRequest) {
       context?: string;
     };
 
-    // Determine LMS from courseId prefix (e.g., "canvas-12345"); fallback to 'canvas'
-    const parts = courseId.split('-');
-    const lms = parts.length > 1 ? parts[0] : 'canvas';
-    const rawCourseId = parts.length > 1 ? parts[1] : courseId;
-
-    // Validate user and get LMS credentials
-    const result = await createLMSProviderWithUserCredentials(request, lms);
-    if (result instanceof NextResponse) {
-      return result; // Unauthorized or bad request
-    }
-
-
-    // Get user id from request (helper above does not return it)
+    // Get user id from request
     const userData = await getUserFromRequest(request);
     if (!userData) {
       return NextResponse.json({ error: "Unauthorized - No valid user token" }, { status: 401 });
+    }
+
+    // Fetch course info from database to get lmsId and lmsProvider
+    const supabase = await createClient();
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('lms_id, lms_provider')
+      .eq('id', courseId)
+      .single();
+
+    if (courseError || !course) {
+      return NextResponse.json(
+        { error: "Course not found" },
+        { status: 404 }
+      );
+    }
+
+    // Validate user and get LMS credentials
+    const result = await createLMSProviderWithUserCredentials(request, course.lms_provider);
+    if (result instanceof NextResponse) {
+      return result; // Unauthorized or bad request
     }
 
     // Python backend URL
@@ -42,7 +52,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         user_id: userData.userId,
-        course_id: rawCourseId,
+        course_id: course.lms_id,
         file_ids: (fileIds || []).map((id: string) => String(id)),
         message,
         ...(prompt ? { prompt } : {}),
