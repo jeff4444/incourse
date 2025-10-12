@@ -699,3 +699,198 @@ async def search_courses(
     
     return matching_courses
 
+
+# Chat System Functions
+
+async def get_or_create_chat_session(
+    ctx: RunContext,
+    user_id: str,
+    document_id: str
+) -> Dict[str, Any]:
+    """
+    Get existing chat session or create a new one for user-document pair.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        user_id: User ID
+        document_id: Module item ID (document ID)
+    
+    Returns:
+        Chat session dictionary
+    """
+    print(f"calling get_or_create_chat_session with user_id={user_id}, document_id={document_id}")
+    
+    supabase = get_supabase_client()
+    
+    # Try to get existing session
+    response = supabase.table("document_chats").select("*").eq("user_id", user_id).eq("document_id", document_id).execute()
+    
+    if response.data:
+        return response.data[0]
+    
+    # Create new session
+    new_session = {
+        "user_id": user_id,
+        "document_id": document_id,
+        "title": None
+    }
+    
+    # Insert the new session
+    insert_response = supabase.table("document_chats").insert(new_session).execute()
+    
+    if not insert_response.data:
+        raise Exception("Failed to create chat session")
+    
+    # Get the created session
+    created_session = insert_response.data[0]
+    return created_session
+
+
+async def get_chat_messages(
+    ctx: RunContext,
+    chat_id: str,
+    limit: int = 50
+) -> List[Dict[str, Any]]:
+    """
+    Get recent chat messages for a session.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        chat_id: Chat session ID
+        limit: Maximum number of messages to retrieve
+    
+    Returns:
+        List of message dictionaries ordered by creation time
+    """
+    print(f"calling get_chat_messages with chat_id={chat_id}, limit={limit}")
+    
+    supabase = get_supabase_client()
+    
+    response = supabase.table("chat_messages").select("*").eq("chat_id", chat_id).order("created_at", desc=False).limit(limit).execute()
+    
+    return response.data
+
+
+async def batch_save_messages(
+    ctx: RunContext,
+    chat_id: str,
+    messages: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Save multiple messages to a chat session.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        chat_id: Chat session ID
+        messages: List of message dictionaries with sender, content, tokens, metadata
+    
+    Returns:
+        List of saved message dictionaries
+    """
+    print(f"calling batch_save_messages with chat_id={chat_id}, message_count={len(messages)}")
+    
+    supabase = get_supabase_client()
+    
+    # Prepare messages for insertion
+    message_records = []
+    for msg in messages:
+        record = {
+            "chat_id": chat_id,
+            "sender": msg["sender"],
+            "content": msg["content"],
+            "tokens": msg.get("tokens"),
+            "metadata": msg.get("metadata")
+        }
+        message_records.append(record)
+    
+    # Insert the messages
+    insert_response = supabase.table("chat_messages").insert(message_records).execute()
+    
+    if not insert_response.data:
+        raise Exception("Failed to save messages")
+    
+    return insert_response.data
+
+
+async def get_latest_context_snapshot(
+    ctx: RunContext,
+    chat_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Get the most recent context snapshot for a chat session.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        chat_id: Chat session ID
+    
+    Returns:
+        Latest context snapshot dictionary or None
+    """
+    print(f"calling get_latest_context_snapshot with chat_id={chat_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = supabase.table("chat_context_snapshots").select("*").eq("chat_id", chat_id).order("created_at", desc=True).limit(1).execute()
+    
+    return response.data[0] if response.data else None
+
+
+async def create_context_snapshot(
+    ctx: RunContext,
+    chat_id: str,
+    summary: str,
+    message_count: int
+) -> Dict[str, Any]:
+    """
+    Create a new context snapshot for a chat session.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        chat_id: Chat session ID
+        summary: Summary text
+        message_count: Number of messages summarized
+    
+    Returns:
+        Created context snapshot dictionary
+    """
+    print(f"calling create_context_snapshot with chat_id={chat_id}, message_count={message_count}")
+    
+    supabase = get_supabase_client()
+    
+    snapshot_data = {
+        "chat_id": chat_id,
+        "summary": summary,
+        "message_count": message_count
+    }
+    
+    # Insert the snapshot
+    insert_response = supabase.table("chat_context_snapshots").insert(snapshot_data).execute()
+    
+    if not insert_response.data:
+        raise Exception("Failed to create context snapshot")
+    
+    return insert_response.data[0]
+
+
+async def get_chat_message_count(
+    ctx: RunContext,
+    chat_id: str
+) -> int:
+    """
+    Get the total number of messages in a chat session.
+    
+    Args:
+        ctx: RunContext containing dependencies
+        chat_id: Chat session ID
+    
+    Returns:
+        Total message count
+    """
+    print(f"calling get_chat_message_count with chat_id={chat_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = supabase.table("chat_messages").select("id", count="exact").eq("chat_id", chat_id).execute()
+    
+    return response.count or 0
+

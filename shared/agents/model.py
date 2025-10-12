@@ -80,6 +80,8 @@ def get_anthropic_model() -> AnthropicModel:
     """
     Get the configured Anthropic model instance.
     """
+    if not ANTHROPIC_API_KEY:
+        raise ValueError("Anthropic API key is not set")
     provider = AnthropicProvider(api_key=ANTHROPIC_API_KEY)
     return AnthropicModel('claude-4-5-sonnet-latest', provider=provider)
 
@@ -87,12 +89,16 @@ def get_openai_model() -> OpenAIChatModel:
     """
     Get the configured OpenAI model instance.
     """
+    if not OPENAI_API_KEY:
+        raise ValueError("OpenAI API key is not set")
     provider = OpenAIProvider(api_key=OPENAI_API_KEY)
-    return OpenAIChatModel('gpt-4o', provider=provider)
+    return OpenAIChatModel('gpt-5-mini', provider=provider)
 
 def get_gemini_model() -> GoogleModel:
     """
     Get the configured Gemini model instance.
     """
+    if not GEMINI_API_KEY:
+        raise ValueError("Gemini API key is not set")
     provider = GoogleProvider(api_key=GEMINI_API_KEY)
-    return GoogleModel('gemini-1.5-flash', provider=provider)
+    return GoogleModel('gemini-2.5-flash', provider=provider)

@@ -4,11 +4,12 @@ import { getUserFromRequest } from "@/lib/utils/userCredentials";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { courseId, fileIds, message, context } = body as {
+    const { courseId, fileIds, message, context, sessionId } = body as {
       courseId: string;
       fileIds: string[];
       message: string;
       context?: string;
+      sessionId?: string;
     };
 
     // Get user id from request
@@ -33,6 +34,7 @@ export async function POST(request: NextRequest) {
         file_ids: (fileIds || []).map((id: string) => String(id)),
         message,
         ...(prompt ? { prompt } : {}),
+        ...(sessionId ? { session_id: sessionId } : {}),
       }),
     });
 

@@ -602,6 +602,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
             onRemoveContextItem={removeContextItem}
             courseId={courseId || ''}
             fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
+            initialSessionId={undefined}
           />
         )}
       </div>
