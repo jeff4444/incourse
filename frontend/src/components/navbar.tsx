@@ -18,11 +18,11 @@ import {
   Calendar,
   ChevronDown,
   Home,
-  Library,
   LogOut,
   Menu,
   Search,
   Settings,
+  Sparkles,
   User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -55,8 +55,8 @@ export function Navbar() {
             <span className="sr-only">Toggle menu</span>
           </Button>
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Library className="h-6 w-6 text-primary" />
-            <span className="text-xl font-bold hidden md:inline-block">
+            <Sparkles className="h-6 w-6 text-pink-500" />
+            <span className="text-xl font-bold hidden md:inline-block bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
               InCourse
             </span>
           </Link>

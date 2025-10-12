@@ -13,8 +13,22 @@ import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, FileText, Layers } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { NudgeCard } from "@/components/nudge-card";
+import { useAuth } from "@/hooks/useAuth";
 
 function DashboardPage() {
+  const { user } = useAuth();
+  
+  // Get user's display name
+  const getUserName = () => {
+    if (user?.user_metadata?.full_name) {
+      return user.user_metadata.full_name.split(' ')[0]; // Get first name
+    }
+    if (user?.email) {
+      return user.email.split('@')[0];
+    }
+    return 'there';
+  };
+
   // Sample activity data
   const recentActivity = [
     {
@@ -91,7 +105,7 @@ function DashboardPage() {
       <div className="container mx-auto px-4 md:px-6 py-6">
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
-            Good morning, Iman!
+            Good morning, {getUserName()}!
           </h1>
           <p className="text-lg text-muted-foreground">
             Here&apos;s what&apos;s happening with your learning today

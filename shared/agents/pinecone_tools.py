@@ -14,6 +14,7 @@ from typing import List, Dict, Any, Optional
 from pinecone import Pinecone
 from pydantic_ai import RunContext
 from dotenv import load_dotenv
+import json
 
 # Import file parsing utilities from tools
 from .tools import parse_file_content
@@ -381,6 +382,8 @@ async def search_file_with_query(
                 "score": hit.get('_score', 0),
                 "text": hit.get('fields', {}).get('text', ''),
                 "chunk_index": hit.get('fields', {}).get('chunk_index', 0),
+                "filename": hit.get('fields', {}).get('filename', ''),
+                "file_id": hit.get('fields', {}).get('file_id', '')
             }
             chunks.append(chunk_data)
         
@@ -394,6 +397,7 @@ async def search_file_with_query(
         }
         
     except Exception as e:
+        print(f"Search failed: {e}")
         return {
             "query": query,
             "file_id": file_id,

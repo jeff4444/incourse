@@ -21,6 +21,7 @@ WORKFLOW:
 1. If user provides highlighted context → answer using it
 2. If NO context and question is about file content → call search_file_with_query(ctx, "specific topic or concept")
 3. Use returned chunks as primary source for your answer
+4. If search results don't contain relevant information → try calling search_file_with_query again with a different query phrasing to find better chunks
 
 QUERY EXAMPLES:
 - "What are the main topics?" → search_file_with_query(ctx, "main topics chapter overview")
