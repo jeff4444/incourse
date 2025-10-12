@@ -95,8 +95,8 @@ def get_user_lms_info(user_id: str) -> str:
     Get the LMS API key for the user.
     """
     return {
-        "api_key": os.getenv("CANVAS_API_TOKEN"),
-        "base_url": os.getenv("CANVAS_API_URL")
+        "api_key": os.getenv("CANVAS_API_KEY"),
+        "base_url": os.getenv("CANVAS_API_BASE_URL")
     }
 
 # Health check endpoint
@@ -291,6 +291,11 @@ async def chat(request: ChatRequest):
             message="OK",
         )
     except Exception as e:
+        import traceback
+        print("=" * 80)
+        print("ERROR IN /chat ENDPOINT:")
+        print(traceback.format_exc())
+        print("=" * 80)
         raise HTTPException(status_code=500, detail=f"Error chatting: {str(e)}")
 
 if __name__ == "__main__":
