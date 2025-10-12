@@ -7,7 +7,6 @@ similar to how the frontend fetches data via API calls.
 
 import os
 from typing import List, Dict, Any, Optional
-from pydantic_ai import RunContext
 from dotenv import load_dotenv
 from supabase import create_client, Client
 
@@ -37,14 +36,12 @@ def get_supabase_client() -> Client:
 
 
 async def get_user(
-    ctx: RunContext,
     user_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Get user information from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         user_id: Optional user ID, defaults to ctx.deps.user_id
     
     Returns:
@@ -53,7 +50,6 @@ async def get_user(
     Raises:
         Exception: If user is not found or query fails
     """
-    user_id = user_id or ctx.deps.user_id
     print(f"calling get_user with user_id={user_id}")
     
     supabase = get_supabase_client()
@@ -67,14 +63,12 @@ async def get_user(
 
 
 async def get_user_by_email(
-    ctx: RunContext,
     email: str
 ) -> Dict[str, Any]:
     """
     Get user information by email from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         email: User email address
     
     Returns:
@@ -96,7 +90,6 @@ async def get_user_by_email(
 
 
 async def get_user_api_keys(
-    ctx: RunContext,
     user_id: Optional[str] = None,
     lms_provider: Optional[str] = None,
     active_only: bool = True
@@ -105,7 +98,6 @@ async def get_user_api_keys(
     Get user API keys from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         user_id: Optional user ID, defaults to ctx.deps.user_id
         lms_provider: Optional filter by LMS provider (canvas, blackboard, moodle, d2l)
         active_only: If True, only return active API keys
@@ -113,7 +105,6 @@ async def get_user_api_keys(
     Returns:
         List of user API key dictionaries
     """
-    user_id = user_id or ctx.deps.user_id
     print(f"calling get_user_api_keys with user_id={user_id}, lms_provider={lms_provider}, active_only={active_only}")
     
     supabase = get_supabase_client()
@@ -132,7 +123,6 @@ async def get_user_api_keys(
 
 
 async def get_courses(
-    ctx: RunContext,
     user_id: Optional[str] = None,
     lms_provider: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -140,14 +130,12 @@ async def get_courses(
     Get all courses for a user from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         user_id: Optional user ID, defaults to ctx.deps.user_id
         lms_provider: Optional filter by LMS provider
     
     Returns:
         List of course dictionaries with enrollment information
     """
-    user_id = user_id or ctx.deps.user_id
     print(f"calling get_courses with user_id={user_id}, lms_provider={lms_provider}")
     
     supabase = get_supabase_client()
@@ -174,14 +162,12 @@ async def get_courses(
 
 
 async def get_course(
-    ctx: RunContext,
     course_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Get a specific course from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         course_id: Optional course ID, defaults to ctx.deps.course_id
     
     Returns:
@@ -190,7 +176,6 @@ async def get_course(
     Raises:
         Exception: If course is not found or query fails
     """
-    course_id = course_id or ctx.deps.course_id
     print(f"calling get_course with course_id={course_id}")
     
     supabase = get_supabase_client()
@@ -204,7 +189,6 @@ async def get_course(
 
 
 async def get_course_by_lms_id(
-    ctx: RunContext,
     lms_id: str,
     lms_provider: str
 ) -> Dict[str, Any]:
@@ -212,7 +196,6 @@ async def get_course_by_lms_id(
     Get a course by its LMS ID and provider.
     
     Args:
-        ctx: RunContext containing dependencies
         lms_id: LMS course ID
         lms_provider: LMS provider name (canvas, blackboard, etc.)
     
@@ -241,20 +224,17 @@ async def get_course_by_lms_id(
 
 
 async def get_user_enrollments(
-    ctx: RunContext,
     user_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Get all enrollments for a user.
     
     Args:
-        ctx: RunContext containing dependencies
         user_id: Optional user ID, defaults to ctx.deps.user_id
     
     Returns:
         List of enrollment dictionaries
     """
-    user_id = user_id or ctx.deps.user_id
     print(f"calling get_user_enrollments with user_id={user_id}")
     
     supabase = get_supabase_client()
@@ -270,7 +250,6 @@ async def get_user_enrollments(
 
 
 async def is_user_enrolled(
-    ctx: RunContext,
     course_id: str,
     user_id: Optional[str] = None
 ) -> bool:
@@ -278,14 +257,12 @@ async def is_user_enrolled(
     Check if a user is enrolled in a course.
     
     Args:
-        ctx: RunContext containing dependencies
         course_id: Course ID
         user_id: Optional user ID, defaults to ctx.deps.user_id
     
     Returns:
         True if enrolled, False otherwise
     """
-    user_id = user_id or ctx.deps.user_id
     print(f"calling is_user_enrolled with user_id={user_id}, course_id={course_id}")
     
     supabase = get_supabase_client()
@@ -302,20 +279,17 @@ async def is_user_enrolled(
 
 
 async def get_course_modules(
-    ctx: RunContext,
     course_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Get all modules for a course from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         course_id: Optional course ID, defaults to ctx.deps.course_id
     
     Returns:
         List of module dictionaries
     """
-    course_id = course_id or ctx.deps.course_id
     print(f"calling get_course_modules with course_id={course_id}")
     
     supabase = get_supabase_client()
@@ -332,14 +306,12 @@ async def get_course_modules(
 
 
 async def get_module(
-    ctx: RunContext,
     module_id: str
 ) -> Dict[str, Any]:
     """
     Get a specific module from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         module_id: Module ID
     
     Returns:
@@ -361,7 +333,6 @@ async def get_module(
 
 
 async def get_module_by_lms_id(
-    ctx: RunContext,
     lms_id: str,
     course_id: Optional[str] = None
 ) -> Dict[str, Any]:
@@ -369,7 +340,6 @@ async def get_module_by_lms_id(
     Get a module by its LMS ID and course ID.
     
     Args:
-        ctx: RunContext containing dependencies
         lms_id: LMS module ID
         course_id: Optional course ID, defaults to ctx.deps.course_id
     
@@ -379,7 +349,6 @@ async def get_module_by_lms_id(
     Raises:
         Exception: If module is not found or query fails
     """
-    course_id = course_id or ctx.deps.course_id
     print(f"calling get_module_by_lms_id with lms_id={lms_id}, course_id={course_id}")
     
     supabase = get_supabase_client()
@@ -399,14 +368,12 @@ async def get_module_by_lms_id(
 
 
 async def get_module_items(
-    ctx: RunContext,
     module_id: str
 ) -> List[Dict[str, Any]]:
     """
     Get all items for a module from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         module_id: Module ID
     
     Returns:
@@ -427,7 +394,6 @@ async def get_module_items(
     return response.data
 
 async def get_module_item_by_lms_id(
-    ctx: RunContext,
     lms_id: str,
     module_id: str
 ) -> Dict[str, Any]:
@@ -435,7 +401,6 @@ async def get_module_item_by_lms_id(
     Get a module item by its LMS ID and module ID.
     
     Args:
-        ctx: RunContext containing dependencies
         lms_id: LMS module item ID
         module_id: Module ID
     
@@ -460,7 +425,6 @@ async def get_module_item_by_lms_id(
     return response.data[0]
 
 async def get_module_items_by_course_id(
-    ctx: RunContext,
     course_id: str,
     lms_id: str
 ) -> List[Dict[str, Any]]:
@@ -484,7 +448,6 @@ async def get_module_items_by_course_id(
     return response.data[0]
 
 async def get_module_items_by_type(
-    ctx: RunContext,
     module_id: str,
     item_type: str
 ) -> List[Dict[str, Any]]:
@@ -492,7 +455,6 @@ async def get_module_items_by_type(
     Get module items filtered by type.
     
     Args:
-        ctx: RunContext containing dependencies
         module_id: Module ID
         item_type: Type of items to fetch (File, Page, Discussion, Assignment, etc.)
     
@@ -516,7 +478,6 @@ async def get_module_items_by_type(
 
 
 async def get_course_module_items(
-    ctx: RunContext,
     course_id: Optional[str] = None,
     item_type: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -524,14 +485,12 @@ async def get_course_module_items(
     Get all module items for a course, optionally filtered by type.
     
     Args:
-        ctx: RunContext containing dependencies
         course_id: Optional course ID, defaults to ctx.deps.course_id
         item_type: Optional type filter (File, Page, Discussion, Assignment, etc.)
     
     Returns:
         List of module item dictionaries
     """
-    course_id = course_id or ctx.deps.course_id
     print(f"calling get_course_module_items with course_id={course_id}, item_type={item_type}")
     
     supabase = get_supabase_client()
@@ -551,14 +510,12 @@ async def get_course_module_items(
 
 
 async def get_module_item(
-    ctx: RunContext,
     item_id: str
 ) -> Dict[str, Any]:
     """
     Get a specific module item from Supabase.
     
     Args:
-        ctx: RunContext containing dependencies
         item_id: Module item ID
     
     Returns:
@@ -580,20 +537,17 @@ async def get_module_item(
 
 
 async def get_modules_with_items(
-    ctx: RunContext,
     course_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Get all modules for a course with their items included.
     
     Args:
-        ctx: RunContext containing dependencies
         course_id: Optional course ID, defaults to ctx.deps.course_id
     
     Returns:
         List of module dictionaries with items nested
     """
-    course_id = course_id or ctx.deps.course_id
     print(f"calling get_modules_with_items with course_id={course_id}")
     
     supabase = get_supabase_client()
@@ -633,7 +587,6 @@ async def get_modules_with_items(
 
 
 async def get_course_with_modules(
-    ctx: RunContext,
     course_id: Optional[str] = None,
     include_items: bool = False
 ) -> Dict[str, Any]:
@@ -641,24 +594,22 @@ async def get_course_with_modules(
     Get a course with its modules (and optionally module items) included.
     
     Args:
-        ctx: RunContext containing dependencies
         course_id: Optional course ID, defaults to ctx.deps.course_id
         include_items: If True, include module items in each module
     
     Returns:
         Course dictionary with modules nested
     """
-    course_id = course_id or ctx.deps.course_id
     print(f"calling get_course_with_modules with course_id={course_id}, include_items={include_items}")
     
     # Get course
-    course = await get_course(ctx, course_id)
+    course = await get_course(course_id=course_id)
     
     # Get modules with or without items
     if include_items:
-        modules = await get_modules_with_items(ctx, course_id)
+        modules = await get_modules_with_items(course_id)
     else:
-        modules = await get_course_modules(ctx, course_id)
+        modules = await get_course_modules(course_id)
     
     course["modules"] = modules
     
@@ -666,7 +617,6 @@ async def get_course_with_modules(
 
 
 async def search_courses(
-    ctx: RunContext,
     search_term: str,
     user_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
@@ -674,20 +624,18 @@ async def search_courses(
     Search courses by name or code for a specific user.
     
     Args:
-        ctx: RunContext containing dependencies
         search_term: Search term to match against course name or code
         user_id: Optional user ID, defaults to ctx.deps.user_id
     
     Returns:
         List of matching course dictionaries
     """
-    user_id = user_id or ctx.deps.user_id
     print(f"calling search_courses with search_term={search_term}, user_id={user_id}")
     
     supabase = get_supabase_client()
     
     # Get user's courses
-    courses = await get_courses(ctx, user_id)
+    courses = await get_courses(user_id)
     
     # Filter by search term
     search_term_lower = search_term.lower()
@@ -703,7 +651,6 @@ async def search_courses(
 # Chat System Functions
 
 async def get_or_create_chat_session(
-    ctx: RunContext,
     user_id: str,
     document_id: str
 ) -> Dict[str, Any]:
@@ -711,15 +658,13 @@ async def get_or_create_chat_session(
     Get existing chat session or create a new one for user-document pair.
     
     Args:
-        ctx: RunContext containing dependencies
         user_id: User ID
         document_id: Module item ID (document ID)
     
     Returns:
         Chat session dictionary
     """
-    print(f"calling get_or_create_chat_session with user_id={user_id}, document_id={document_id}")
-    
+    print(f"calling get_or_create_chat_session with user_id={user_id}, document_id={document_id}")    
     supabase = get_supabase_client()
     
     # Try to get existing session
@@ -747,7 +692,6 @@ async def get_or_create_chat_session(
 
 
 async def get_chat_messages(
-    ctx: RunContext,
     chat_id: str,
     limit: int = 50
 ) -> List[Dict[str, Any]]:
@@ -755,7 +699,6 @@ async def get_chat_messages(
     Get recent chat messages for a session.
     
     Args:
-        ctx: RunContext containing dependencies
         chat_id: Chat session ID
         limit: Maximum number of messages to retrieve
     
@@ -772,7 +715,6 @@ async def get_chat_messages(
 
 
 async def batch_save_messages(
-    ctx: RunContext,
     chat_id: str,
     messages: List[Dict[str, Any]]
 ) -> List[Dict[str, Any]]:
@@ -780,7 +722,6 @@ async def batch_save_messages(
     Save multiple messages to a chat session.
     
     Args:
-        ctx: RunContext containing dependencies
         chat_id: Chat session ID
         messages: List of message dictionaries with sender, content, tokens, metadata
     
@@ -813,14 +754,12 @@ async def batch_save_messages(
 
 
 async def get_latest_context_snapshot(
-    ctx: RunContext,
     chat_id: str
 ) -> Optional[Dict[str, Any]]:
     """
     Get the most recent context snapshot for a chat session.
     
     Args:
-        ctx: RunContext containing dependencies
         chat_id: Chat session ID
     
     Returns:
@@ -836,7 +775,6 @@ async def get_latest_context_snapshot(
 
 
 async def create_context_snapshot(
-    ctx: RunContext,
     chat_id: str,
     summary: str,
     message_count: int
@@ -845,7 +783,6 @@ async def create_context_snapshot(
     Create a new context snapshot for a chat session.
     
     Args:
-        ctx: RunContext containing dependencies
         chat_id: Chat session ID
         summary: Summary text
         message_count: Number of messages summarized
@@ -873,14 +810,12 @@ async def create_context_snapshot(
 
 
 async def get_chat_message_count(
-    ctx: RunContext,
     chat_id: str
 ) -> int:
     """
     Get the total number of messages in a chat session.
     
     Args:
-        ctx: RunContext containing dependencies
         chat_id: Chat session ID
     
     Returns:

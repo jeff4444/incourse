@@ -89,14 +89,14 @@ class ChatSessionManager:
             chat_id = session_id
         else:
             # Get or create new session
-            chat_session = await get_or_create_chat_session(user_id, document_id)
+            chat_session = await get_or_create_chat_session(user_id=user_id, document_id=document_id)
             chat_id = chat_session["id"]
         
         # Load recent messages (last 20 to keep context manageable)
-        chat_history = await get_chat_messages(chat_id, limit=20)
+        chat_history = await get_chat_messages(chat_id=chat_id, limit=20)
         
         # Load latest context summary
-        context_snapshot = await get_latest_context_snapshot(chat_id)
+        context_snapshot = await get_latest_context_snapshot(chat_id=chat_id)
         context_summary = context_snapshot["summary"] if context_snapshot else None
         
         return {
@@ -140,7 +140,7 @@ class ChatSessionManager:
             return
         
         try:
-            await batch_save_messages(chat_id, self.message_buffer)
+            await batch_save_messages(chat_id=chat_id, messages=self.message_buffer)
             self.message_buffer.clear()
             print(f"Flushed {len(self.message_buffer)} messages to database")
         except Exception as e:
@@ -158,11 +158,11 @@ class ChatSessionManager:
         """
         try:
             # Get current message count
-            message_count = await get_chat_message_count(chat_id)
+            message_count = await get_chat_message_count(chat_id=chat_id)
             
             # Check if we've reached a summary interval
             if message_count % self.summary_interval == 0 and message_count > 0:
-                await self.create_context_summary(chat_id, user_message, assistant_response)
+                await self.create_context_summary(chat_id=chat_id, user_message=user_message, assistant_response=assistant_response)
         except Exception as e:
             print(f"Error checking summary creation: {e}")
     
@@ -177,7 +177,7 @@ class ChatSessionManager:
         """
         try:
             # Get recent messages for summarization
-            recent_messages = await get_chat_messages(chat_id, limit=20)
+            recent_messages = await get_chat_messages(chat_id=chat_id, limit=20)
             
             # Add current conversation to messages
             messages_to_summarize = recent_messages + [
@@ -186,11 +186,11 @@ class ChatSessionManager:
             ]
             
             # Get previous summary if it exists
-            previous_snapshot = await get_latest_context_snapshot(chat_id)
+            previous_snapshot = await get_latest_context_snapshot(chat_id=chat_id)
             previous_summary = previous_snapshot["summary"] if previous_snapshot else None
             
             # Get total message count
-            message_count = await get_chat_message_count(chat_id)
+            message_count = await get_chat_message_count(chat_id=chat_id)
             
             # Create additional context from deps
             course_name = self.course_info.get("name", "Unknown Course") if self.course_info else "Unknown Course"
@@ -222,7 +222,7 @@ class ChatSessionManager:
                 summary_text += f"\n\nKey Insights:\n" + "\n".join(f"- {insight}" for insight in summary_result.key_insights)
             
             # Save the summary
-            await create_context_snapshot(chat_id, summary_text, message_count)
+            await create_context_snapshot(chat_id=chat_id, summary=summary_text, message_count=message_count)
             
             print(f"Created context summary for chat {chat_id} with {message_count} messages")
             print(f"Topics covered: {', '.join(summary_result.main_topics) if summary_result.main_topics else 'None identified'}")

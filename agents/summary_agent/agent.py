@@ -89,11 +89,11 @@ async def summarize_conversation(
         previous_summary=previous_summary
     )
     
-    result = await agent.run_sync(
-        f"Please summarize this conversation:\n\n{conversation_text}"
+    result = await agent.run(
+        f"Please summarize this conversation:\n\n{conversation_text}", deps=deps
     )
     
-    return result.data
+    return result.output
 
 
 async def summarize_conversation_incremental(
@@ -146,7 +146,7 @@ async def summarize_conversation_incremental(
     {conversation_text}
     """
     
-    result = await agent.run_sync(prompt)
+    result = await agent.run(prompt, deps=deps)
     
-    return result.data
+    return result.output
 

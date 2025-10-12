@@ -152,7 +152,7 @@ async def get_user_lms_info(user_id: str) -> str:
     """
     Get the LMS API key for the user.
     """
-    api_keys = await get_user_api_keys(ctx=None, user_id=user_id)
+    api_keys = await get_user_api_keys(user_id=user_id)
     api_key = api_keys[0]
     encrypted_api_key = api_key["encrypted_api_key"]
     api_base_url =f"{api_key["api_base_url"]}/api/v1"
@@ -336,10 +336,10 @@ async def chat(request: ChatRequest):
     try:
         lms_info = await get_user_lms_info(request.user_id)
         
-        course_info = await get_course(ctx=None, course_id=request.course_id)
+        course_info = await get_course(course_id=request.course_id)
         
         try:
-            file_info = await get_module_items_by_course_id(ctx=None, course_id=course_info["id"], lms_id=request.file_ids[0])
+            file_info = await get_module_items_by_course_id(course_id=course_info["id"], lms_id=request.file_ids[0])
             is_file_from_lms = False
             document_id = file_info["id"]  # Use the module_item ID
         except Exception as e:
