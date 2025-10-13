@@ -328,7 +328,7 @@ async def search_file_with_query(
     if not namespace_exists:
         print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
         created_new_namespace = True
-        if ctx.deps.is_file_from_lms:
+        if not ctx.deps.is_file_from_lms:
             file_details = await get_file_details(api_key, api_base_url, course_id, file_id)
         else:
             file_details = ctx.deps.file_info

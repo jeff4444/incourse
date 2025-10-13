@@ -320,6 +320,9 @@ export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails 
             contextItems={contextItems}
             selectedContextItem={selectedContextItem}
             onRemoveContextItem={removeContextItem}
+            courseId=""
+            fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
+            initialSessionId={undefined}
           />
         )}
       </div>

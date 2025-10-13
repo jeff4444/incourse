@@ -20,6 +20,7 @@ interface ChatPanelProps {
   onRemoveContextItem: (id: string) => void
   courseId: string
   fileIdList: string[]
+  initialSessionId?: string
 }
 
 export function ChatPanel({
@@ -30,6 +31,7 @@ export function ChatPanel({
   onRemoveContextItem,
   courseId,
   fileIdList,
+  initialSessionId,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]>([
     {
@@ -40,6 +42,8 @@ export function ChatPanel({
   ])
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null)
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const suggestions = [
@@ -57,13 +61,86 @@ export function ChatPanel({
     scrollToBottom()
   }, [messages])
 
+  // Load chat history when sessionId is provided or auto-detect existing session
+  useEffect(() => {
+    if (initialSessionId && !sessionId) {
+      loadChatHistory(initialSessionId)
+    } else if (!initialSessionId && !sessionId && courseId && fileIdList.length > 0) {
+      // Auto-detect existing session for this user-document pair
+      detectAndLoadExistingSession()
+    }
+  }, [initialSessionId, sessionId, courseId, fileIdList])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
+  const detectAndLoadExistingSession = async () => {
+    setIsLoadingHistory(true)
+    try {
+      // Check if there's an existing session for this user-document pair
+      const data = await authenticatedFetchJson<{ sessionId?: string }>(
+        '/api/agents/chat/session',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            courseId,
+            fileIds: fileIdList,
+          }),
+        }
+      )
+      
+      if (data?.sessionId) {
+        // We found an existing session, load its history
+        await loadChatHistory(data.sessionId)
+      }
+    } catch (error) {
+      console.error("Error detecting existing session:", error)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+  const loadChatHistory = async (sessionId: string) => {
+    setIsLoadingHistory(true)
+    try {
+      // Load chat history from the backend
+      const data = await authenticatedFetchJson<{ messages: any[] }>(
+        `/api/agents/chat/history?sessionId=${sessionId}`,
+        {
+          method: 'GET',
+        }
+      )
+      
+      if (data?.messages && data.messages.length > 0) {
+        // Convert backend messages to frontend format
+        const historyMessages = data.messages.map((msg: any) => ({
+          role: msg.sender as "user" | "assistant",
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          contextPreview: undefined
+        }))
+        
+        // Replace the default welcome message with actual history
+        setMessages(historyMessages)
+      }
+      
+      setSessionId(sessionId)
+      console.log("Loaded session with", data?.messages?.length || 0, "messages")
+    } catch (error) {
+      console.error("Error loading chat history:", error)
+      // Still set the sessionId even if history loading fails
+      setSessionId(sessionId)
+    } finally {
+      setIsLoadingHistory(false)
+    }
+  }
+
+
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || isLoading) return
+    if (!inputValue.trim() || isLoading || isLoadingHistory) return
 
     // Add user message
     const contextText = selectedContextItem?.text
@@ -93,7 +170,7 @@ export function ChatPanel({
         onRemoveContextItem(selectedContextItem.id)
       }
 
-      const data = await authenticatedFetchJson<{ answer?: string }>(
+      const data = await authenticatedFetchJson<{ answer?: string; session_id?: string }>(
         '/api/agents/chat',
         {
           method: 'POST',
@@ -103,15 +180,22 @@ export function ChatPanel({
             fileIds: fileIdList,
             message: inputValue,
             context: contextText,
+            sessionId: sessionId,
           }),
         }
       )
       const answer = data?.answer ?? 'Sorry, I could not get a response.'
+      
+      // Store sessionId if provided (for new sessions)
+      if (data?.session_id) {
+        setSessionId(data.session_id)
+      }
+      
       setMessages([
         ...newMessages,
         {
           role: "assistant",
-            content: answer,
+          content: answer,
           timestamp: new Date(),
         },
       ])
@@ -155,8 +239,17 @@ export function ChatPanel({
             Suggestions
           </TabsTrigger>
         </TabsList>
+        
 
         <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 overflow-hidden">
+          {/* Loading indicator */}
+          {isLoadingHistory && (
+            <div className="p-4 text-center text-sm text-gray-500">
+              <Loader2 className="h-4 w-4 animate-spin mx-auto mb-2" />
+              Loading chat history...
+            </div>
+          )}
+          
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4">
             {messages.map((message, index) => (
