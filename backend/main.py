@@ -21,8 +21,8 @@ from agents.nudge_agent.agent import get_nudge_agent, Nudge, Deps as NudgeDeps
 from agents.take_action_agent.agent import get_take_action_agent, RouteOutput, Deps as TakeActionDeps
 from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps, ChatSessionManager
 
-from shared.agents.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
-from shared.agents.pinecone_tools import get_file_details
+from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
+from tools.pinecone_tools import get_file_details
 
 load_dotenv()
 
