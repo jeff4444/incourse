@@ -1,110 +1,18 @@
 """
-Pinecone tools for semantic search over course files.
-
-This module provides tools to search course files using Pinecone's vector database,
-automatically creating indexes and namespaces as needed.
+Core Pinecone API functions without RunContext dependency.
+All functions accept explicit parameters instead of extracting from context.
 """
 
 import os
-import re
-import asyncio
 import aiohttp
 import tempfile
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any
 from pinecone import Pinecone
-from pydantic_ai import RunContext
 from dotenv import load_dotenv
-import json
-
-# Import file parsing utilities from tools
-from .tools import parse_file_content
+from shared.utils.pinecone_utils import chunk_text, sanitize_index_name, sanitize_namespace_name
+from shared.utils.canvas_utils import parse_file_content
 
 load_dotenv()
-
-# Configuration
-CHUNK_SIZE = 500  # characters per chunk
-CHUNK_OVERLAP = 50  # overlap between chunks
-
-
-def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) -> List[str]:
-    """
-    Chunk text into smaller pieces with overlap.
-    
-    Args:
-        text: Text to chunk
-        chunk_size: Maximum characters per chunk
-        overlap: Number of characters to overlap between chunks
-    
-    Returns:
-        List of text chunks
-    """
-    if not text or len(text) <= chunk_size:
-        return [text] if text else []
-    
-    chunks = []
-    start = 0
-    
-    while start < len(text):
-        end = start + chunk_size
-        
-        # Try to break at a sentence boundary
-        if end < len(text):
-            # Look for sentence endings (., !, ?, newline)
-            sentence_end = max(
-                text.rfind('.', start, end),
-                text.rfind('!', start, end),
-                text.rfind('?', start, end),
-                text.rfind('\n', start, end)
-            )
-            if sentence_end > start:
-                end = sentence_end + 1
-        
-        chunk = text[start:end].strip()
-        if chunk:
-            chunks.append(chunk)
-        
-        # Move start position with overlap
-        start = end - overlap if end < len(text) else end
-    
-    return chunks
-
-
-def sanitize_index_name(name: str) -> str:
-    """
-    Sanitize index name to meet Pinecone requirements.
-    Index names must be lowercase alphanumeric with hyphens.
-    """
-    # Convert to lowercase
-    name = name.lower()
-    # Replace spaces and underscores with hyphens
-    name = re.sub(r'[\s_]+', '-', name)
-    # Remove any non-alphanumeric characters except hyphens
-    name = re.sub(r'[^a-z0-9-]', '', name)
-    # Remove leading/trailing hyphens
-    name = name.strip('-')
-    # Limit length to 45 characters (Pinecone max is ~50)
-    name = name[:45]
-    # Ensure name ends with alphanumeric after truncation
-    name = re.sub(r'-+$', '', name)
-    return name
-
-
-def sanitize_namespace_name(name: str) -> str:
-    """
-    Sanitize namespace name to meet Pinecone requirements.
-    Namespaces can contain most characters but should avoid special chars.
-    """
-    # Replace problematic characters
-    name = re.sub(r'[\s]+', '-', name)
-    # Remove any special characters that might cause issues
-    name = re.sub(r'[^a-zA-Z0-9_-]', '', name)
-    # Remove leading/trailing hyphens and underscores
-    name = name.strip('-_')
-    # Limit length
-    name = name[:100]
-    # Ensure name ends with alphanumeric after truncation
-    name = re.sub(r'[-_]+$', '', name)
-    return name
 
 
 async def get_course_details(
@@ -261,8 +169,15 @@ def create_and_populate_namespace(
 
 
 async def search_file_with_query(
-    ctx: RunContext,
-    query: str
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    course_name: str,
+    file_id: str,
+    filename: str,
+    query: str,
+    is_file_from_lms: bool = False,
+    file_info: Dict[str, Any] = None
 ) -> Dict[str, Any]:
     """
     Search for relevant chunks in a course file using Pinecone.
@@ -270,10 +185,15 @@ async def search_file_with_query(
     If the index or namespace doesn't exist, automatically creates it and indexes the file.
     
     Args:
-        ctx: RunContext with dependencies (lms_api_key, lms_base_url, course_id)
+        api_key: LMS API key
+        api_base_url: LMS API base URL
+        course_id: Course ID
+        course_name: Course name
         file_id: The file ID to search
+        filename: The file name
         query: The search query
-        course_id: Optional course ID (defaults to ctx.deps.course_id)
+        is_file_from_lms: Whether file is directly from LMS
+        file_info: Optional file info dict if already loaded
     
     Returns:
         Dictionary containing:
@@ -284,14 +204,6 @@ async def search_file_with_query(
         - created_new_index: Whether a new index was created
         - created_new_namespace: Whether a new namespace was created
     """
-    
-    # Get API credentials from context
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
-    course_id = ctx.deps.course_info["lms_id"]
-    course_name = ctx.deps.course_info["name"]
-    file_id = ctx.deps.file_info["id"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["lms_content_id"]
-    filename = ctx.deps.file_info["display_name"] if ctx.deps.is_file_from_lms else ctx.deps.file_info["name"]
     print(f"search_file_with_query called with file_id={file_id}, query='{query}'")
     
     # Get Pinecone API key
@@ -328,10 +240,10 @@ async def search_file_with_query(
     if not namespace_exists:
         print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
         created_new_namespace = True
-        if not ctx.deps.is_file_from_lms:
+        if not is_file_from_lms:
             file_details = await get_file_details(api_key, api_base_url, course_id, file_id)
         else:
-            file_details = ctx.deps.file_info
+            file_details = file_info if file_info else {}
         file_content = file_details.get('parsed_content', '')
         
         # Validate we have content to index
