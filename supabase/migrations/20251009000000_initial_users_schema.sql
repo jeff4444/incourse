@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     full_name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
+    school_name TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -25,6 +26,7 @@ CREATE TABLE IF NOT EXISTS user_api_keys (
 
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_school_name ON users(school_name);
 CREATE INDEX IF NOT EXISTS idx_user_api_keys_user_id ON user_api_keys(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_api_keys_lms_provider ON user_api_keys(lms_provider);
 CREATE INDEX IF NOT EXISTS idx_user_api_keys_active ON user_api_keys(is_active);
@@ -73,8 +75,13 @@ CREATE TRIGGER update_user_api_keys_updated_at BEFORE UPDATE ON user_api_keys
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO public.users (id, full_name, email)
-    VALUES (new.id, new.raw_user_meta_data->>'full_name', new.email);
+    INSERT INTO public.users (id, full_name, email, school_name)
+    VALUES (
+        new.id, 
+        new.raw_user_meta_data->>'full_name', 
+        new.email,
+        new.raw_user_meta_data->>'school_name'
+    );
     RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
