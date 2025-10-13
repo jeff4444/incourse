@@ -1,27 +1,13 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from pydantic_ai import Agent, Tool
 from prompts.flashcard_agent_prompt import FLASHCARD_AGENT_PROMPT
 from shared.model import get_model
-from tools.canvas_tools import (
-    get_chat_history_summary, 
-    get_course_grade_details, 
-    get_course_quiz_history, 
-    get_file_content_summaries, 
-    get_overall_course_performance,
-    get_assignment_grades,
-    get_all_grades,
-    get_some_grades,
-    get_course_analytics,
-    get_student_analytics,
-    get_canvas_courses,
-    get_canvas_course,
-    get_canvas_course_modules,
-    get_canvas_module_items,
-    get_canvas_file_details,
-    get_canvas_files_details,
-    get_canvas_course_assignments
+from tools.pinecone_tools import (
+    search_multiple_files_with_query,
+    search_single_file_with_query,
+    search_single_file_with_chunk_index
 )
 
 class Flashcard(BaseModel):
@@ -60,10 +46,14 @@ class Flashcard(BaseModel):
 @dataclass
 class Deps:
     user_id: str
-    lms_api_key: str
-    lms_base_url: str
     course_id: str
     file_ids: List[str]
+    
+    # Lazy-loaded fields (will be fetched by tools if needed, but can be pre-populated)
+    lms_api_key: Optional[str] = None
+    lms_base_url: Optional[str] = None
+    course_info: Optional[Dict[str, Any]] = None
+    files_info: Optional[List[Dict[str, Any]]] = None
     
     
 def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
@@ -73,6 +63,14 @@ def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
     system_prompt = kwargs.get("prompt", None)
     if system_prompt is None:
         system_prompt = FLASHCARD_AGENT_PROMPT
+    
+    # Inject file_ids into prompt if available
+    file_ids = kwargs.get("file_ids", [])
+    if file_ids:
+        system_prompt += f"\n\n📁 AVAILABLE FILES:\n"
+        for file_id in file_ids:
+            system_prompt += f"- {file_id}\n"
+        system_prompt += "\nUse these file_ids when calling search_single_file_with_query() or search_single_file_with_chunk_index()."
             
     model = get_model()
     
@@ -84,22 +82,9 @@ def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
         output_type=List[Flashcard],
         system_prompt=system_prompt,
         tools=[  
-            Tool(get_overall_course_performance, takes_ctx=True),
-            Tool(get_chat_history_summary, takes_ctx=True),
-            Tool(get_course_quiz_history, takes_ctx=True),
-            Tool(get_course_grade_details, takes_ctx=True),
-            Tool(get_file_content_summaries, takes_ctx=True),
-            Tool(get_assignment_grades, takes_ctx=True),
-            Tool(get_all_grades, takes_ctx=True),
-            Tool(get_some_grades, takes_ctx=True),
-            Tool(get_course_analytics, takes_ctx=True),
-            Tool(get_student_analytics, takes_ctx=True),
-            Tool(get_canvas_courses, takes_ctx=True),
-            Tool(get_canvas_course, takes_ctx=True),
-            Tool(get_canvas_course_modules, takes_ctx=True),
-            Tool(get_canvas_module_items, takes_ctx=True),
-            Tool(get_canvas_file_details, takes_ctx=True),
-            Tool(get_canvas_files_details, takes_ctx=True),
-            Tool(get_canvas_course_assignments, takes_ctx=True),
+            # Pinecone search tools - primary for content retrieval
+            Tool(search_multiple_files_with_query, takes_ctx=True),
+            Tool(search_single_file_with_query, takes_ctx=True),
+            Tool(search_single_file_with_chunk_index, takes_ctx=True),
         ],
     )

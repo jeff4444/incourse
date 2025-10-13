@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Calendar, TrendingUp } from "lucide-react";
 import { Course } from "@/lib/types/course";
 
 function calculateSemesterProgress(semester: string | null, year: string | null): number {
@@ -41,24 +41,56 @@ export function CourseCard({ course }: { course: Course }) {
     <Link href={{
       pathname: `/courses/${course.id}`,
     }}>
-      <Card className="h-full overflow-hidden card-hover pb-0 justify-between">
-        <CardContent className="p-6">
-          <div className="flex items-start justify-between mb-4">
-            <div className={`text-white p-2 rounded-lg bg-blue-500`}>
-              <BookOpen className="h-5 w-5" />
+      <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-1 group cursor-pointer">
+        <CardContent className="h-full flex flex-col">
+          {/* Header with icon and term */}
+          <div className="flex items-start justify-between mb-6">
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl blur-sm opacity-50 group-hover:opacity-100 transition-opacity"></div>
+              <div className="relative bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 rounded-xl">
+                <BookOpen className="h-6 w-6" />
+              </div>
             </div>
-            <Badge variant="outline">{course.year} {course.semester}</Badge>
+            <Badge 
+              variant="secondary" 
+              className="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border-0 shadow-sm"
+            >
+              <Calendar className="h-3 w-3 mr-1" />
+              {course.year} {course.semester}
+            </Badge>
           </div>
-          <h3 className="font-semibold text-lg mb-1 line-clamp-2">
-            {course.name}
-          </h3>
-          {course.code && <p className="text-sm font-medium text-blue-600">{course.code}</p>}
-          <br />
-          <Progress value={progress} className="h-1 mb-2" />
+
+          {/* Course information */}
+          <div className="flex-1 space-y-3">
+            <h3 className="font-bold text-xl text-gray-900 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+              {course.name}
+            </h3>
+            {course.code && (
+              <p className="text-sm font-medium text-blue-600 bg-blue-50 px-3 py-1 rounded-full inline-block">
+                {course.code}
+              </p>
+            )}
+          </div>
+
+          {/* Progress section */}
+          <div className="mt-6 space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600 font-medium">Semester Progress</span>
+              <span className="text-gray-900 font-semibold">{Math.round(progress)}%</span>
+            </div>
+            <div className="relative">
+              <Progress 
+                value={progress} 
+                className="h-2 bg-gray-200"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full opacity-0 group-hover:opacity-20 transition-opacity"></div>
+            </div>
+            <div className="flex items-center text-xs text-gray-500">
+              <TrendingUp className="h-3 w-3 mr-1" />
+              <span>On track for completion</span>
+            </div>
+          </div>
         </CardContent>
-        <CardFooter className="bg-muted/50 px-6 py-3 text-sm [.border-t]:pt-3">
-          Continue Learning
-        </CardFooter>
       </Card>
     </Link>
   );

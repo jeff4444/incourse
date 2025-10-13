@@ -1,0 +1,55 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/utils/supabase/server";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ quizId: string }> }
+) {
+  try {
+    const { quizId } = await params;
+    const supabase = await createClient();
+
+    // Get the quiz
+    const { data: quiz, error: quizError } = await supabase
+      .from('quizzes')
+      .select('*')
+      .eq('id', quizId)
+      .single();
+
+    if (quizError || !quiz) {
+      return NextResponse.json(
+        { error: "Quiz not found" },
+        { status: 404 }
+      );
+    }
+
+    // Get questions
+    const { data: questions, error: questionsError } = await supabase
+      .from('quiz_questions')
+      .select('*')
+      .eq('quiz_id', quizId)
+      .order('position');
+
+    if (questionsError) {
+      return NextResponse.json(
+        { error: "Failed to fetch quiz questions" },
+        { status: 500 }
+      );
+    }
+
+    // Combine quiz with questions
+    const quizWithQuestions = {
+      ...quiz,
+      questions: questions || [],
+    };
+
+    return NextResponse.json(quizWithQuestions);
+  } catch (error) {
+    console.error("Error fetching quiz:", error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+

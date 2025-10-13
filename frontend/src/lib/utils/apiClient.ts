@@ -44,7 +44,7 @@ export async function authenticatedFetchJson<T>(url: string, options: RequestIni
   const response = await authenticatedFetch(url, options);
   
   if (!response.ok) {
-    throw new Error(`API call failed: ${response.status} ${response.statusText}`);
+    throw new Error(`API call failed: ${response.status} ${response.statusText} ${response.body} ${url}`);
   }
   
   return response.json();

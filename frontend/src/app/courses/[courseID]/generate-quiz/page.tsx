@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { authenticatedFetchJson } from "@/lib/utils/apiClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Navbar } from "@/components/navbar"
+import { FileSelector } from "@/components/file-selector"
 import { Brain, ChevronLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 
@@ -18,7 +20,8 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
   const [courseID, setCourseID] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const [extraContext, setExtraContext] = useState("")
   const [questionCount, setQuestionCount] = useState(5)
   const [difficulty, setDifficulty] = useState("medium")
 
@@ -30,15 +33,32 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
     getParams();
   }, [params]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true)
 
-    // In a real app, this would call an API to generate a quiz
-    // For now, simulate a delay and redirect to the quiz page
-    setTimeout(() => {
+    try {
+      const response = await authenticatedFetchJson<{ quiz_id: string; quiz: any }>(
+        '/api/agents/quizzes',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            courseId: courseID,
+            name: title,
+            fileIds: selectedFiles,
+            numQuestions: questionCount,
+            difficulty,
+            extraContext: extraContext || undefined,
+          }),
+        }
+      )
+
+      // Navigate to the newly created quiz
+      router.push(`/courses/${courseID}/quiz/${response.quiz_id}`)
+    } catch (error) {
+      console.error('Error generating quiz:', error)
+      alert('Failed to generate quiz. Please try again.')
       setIsGenerating(false)
-      router.push(`/courses/${courseID}/quiz`)
-    }, 2000)
+    }
   }
 
   return (
@@ -71,17 +91,26 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="content">Source Content (optional)</Label>
-              <Textarea
-                id="content"
-                placeholder="Paste lecture notes, textbook excerpts, or other content to base the quiz on..."
-                className="min-h-[150px]"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">
-                Leave blank to generate questions based on the course materials.
+              <Label>Select Files</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose which files to use for generating quiz questions.
               </p>
+              <FileSelector
+                courseId={courseID}
+                selectedFileIds={selectedFiles}
+                onSelectionChange={setSelectedFiles}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="extra-context">Additional Instructions (optional)</Label>
+              <Textarea
+                id="extra-context"
+                placeholder="Add any specific instructions (e.g., 'Focus on chapters 5-7', 'Include problem-solving questions', 'Avoid topics covered in the last exam')..."
+                className="min-h-[100px]"
+                value={extraContext}
+                onChange={(e) => setExtraContext(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -115,7 +144,7 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={handleGenerate} disabled={isGenerating || !title}>
+            <Button className="w-full" onClick={handleGenerate} disabled={isGenerating || !title || selectedFiles.length === 0}>
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

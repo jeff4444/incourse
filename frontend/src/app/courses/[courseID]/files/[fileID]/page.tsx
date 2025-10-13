@@ -15,30 +15,36 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 function getViewer(fileDetails: FileDetails, courseID?: string) {
   // PDF files
-  if (fileDetails.type === "application/pdf") {
+  if (fileDetails.type === "application/pdf" || fileDetails.contentType === "application/pdf") {
     return <PDFViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // PowerPoint files
   if (fileDetails.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-      fileDetails.type === "application/vnd.ms-powerpoint") {
+      fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+      fileDetails.type === "application/vnd.ms-powerpoint" ||
+      fileDetails.contentType === "application/vnd.ms-powerpoint") {
     return <PPTXViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // Excel files
   if (fileDetails.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      fileDetails.type === "application/vnd.ms-excel") {
+      fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      fileDetails.type === "application/vnd.ms-excel" ||
+      fileDetails.contentType === "application/vnd.ms-excel") {
     return <XLSXViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // Word files
   if (fileDetails.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      fileDetails.type === "application/msword") {
+      fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+      fileDetails.type === "application/msword" ||
+      fileDetails.contentType === "application/msword") {
     return <DOCXViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // Image files
-  if (fileDetails.type.startsWith("image/")) {
+  if (fileDetails.type.startsWith("image/") || fileDetails.contentType?.startsWith("image/")) {
     return <ImageViewer fileDetails={fileDetails} />;
   }
   

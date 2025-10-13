@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { authenticatedFetchJson } from "@/lib/utils/apiClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { Navbar } from "@/components/navbar"
+import { FileSelector } from "@/components/file-selector"
 import { Brain, ChevronLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
 
@@ -18,7 +20,8 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
   const [courseID, setCourseID] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
+  const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const [extraContext, setExtraContext] = useState("")
   const [cardCount, setCardCount] = useState(10)
   const [cardType, setCardType] = useState("term-definition")
 
@@ -30,15 +33,32 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
     getParams();
   }, [params]);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true)
 
-    // In a real app, this would call an API to generate flashcards
-    // For now, simulate a delay and redirect to the flashcards page
-    setTimeout(() => {
+    try {
+      const response = await authenticatedFetchJson<{ deck_id: string; deck: any }>(
+        '/api/agents/flashcards',
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            courseId: courseID,
+            name: title,
+            fileIds: selectedFiles,
+            numFlashcards: cardCount,
+            cardType,
+            extraContext: extraContext || undefined,
+          }),
+        }
+      )
+
+      // Navigate to the newly created flashcard deck
+      router.push(`/courses/${courseID}/flashcards/${response.deck_id}`)
+    } catch (error) {
+      console.error('Error generating flashcards:', error)
+      alert('Failed to generate flashcards. Please try again.')
       setIsGenerating(false)
-      router.push(`/courses/${courseID}/flashcards/deck1`)
-    }, 2000)
+    }
   }
 
   return (
@@ -71,17 +91,26 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="content">Source Content (optional)</Label>
-              <Textarea
-                id="content"
-                placeholder="Paste lecture notes, textbook excerpts, or other content to extract flashcards from..."
-                className="min-h-[150px]"
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">
-                Leave blank to generate flashcards based on the course materials.
+              <Label>Select Files</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose which files to use for generating flashcards.
               </p>
+              <FileSelector
+                courseId={courseID}
+                selectedFileIds={selectedFiles}
+                onSelectionChange={setSelectedFiles}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="extra-context">Additional Instructions (optional)</Label>
+              <Textarea
+                id="extra-context"
+                placeholder="Add any specific instructions (e.g., 'Focus on key definitions', 'Include code examples', 'Avoid topics from chapter 1')..."
+                className="min-h-[100px]"
+                value={extraContext}
+                onChange={(e) => setExtraContext(e.target.value)}
+              />
             </div>
 
             <div className="space-y-2">
@@ -115,7 +144,7 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={handleGenerate} disabled={isGenerating || !title}>
+            <Button className="w-full" onClick={handleGenerate} disabled={isGenerating || !title || selectedFiles.length === 0}>
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

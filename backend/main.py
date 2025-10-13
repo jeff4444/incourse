@@ -6,7 +6,7 @@ import tempfile
 import subprocess
 import aiohttp
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -23,10 +23,19 @@ from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps
 
 # Import managers and tools
 from shared.managers import ChatSessionManager
-from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
+from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id
 from api.canvas import get_course_details, get_file_details_with_content
 from shared.utils.supabase_utils import decrypt_api_key
-from api.supabase import get_user_lms_info
+from api.supabase import (
+    get_user_lms_info,
+    get_course,
+    create_flashcard_deck,
+    create_flashcards,
+    get_flashcard_deck,
+    create_quiz,
+    create_quiz_questions,
+    get_quiz
+)
 
 
 load_dotenv()
@@ -50,16 +59,20 @@ app.add_middleware(
 class FlashcardRequest(BaseModel):
     user_id: str
     course_id: str
+    name: str
     file_ids: List[str]
     num_flashcards: int = 10
-    prompt: Optional[str] = None
+    card_type: str = "term-definition"
+    extra_context: Optional[str] = None
 
 class QuizRequest(BaseModel):
     user_id: str
     course_id: str
+    name: str
     file_ids: List[str]
-    num_quizzes: int = 10
-    prompt: Optional[str] = None
+    num_questions: int = 5
+    difficulty: str = "medium"
+    extra_context: Optional[str] = None
 
 class NudgeRequest(BaseModel):
     user_id: str
@@ -70,12 +83,14 @@ class TakeActionRequest(BaseModel):
     user_input: str
 
 class FlashcardResponse(BaseModel):
-    flashcards: List[Dict[str, str]]
+    deck_id: str
+    deck: Dict[str, Any]
     success: bool
     message: str
 
 class QuizResponse(BaseModel):
-    quizzes: List[Dict[str, str]]
+    quiz_id: str
+    quiz: Dict[str, Any]
     success: bool
     message: str
 
@@ -120,34 +135,58 @@ async def health_check():
 @app.post("/generate-flashcards", response_model=FlashcardResponse)
 async def generate_flashcards(request: FlashcardRequest):
     """
-    Generate flashcards based on course content and files.
+    Generate flashcards based on course content and files, and store them in the database.
     """
     try:
-        # Create dependencies
+        # Pre-load dependencies to avoid refetching on every tool call
         lms_info = await get_user_lms_info(request.user_id)
+        course_info = await get_course(request.course_id)
         
         deps = FlashcardDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"]
+            lms_base_url=lms_info["base_url"],
+            course_info=course_info
         )
         
-        # Get the flashcard agent
-        agent = get_flashcard_agent(num_flashcards=request.num_flashcards)
+        # Get the flashcard agent with file_ids injected
+        agent = get_flashcard_agent(num_flashcards=request.num_flashcards, file_ids=request.file_ids)
+        
+        # Build prompt with extra context if provided
+        prompt = f"Generate {request.num_flashcards} flashcards"
+        if request.extra_context:
+            prompt += f". Additional instructions: {request.extra_context}"
         
         # Generate flashcards
-        prompt = f"Generate {request.num_flashcards} flashcards. Additional instructions: {request.prompt}"
-        flashcards = await agent.run(prompt, deps=deps)
+        flashcards_result = await agent.run(prompt, deps=deps)
         
         # Convert to dictionary format
-        flashcard_dicts = [flashcard.to_dict() for flashcard in flashcards.output]
+        flashcard_dicts = [flashcard.to_dict() for flashcard in flashcards_result.output]
+        
+        # Create deck in database
+        deck_id = await create_flashcard_deck(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            name=request.name,
+            file_ids=request.file_ids,
+            card_count=len(flashcard_dicts),
+            extra_context=request.extra_context,
+            card_type=request.card_type
+        )
+        
+        # Store flashcards in database
+        await create_flashcards(deck_id, flashcard_dicts)
+        
+        # Fetch complete deck with flashcards
+        deck = await get_flashcard_deck(deck_id)
         
         return FlashcardResponse(
-            flashcards=flashcard_dicts,
+            deck_id=deck_id,
+            deck=deck,
             success=True,
-            message="Flashcards generated successfully"
+            message="Flashcards generated and saved successfully"
         )
         
     except Exception as e:
@@ -157,33 +196,58 @@ async def generate_flashcards(request: FlashcardRequest):
 @app.post("/generate-quiz", response_model=QuizResponse)
 async def generate_quiz(request: QuizRequest):
     """
-    Generate quiz questions based on course content and files.
+    Generate quiz questions based on course content and files, and store them in the database.
     """
     try:
-        # Create dependencies
+        # Pre-load dependencies to avoid refetching on every tool call
         lms_info = await get_user_lms_info(request.user_id)
+        course_info = await get_course(request.course_id)
         
         deps = QuizDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"]
+            lms_base_url=lms_info["base_url"],
+            course_info=course_info
         )
         
-        # Get the quiz agent
-        agent = get_quiz_agent(num_quizzes=request.num_quizzes)
+        # Get the quiz agent with file_ids injected
+        agent = get_quiz_agent(num_quizzes=request.num_questions, difficulty=request.difficulty, file_ids=request.file_ids)
+        
+        # Build prompt with difficulty and extra context
+        prompt = f"Generate {request.num_questions} {request.difficulty} difficulty quiz questions"
+        if request.extra_context:
+            prompt += f". Additional instructions: {request.extra_context}"
         
         # Generate quiz questions
-        quizzes = await agent.run(request.prompt, deps=deps)
+        quizzes_result = await agent.run(prompt, deps=deps)
         
         # Convert to dictionary format
-        quiz_dicts = [quiz.to_dict() for quiz in quizzes.output]
+        quiz_dicts = [quiz.to_dict() for quiz in quizzes_result.output]
+        
+        # Create quiz in database
+        quiz_id = await create_quiz(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            name=request.name,
+            file_ids=request.file_ids,
+            question_count=len(quiz_dicts),
+            extra_context=request.extra_context,
+            difficulty=request.difficulty
+        )
+        
+        # Store quiz questions in database
+        await create_quiz_questions(quiz_id, quiz_dicts)
+        
+        # Fetch complete quiz with questions
+        quiz = await get_quiz(quiz_id)
         
         return QuizResponse(
-            quizzes=quiz_dicts,
+            quiz_id=quiz_id,
+            quiz=quiz,
             success=True,
-            message="Quiz questions generated successfully"
+            message="Quiz generated and saved successfully"
         )
         
     except Exception as e:
