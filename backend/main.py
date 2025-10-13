@@ -19,10 +19,15 @@ from agents.flashcard_gen_agent.agent import get_flashcard_agent, Flashcard, Dep
 from agents.quiz_gen_agent.agent import get_quiz_agent, Quiz, Deps as QuizDeps
 from agents.nudge_agent.agent import get_nudge_agent, Nudge, Deps as NudgeDeps
 from agents.take_action_agent.agent import get_take_action_agent, RouteOutput, Deps as TakeActionDeps
-from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps, ChatSessionManager
+from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps
 
-from shared.agents.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
-from shared.agents.pinecone_tools import get_file_details
+# Import managers and tools
+from shared.managers import ChatSessionManager
+from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
+from api.canvas import get_course_details, get_file_details_with_content
+from shared.utils.supabase_utils import decrypt_api_key
+from api.supabase import get_user_lms_info
+
 
 load_dotenv()
 
@@ -101,66 +106,6 @@ class ChatResponse(BaseModel):
     success: bool
     message: str
     session_id: str
-    
-def decrypt_api_key(encrypted_api_key: str) -> str:
-    """
-    Decrypt the API key using AES decryption compatible with CryptoJS.
-    """
-    try:
-        # Get encryption key from environment
-        encryption_key = os.getenv("NEXT_PUBLIC_ENCRYPTION_KEY")
-        
-        # Decode from base64
-        encrypted_bytes = base64.b64decode(encrypted_api_key)
-        
-        # Check for "Salted__" prefix
-        if encrypted_bytes[:8] != b"Salted__":
-            raise ValueError("Invalid encrypted data format")
-        
-        # Extract salt and ciphertext
-        salt = encrypted_bytes[8:16]
-        ciphertext = encrypted_bytes[16:]
-        
-        # Derive key and IV using MD5 (CryptoJS default)
-        key_size = 32  # 256 bits
-        iv_size = 16   # 128 bits
-        derived = b""
-        last_hash = b""
-        
-        while len(derived) < key_size + iv_size:
-            last_hash = hashlib.md5(last_hash + encryption_key.encode('utf-8') + salt).digest()
-            derived += last_hash
-        
-        key = derived[:key_size]
-        iv = derived[key_size:key_size + iv_size]
-        
-        # Decrypt
-        cipher = AES.new(key, AES.MODE_CBC, iv)
-        decrypted_padded = cipher.decrypt(ciphertext)
-        
-        # Remove PKCS7 padding
-        pad_len = decrypted_padded[-1]
-        decrypted_text = decrypted_padded[:-pad_len].decode('utf-8')
-        
-        return decrypted_text
-        
-    except Exception as e:
-        print(f"Error decrypting API key: {e}")
-        raise Exception("Failed to decrypt API key")
-    
-async def get_user_lms_info(user_id: str) -> str:
-    """
-    Get the LMS API key for the user.
-    """
-    api_keys = await get_user_api_keys(user_id=user_id)
-    api_key = api_keys[0]
-    encrypted_api_key = api_key["encrypted_api_key"]
-    api_base_url =f"{api_key["api_base_url"]}/api/v1"
-    decrypted_api_key = decrypt_api_key(encrypted_api_key)
-    return {
-        "api_key": decrypted_api_key,
-        "base_url": api_base_url
-    }
 
 # Health check endpoint
 @app.get("/")
@@ -331,94 +276,118 @@ async def get_agents_status():
 async def chat(request: ChatRequest):
     """
     Chat with an AI assistant in the context of a course and selected files.
-    Supports chat history and session management.
+    The agent intelligently fetches context only when needed, making simple
+    queries like "hi" much faster.
     """
     try:
-        lms_info = await get_user_lms_info(request.user_id)
-        
-        course_info = await get_course(course_id=request.course_id)
-        
-        try:
-            file_info = await get_module_items_by_course_id(course_id=course_info["id"], lms_id=request.file_ids[0])
-            is_file_from_lms = False
-            document_id = file_info["id"]  # Use the module_item ID
-        except Exception as e:
-            file_info = await get_file_details(api_key=lms_info["api_key"], api_base_url=lms_info["base_url"], course_id=course_info["lms_id"], file_id=request.file_ids[0])
-            is_file_from_lms = True
-            # For LMS files, we'll use the file_id as document_id since we don't have a module_item
-            document_id = request.file_ids[0]
-        
-        # Initialize session manager
-        session_manager = ChatSessionManager(course_info=course_info, file_info=file_info)
-        
-        # Load chat context (session, history, summary)
-        chat_context = await session_manager.load_chat_context(
-            user_id=request.user_id,
-            document_id=document_id,
-            session_id=request.session_id
-        )
-        
-        # Create dependencies with chat context
+        # Create minimal dependencies - agent will fetch what it needs
         deps = ChatDeps(
             user_id=request.user_id,
-            lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"],
-            course_info=course_info,
-            file_info=file_info,
-            is_file_from_lms=is_file_from_lms,
-            chat_id=chat_context["chat_id"],
-            chat_history=chat_context["chat_history"],
-            context_summary=chat_context["context_summary"]
+            course_id=request.course_id,
+            file_id=request.file_ids[0],
+            session_id=request.session_id
         )
 
-        # Build context-aware prompt
+        # Let the agent handle the query - it will fetch context as needed
         user_prompt = request.prompt or request.message
-        
-        # Add context summary to prompt if available
-        if chat_context["context_summary"]:
-            user_prompt = f"Previous conversation summary: {chat_context['context_summary']}\n\nCurrent question: {user_prompt}"
-        
-        # Add recent chat history to prompt (last 5 messages for context)
-        if chat_context["chat_history"]:
-            recent_history = chat_context["chat_history"][-5:]  # Last 5 messages
-            history_text = ""
-            for msg in recent_history:
-                role = "User" if msg["sender"] == "user" else "Assistant"
-                history_text += f"{role}: {msg['content']}\n"
-            
-            user_prompt = f"Recent conversation:\n{history_text}\n\nCurrent question: {user_prompt}"
-
         agent = get_chat_agent()
         result = await agent.run(user_prompt, deps=deps)
         
-        # Add messages to buffer
+        # Always do session management - we need to save all messages
+        # However, we minimize API calls by reusing data the agent already fetched
+        
+        # 1. Ensure we have a chat_id
+        if not deps.chat_id:
+            from tools.supabase_tools import get_or_create_chat_session
+            
+            # Need document_id for chat session
+            if not deps.file_info:
+                # Try to get from Supabase first (cheapest call)
+                try:
+                    file_info = await get_module_items_by_course_id(
+                        course_id=deps.course_id,
+                        lms_id=request.file_ids[0]
+                    )
+                    document_id = file_info["id"]
+                    deps.file_info = file_info
+                    deps.is_file_from_lms = False
+                except Exception:
+                    # Fall back to using LMS file ID directly
+                    document_id = request.file_ids[0]
+                    deps.is_file_from_lms = True
+            else:
+                document_id = deps.file_info["id"] if not deps.is_file_from_lms else request.file_ids[0]
+            
+            chat_session = await get_or_create_chat_session(
+                user_id=request.user_id,
+                document_id=document_id
+            )
+            deps.chat_id = chat_session["id"]
+        
+        # 2. Ensure we have minimal info for session manager (lazy fetch only what's needed)
+        if not deps.course_info:
+            deps.course_info = await get_course(course_id=request.course_id)
+        
+        if not deps.file_info:
+            # Try Supabase first (faster), then fallback to LMS
+            try:
+                deps.file_info = await get_module_items_by_course_id(
+                    course_id=deps.course_info["id"],
+                    lms_id=request.file_ids[0]
+                )
+                deps.is_file_from_lms = False
+            except Exception:
+                # Need LMS credentials
+                if not deps.lms_api_key:
+                    lms_info = await get_user_lms_info(request.user_id)
+                    deps.lms_api_key = lms_info["api_key"]
+                    deps.lms_base_url = lms_info["base_url"]
+                
+                deps.file_info = await get_file_details_with_content(
+                    api_key=deps.lms_api_key,
+                    api_base_url=deps.lms_base_url,
+                    course_id=deps.course_info["lms_id"],
+                    file_id=request.file_ids[0]
+                )
+                deps.is_file_from_lms = True
+        
+        # 3. Initialize session manager and save messages
+        session_manager = ChatSessionManager(
+            course_info=deps.course_info,
+            file_info=deps.file_info
+        )
+        
         await session_manager.add_message_to_buffer(
-            chat_id=chat_context["chat_id"],
+            chat_id=deps.chat_id,
             sender="user",
             content=request.message
         )
         
         await session_manager.add_message_to_buffer(
-            chat_id=chat_context["chat_id"],
+            chat_id=deps.chat_id,
             sender="assistant",
             content=result.output.answer
         )
         
-        # Check if we should create a summary
+        # 4. Check if we should create a summary (reuse existing data from agent)
         await session_manager.check_and_create_summary(
-            chat_id=chat_context["chat_id"],
+            chat_id=deps.chat_id,
             user_message=request.message,
-            assistant_response=result.output.answer
+            assistant_response=result.output.answer,
+            existing_chat_history=deps.chat_history,  # Reuse if agent fetched it
+            existing_context_summary=deps.context_summary  # Reuse if agent fetched it
         )
         
-        # Flush any remaining messages in buffer
-        await session_manager.flush_buffer(chat_id=chat_context["chat_id"])
+        # 5. Flush any remaining messages in buffer
+        await session_manager.flush_buffer(chat_id=deps.chat_id)
+        
+        session_id = deps.chat_id
         
         return ChatResponse(
             answer=result.output.answer,
             success=True,
             message="OK",
-            session_id=chat_context["chat_id"]
+            session_id=session_id or request.session_id or ""
         )
     except Exception as e:
         import traceback

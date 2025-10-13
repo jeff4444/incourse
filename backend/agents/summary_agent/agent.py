@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent
-from shared.prompts.summary_agent_prompt import SUMMARY_AGENT_PROMPT
-from shared.agents.model import get_model
+from prompts.summary_agent_prompt import SUMMARY_AGENT_PROMPT
+from shared.model import get_model
 
 
 class SummaryResult(BaseModel):

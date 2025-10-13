@@ -1,19 +1,20 @@
+"""
+Core Canvas API functions without RunContext dependency.
+All functions accept explicit parameters instead of extracting from context.
+"""
+
 import asyncio
-from pydantic_ai import RunContext
-import random
-from typing import List, Dict, Optional
 import aiohttp
-import json
-import io
-import mimetypes
 import tempfile
 import os
-import pymupdf4llm
-from docx import Document
-from pptx import Presentation
+from typing import List, Dict, Optional, Any
+from shared.utils.canvas_utils import parse_file_content
+import shutil
+
 
 async def get_overall_course_performance(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_id: Optional[str] = None
 ) -> Dict:
     """
@@ -21,9 +22,6 @@ async def get_overall_course_performance(
     Returns performance data including current/final scores and grades.
     """
     print(f"calling get_overall_course_performance with course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     if course_id:
         # Get performance for specific course
@@ -84,16 +82,14 @@ async def get_overall_course_performance(
 
 
 async def get_course_grade_details(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_id: str
 ) -> Dict:
     """
     Get detailed grade information for a specific course including all assignments.
     """
     print(f"calling get_course_grade_details with course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     # Get course info with scores
     course_url = f"{api_base_url}/courses/{course_id}"
@@ -163,7 +159,8 @@ async def get_course_grade_details(
 
 
 async def get_assignment_grades(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_id: str,
     assignment_id: Optional[str] = None
 ) -> List[Dict]:
@@ -171,9 +168,6 @@ async def get_assignment_grades(
     Get assignment grades for a specific course, optionally for a specific assignment.
     """
     print(f"calling get_assignment_grades with course_id={course_id}, assignment_id={assignment_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     if assignment_id:
         # Get specific assignment
@@ -228,15 +222,13 @@ async def get_assignment_grades(
 
 
 async def get_all_grades(
-    ctx: RunContext
+    api_key: str,
+    api_base_url: str
 ) -> Dict:
     """
     Get comprehensive grade information for all courses and their assignments.
     """
     print("calling get_all_grades")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     # Get all courses with scores
     courses_url = f"{api_base_url}/courses"
@@ -270,7 +262,7 @@ async def get_all_grades(
         
         # Get assignments for this course
         try:
-            assignments = await get_assignment_grades(ctx, str(course_id))
+            assignments = await get_assignment_grades(api_key, api_base_url, str(course_id))
         except Exception as e:
             # If we can't get assignments, continue with course-level data only
             assignments = []
@@ -289,7 +281,8 @@ async def get_all_grades(
 
 
 async def get_some_grades(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_ids: List[str],
     include_assignments: bool = True
 ) -> Dict:
@@ -297,9 +290,6 @@ async def get_some_grades(
     Get grade information for specific courses by their IDs.
     """
     print(f"calling get_some_grades with course_ids={course_ids}, include_assignments={include_assignments}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     selected_grades = []
     
@@ -342,7 +332,7 @@ async def get_some_grades(
                     # Get assignments if requested
                     if include_assignments:
                         try:
-                            assignments = await get_assignment_grades(ctx, str(course_id))
+                            assignments = await get_assignment_grades(api_key, api_base_url, str(course_id))
                             course_grade["assignments"] = assignments
                         except Exception:
                             course_grade["assignments"] = []
@@ -356,16 +346,14 @@ async def get_some_grades(
 
 
 async def get_course_analytics(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_id: str
 ) -> Dict:
     """
     Get analytics data for a specific course including participation and performance metrics.
     """
     print(f"calling get_course_analytics with course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     # Get course analytics
     analytics_url = f"{api_base_url}/courses/{course_id}/analytics"
@@ -386,7 +374,8 @@ async def get_course_analytics(
 
 
 async def get_student_analytics(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_id: str,
     student_id: Optional[str] = None
 ) -> Dict:
@@ -394,9 +383,6 @@ async def get_student_analytics(
     Get student analytics for a specific course, optionally for a specific student.
     """
     print(f"calling get_student_analytics with course_id={course_id}, student_id={student_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     if student_id:
         # Get analytics for specific student
@@ -420,69 +406,14 @@ async def get_student_analytics(
             return analytics_data
 
 
-async def get_chat_history_summary(
-    ctx: RunContext
-) -> str:
-    """
-    Get chat history for the list of course IDs.
-    """
-    print("calling get_chat_history_summary")
-    
-    # Simulate a call to an external API to get chat history
-    await asyncio.sleep(1)
-    
-    # For demonstration purposes, return a random chat history summary
-    return "User has been asking about the course content and assignments. User seems to be struggling with the material. Would you like some help?"
-    
-async def get_course_quiz_history(
-    ctx: RunContext
-) -> List[Dict[str, str]]:
-    """
-    Get quiz history for the list of course IDs.
-    """
-    print("calling get_course_quiz_history")
-    
-    # Simulate a call to an external API to get quiz history
-    await asyncio.sleep(1)
-    
-    # For demonstration purposes, return a list of random quiz history
-    quiz_history = [
-        {
-            "quiz_id": f"quiz_{i}",
-            "score": random.randint(0, 100),
-            "date": f"2023-10-{random.randint(1, 30)}"
-        }
-        for i in range(1, 4)
-    ]
-    return quiz_history
-
-async def get_file_content_summaries(
-    ctx: RunContext
-) -> Dict[str, str]:
-    """
-    Get file content summary for the list of file IDs.
-    """
-    print("calling get_file_content_summaries")
-    
-    # Simulate a call to an external API to get file content summary
-    await asyncio.sleep(1)
-    
-    # For demonstration purposes, return a random file content summary
-    file_content_summary = {
-        "file_id": f"Summary for file"
-    }
-    return file_content_summary
-
 async def get_canvas_courses(
-    ctx: RunContext
+    api_key: str,
+    api_base_url: str
 ) -> List[Dict]:
     """
     Get all courses from Canvas API.
     """
     print("calling get_canvas_courses")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     async with aiohttp.ClientSession() as session:
         async with session.get(
@@ -507,16 +438,14 @@ async def get_canvas_courses(
 
 
 async def get_canvas_course(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
+    course_id: str
 ) -> Dict:
     """
     Get a specific course from Canvas API.
     """
-    course_id = ctx.deps.course_id
     print(f"calling get_canvas_course with course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     async with aiohttp.ClientSession() as session:
         async with session.get(
@@ -534,16 +463,14 @@ async def get_canvas_course(
 
 
 async def get_canvas_course_modules(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
+    course_id: str
 ) -> List[Dict]:
     """
     Get all modules for a specific course from Canvas API.
     """
-    course_id = ctx.deps.course_id
     print(f"calling get_canvas_course_modules with course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     async with aiohttp.ClientSession() as session:
         async with session.get(
@@ -561,17 +488,15 @@ async def get_canvas_course_modules(
 
 
 async def get_canvas_module_items(
-    ctx: RunContext,
-    module_id: str,
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    module_id: str
 ) -> List[Dict]:
     """
     Get all items for a specific module from Canvas API.
     """
-    course_id = ctx.deps.course_id
     print(f"calling get_canvas_module_items with module_id={module_id}, course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     async with aiohttp.ClientSession() as session:
         async with session.get(
@@ -587,89 +512,17 @@ async def get_canvas_module_items(
             module_items_data = await response.json()
             return module_items_data
 
-async def get_canvas_files_details(
-    ctx: RunContext,
-) -> List[Dict]:
-    """
-    Get all files for a specific course from Canvas API. YOU MUST CALL THIS TOOL WHEN VERY LITTLE CONTEXT IS PROVIDED.
-    """
-    course_id = ctx.deps.course_id
-    file_ids = ctx.deps.file_ids
-    print(f"calling get_canvas_files_details with course_id={course_id}, file_ids={file_ids}")
-    
-    file_details_list = []
-    
-    for file_id in file_ids:
-        file_details = await get_canvas_file_details(ctx, file_id)
-        file_details_list.append(file_details)
-    
-    return file_details_list
 
-async def parse_file_content(file_path: str, content_type: str, filename: str) -> str:
-    """
-    Parse file content based on file type and return text content from local file.
-    """
-    try:
-        if content_type == 'application/pdf':
-            return await parse_pdf_content(file_path)
-        elif content_type in ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']:
-            return await parse_docx_content(file_path)
-        elif content_type in ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.ms-powerpoint']:
-            return await parse_pptx_content(file_path)
-        elif content_type in ['text/plain', 'text/html']:
-            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                return f.read()
-        else:
-            return f"[File type {content_type} not supported for text extraction]"
-    except Exception as e:
-        return f"[Error parsing file content: {str(e)}]"
-
-async def parse_pdf_content(file_path: str) -> str:
-    """Parse PDF content and extract text using pymupdf4llm from local file."""
-    try:
-        # Use pymupdf4llm to extract text with better formatting from local file
-        text = pymupdf4llm.to_markdown(file_path)
-        return text.strip()
-    except Exception as e:
-        return f"[Error parsing PDF: {str(e)}]"
-
-async def parse_docx_content(file_path: str) -> str:
-    """Parse DOCX content and extract text from local file."""
-    try:
-        doc = Document(file_path)
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
-        return text.strip()
-    except Exception as e:
-        return f"[Error parsing DOCX: {str(e)}]"
-
-async def parse_pptx_content(file_path: str) -> str:
-    """Parse PPTX content and extract text from local file."""
-    try:
-        prs = Presentation(file_path)
-        text = ""
-        for slide in prs.slides:
-            for shape in slide.shapes:
-                if hasattr(shape, "text"):
-                    text += shape.text + "\n"
-        return text.strip()
-    except Exception as e:
-        return f"[Error parsing PPTX: {str(e)}]"
-
-async def get_canvas_file_details(
-    ctx: RunContext,
-    file_id: str,
+async def get_file_details_with_content(
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    file_id: str
 ) -> Dict:
     """
     Get file details and content for a specific file from Canvas API.
     """
-    
-    course_id = ctx.deps.course_id
-    print(f"calling get_canvas_file_details with file_id={file_id}, course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
+    print(f"calling get_canvas_file_details_with_content with file_id={file_id}, course_id={course_id}")
 
     async with aiohttp.ClientSession() as session:
         # First, get file metadata
@@ -703,7 +556,7 @@ async def get_canvas_file_details(
                                 temp_file.write(file_content)
                                 temp_file_path = temp_file.name
                             try:
-                                parsed_content = await parse_file_content(temp_file_path, content_type, filename)
+                                parsed_content = await parse_file_content(temp_file_path, content_type, filename, file_extension)
                                 file_details_data['parsed_content'] = parsed_content
                             finally:
                                 # Clean up the temporary file
@@ -719,18 +572,39 @@ async def get_canvas_file_details(
 
         return file_details_data
 
+async def get_canvas_files_details(
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    file_ids: List[str],
+    include_content: bool = True
+) -> List[Dict]:
+    """
+    Get all files for a specific course from Canvas API.
+    """
+    print(f"calling get_canvas_files_details with course_id={course_id}, file_ids={file_ids}")
+    
+    file_details_list = []
+    
+    for file_id in file_ids:
+        if include_content:
+            file_details = await get_canvas_file_details_with_content(api_key, api_base_url, course_id, file_id, include_content)
+        else:
+            file_details = await get_canvas_file_details(api_key, api_base_url, course_id, file_id)
+        file_details_list.append(file_details)
+    
+    return file_details_list
+
 
 async def get_canvas_course_assignments(
-    ctx: RunContext,
+    api_key: str,
+    api_base_url: str,
     course_id: str
 ) -> List[Dict]:
     """
     Get all assignments for a specific course from Canvas API.
     """
     print(f"calling get_canvas_course_assignments with course_id={course_id}")
-    
-    api_key = ctx.deps.lms_api_key
-    api_base_url = ctx.deps.lms_base_url
     
     async with aiohttp.ClientSession() as session:
         async with session.get(
@@ -745,3 +619,48 @@ async def get_canvas_course_assignments(
             
             assignments_data = await response.json()
             return assignments_data
+
+
+
+async def get_file_details(
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    file_id: str
+) -> Dict[str, Any]:
+    """Fetch file details and content from the API."""
+    print(f"calling get_file_details with file_id={file_id}, course_id={course_id}")
+    async with aiohttp.ClientSession() as session:
+        # Get file metadata
+        async with session.get(
+            f"{api_base_url}/courses/{course_id}/files/{file_id}",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        ) as response:
+            if not response.ok:
+                raise Exception(f"Failed to fetch file details: {response.status}")
+            
+            file_details = await response.json()
+        
+        return file_details
+
+
+async def get_course_details(
+    api_key: str,
+    api_base_url: str,
+    course_id: str
+) -> Dict[str, Any]:
+    """Fetch course details from the API."""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"{api_base_url}/courses/{course_id}",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        ) as response:
+            if not response.ok:
+                raise Exception(f"Failed to fetch course details: {response.status}")
+            return await response.json()

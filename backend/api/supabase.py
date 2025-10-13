@@ -1,14 +1,13 @@
 """
-Supabase tools for fetching user, course, and module data.
-
-This module provides tools to fetch data from the Supabase database,
-similar to how the frontend fetches data via API calls.
+Core Supabase API functions without RunContext dependency.
+All functions accept explicit parameters instead of extracting from context.
 """
 
 import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from shared.utils.supabase_utils import decrypt_api_key
 
 load_dotenv()
 
@@ -36,13 +35,13 @@ def get_supabase_client() -> Client:
 
 
 async def get_user(
-    user_id: Optional[str] = None
+    user_id: str
 ) -> Dict[str, Any]:
     """
     Get user information from Supabase.
     
     Args:
-        user_id: Optional user ID, defaults to ctx.deps.user_id
+        user_id: User ID
     
     Returns:
         User data dictionary
@@ -87,10 +86,23 @@ async def get_user_by_email(
         raise Exception(f"User not found with email: {email}")
     
     return response.data[0]
-
-
+  
+async def get_user_lms_info(user_id: str) -> str:
+    """
+    Get the LMS API key for the user.
+    """
+    api_keys = await get_user_api_keys(user_id=user_id)
+    api_key = api_keys[0]
+    encrypted_api_key = api_key["encrypted_api_key"]
+    api_base_url =f"{api_key["api_base_url"]}/api/v1"
+    decrypted_api_key = decrypt_api_key(encrypted_api_key)
+    return {
+        "api_key": decrypted_api_key,
+        "base_url": api_base_url
+    }
+    
 async def get_user_api_keys(
-    user_id: Optional[str] = None,
+    user_id: str,
     lms_provider: Optional[str] = None,
     active_only: bool = True
 ) -> List[Dict[str, Any]]:
@@ -98,7 +110,7 @@ async def get_user_api_keys(
     Get user API keys from Supabase.
     
     Args:
-        user_id: Optional user ID, defaults to ctx.deps.user_id
+        user_id: User ID
         lms_provider: Optional filter by LMS provider (canvas, blackboard, moodle, d2l)
         active_only: If True, only return active API keys
     
@@ -123,14 +135,14 @@ async def get_user_api_keys(
 
 
 async def get_courses(
-    user_id: Optional[str] = None,
+    user_id: str,
     lms_provider: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Get all courses for a user from Supabase.
     
     Args:
-        user_id: Optional user ID, defaults to ctx.deps.user_id
+        user_id: User ID
         lms_provider: Optional filter by LMS provider
     
     Returns:
@@ -162,13 +174,13 @@ async def get_courses(
 
 
 async def get_course(
-    course_id: Optional[str] = None
+    course_id: str
 ) -> Dict[str, Any]:
     """
     Get a specific course from Supabase.
     
     Args:
-        course_id: Optional course ID, defaults to ctx.deps.course_id
+        course_id: Course ID
     
     Returns:
         Course data dictionary
@@ -224,13 +236,13 @@ async def get_course_by_lms_id(
 
 
 async def get_user_enrollments(
-    user_id: Optional[str] = None
+    user_id: str
 ) -> List[Dict[str, Any]]:
     """
     Get all enrollments for a user.
     
     Args:
-        user_id: Optional user ID, defaults to ctx.deps.user_id
+        user_id: User ID
     
     Returns:
         List of enrollment dictionaries
@@ -251,14 +263,14 @@ async def get_user_enrollments(
 
 async def is_user_enrolled(
     course_id: str,
-    user_id: Optional[str] = None
+    user_id: str
 ) -> bool:
     """
     Check if a user is enrolled in a course.
     
     Args:
         course_id: Course ID
-        user_id: Optional user ID, defaults to ctx.deps.user_id
+        user_id: User ID
     
     Returns:
         True if enrolled, False otherwise
@@ -279,13 +291,13 @@ async def is_user_enrolled(
 
 
 async def get_course_modules(
-    course_id: Optional[str] = None
+    course_id: str
 ) -> List[Dict[str, Any]]:
     """
     Get all modules for a course from Supabase.
     
     Args:
-        course_id: Optional course ID, defaults to ctx.deps.course_id
+        course_id: Course ID
     
     Returns:
         List of module dictionaries
@@ -334,14 +346,14 @@ async def get_module(
 
 async def get_module_by_lms_id(
     lms_id: str,
-    course_id: Optional[str] = None
+    course_id: str
 ) -> Dict[str, Any]:
     """
     Get a module by its LMS ID and course ID.
     
     Args:
         lms_id: LMS module ID
-        course_id: Optional course ID, defaults to ctx.deps.course_id
+        course_id: Course ID
     
     Returns:
         Module data dictionary
@@ -393,6 +405,7 @@ async def get_module_items(
     
     return response.data
 
+
 async def get_module_item_by_lms_id(
     lms_id: str,
     module_id: str
@@ -424,12 +437,20 @@ async def get_module_item_by_lms_id(
     
     return response.data[0]
 
+
 async def get_module_items_by_course_id(
     course_id: str,
     lms_id: str
-) -> List[Dict[str, Any]]:
+) -> Dict[str, Any]:
     """
     Get a module item by its LMS ID and course ID.
+    
+    Args:
+        course_id: Course ID
+        lms_id: LMS content ID
+        
+    Returns:
+        Module item data dictionary
     """
     print(f"calling get_module_items_by_course_id with course_id={course_id} and lms_id={lms_id}")
     
@@ -446,6 +467,7 @@ async def get_module_items_by_course_id(
         raise Exception(f"Module item not found with lms_id={lms_id}, course_id={course_id}")
     
     return response.data[0]
+
 
 async def get_module_items_by_type(
     module_id: str,
@@ -478,14 +500,14 @@ async def get_module_items_by_type(
 
 
 async def get_course_module_items(
-    course_id: Optional[str] = None,
+    course_id: str,
     item_type: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
     Get all module items for a course, optionally filtered by type.
     
     Args:
-        course_id: Optional course ID, defaults to ctx.deps.course_id
+        course_id: Course ID
         item_type: Optional type filter (File, Page, Discussion, Assignment, etc.)
     
     Returns:
@@ -537,13 +559,13 @@ async def get_module_item(
 
 
 async def get_modules_with_items(
-    course_id: Optional[str] = None
+    course_id: str
 ) -> List[Dict[str, Any]]:
     """
     Get all modules for a course with their items included.
     
     Args:
-        course_id: Optional course ID, defaults to ctx.deps.course_id
+        course_id: Course ID
     
     Returns:
         List of module dictionaries with items nested
@@ -587,14 +609,14 @@ async def get_modules_with_items(
 
 
 async def get_course_with_modules(
-    course_id: Optional[str] = None,
+    course_id: str,
     include_items: bool = False
 ) -> Dict[str, Any]:
     """
     Get a course with its modules (and optionally module items) included.
     
     Args:
-        course_id: Optional course ID, defaults to ctx.deps.course_id
+        course_id: Course ID
         include_items: If True, include module items in each module
     
     Returns:
@@ -618,21 +640,19 @@ async def get_course_with_modules(
 
 async def search_courses(
     search_term: str,
-    user_id: Optional[str] = None
+    user_id: str
 ) -> List[Dict[str, Any]]:
     """
     Search courses by name or code for a specific user.
     
     Args:
         search_term: Search term to match against course name or code
-        user_id: Optional user ID, defaults to ctx.deps.user_id
+        user_id: User ID
     
     Returns:
         List of matching course dictionaries
     """
     print(f"calling search_courses with search_term={search_term}, user_id={user_id}")
-    
-    supabase = get_supabase_client()
     
     # Get user's courses
     courses = await get_courses(user_id)
@@ -849,4 +869,3 @@ async def get_chat_message_count(
     response = supabase.table("chat_messages").select("id", count="exact").eq("chat_id", chat_id).execute()
     
     return response.count or 0
-

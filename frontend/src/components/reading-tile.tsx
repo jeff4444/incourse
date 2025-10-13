@@ -59,7 +59,7 @@ function getHref(type: string, courseID: string, lmsContentId: string) {
 
 export function ReadingTile({ reading, courseID, module }: { reading: ModuleItem, courseID: string, module: Module }) {
   // Only render supported types
-  if (!['File', 'Page', 'Discussion'].includes(reading.type)) {
+  if (!['File', 'Page', 'Discussion'].includes(reading.type) && reading.type !== reading.contentType) {
     return null;
   }
 

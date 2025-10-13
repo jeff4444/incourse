@@ -12,6 +12,19 @@ class CanvasProvider extends LMSProvider {
     this.apiKey = apiKey;
   }
 
+  private async handleFetchError(response: Response, context: string): Promise<never> {
+    let errorDetails = "";
+    try {
+      const errorBody = await response.text();
+      errorDetails = errorBody ? ` - ${errorBody}` : "";
+    } catch (e) {
+      // If we can't read the error body, that's fine
+    }
+    throw new Error(
+      `${context}: ${response.status} ${response.statusText}${errorDetails}`
+    );
+  }
+
   convertCanvasCourse(courseData: any): Course {
     const fullCourseName = courseData.name;
     let courseSemester = "";
@@ -91,7 +104,8 @@ class CanvasProvider extends LMSProvider {
       name: moduleItemData.title,
       moduleId: moduleId,
       courseId: courseId,
-      type: moduleItemData.type,
+      type: moduleItemData.type || moduleItemData["content-type"],
+      contentType: moduleItemData["content-type"],
       url: moduleItemData.url,
       lmsContentId: lmsContentId,
       position: moduleItemData.position || null,
@@ -117,7 +131,8 @@ class CanvasProvider extends LMSProvider {
       name: fileName,
       url: fileDetailsData.url,
       size: fileSize,
-      type: contentType,
+      type: fileDetailsData.type || fileDetailsData["content-type"],
+      contentType: contentType,
       isValidForProcessing: validation.isValid,
       validationError: validation.error || null,
       fileTypeName: validation.fileTypeName || null,
@@ -136,7 +151,7 @@ class CanvasProvider extends LMSProvider {
       }
     );
     if (!coursesResponse.ok) {
-      throw new Error(`Failed to fetch courses`);
+      await this.handleFetchError(coursesResponse, "Failed to fetch courses");
     }
     const coursesData = await coursesResponse.json();
 
@@ -158,9 +173,9 @@ class CanvasProvider extends LMSProvider {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
-    });
+    }    );
     if (!response.ok) {
-      throw new Error("Failed to fetch course");
+      await this.handleFetchError(response, `Failed to fetch course ${courseId}`);
     }
     const courseData = await response.json();
     return this.convertCanvasCourse(courseData);
@@ -177,9 +192,10 @@ class CanvasProvider extends LMSProvider {
       }
     );
     if (!modulesResponse.ok) {
-      throw new Error("Failed to fetch course modules");
+      await this.handleFetchError(modulesResponse, `Failed to fetch modules for course ${courseId}`);
     }
     const modulesData = await modulesResponse.json();
+    
     const modules = modulesData.map((module: any) =>
       this.convertCanvasModule(module, courseId)
     );
@@ -211,7 +227,8 @@ class CanvasProvider extends LMSProvider {
           name: file.name,
           moduleId: "all-files",
           courseId: courseId,
-          type: "File",
+          type: file.type,
+          contentType: file.contentType,  
           url: file.url,
           position: index + 1,
         }));
@@ -241,7 +258,7 @@ class CanvasProvider extends LMSProvider {
       }
     );
     if (!moduleItemsResponse.ok) {
-      throw new Error("Failed to fetch module items");
+      await this.handleFetchError(moduleItemsResponse, `Failed to fetch items for module ${moduleId}`);
     }
     const moduleItemsData = await moduleItemsResponse.json();
     const moduleItems = moduleItemsData.map((moduleItemData: any) => {
@@ -264,9 +281,9 @@ class CanvasProvider extends LMSProvider {
         Authorization: `Bearer ${this.apiKey}`,
         "Content-Type": "application/json",
       },
-    });
+    }    );
     if (!fileDetailsResponse.ok) {
-      throw new Error(`Failed to fetch file details ${url}`);
+      await this.handleFetchError(fileDetailsResponse, `Failed to fetch file details for ${url}`);
     }
     const fileDetailsData = await fileDetailsResponse.json();
     return this.convertCanvasFileDetails(fileDetailsData);
@@ -282,7 +299,7 @@ class CanvasProvider extends LMSProvider {
       },
     });
     if (!response.ok) {
-      throw new Error(`Failed to fetch discussion topic ${url}`);
+      await this.handleFetchError(response, `Failed to fetch discussion topic ${url}`);
     }
     const discussionData = await response.json();
     return discussionData as DiscussionTopic;
@@ -299,7 +316,7 @@ class CanvasProvider extends LMSProvider {
       }
     );
     if (!filesResponse.ok) {
-      throw new Error("Failed to fetch course files");
+      return [];
     }
     const filesData = await filesResponse.json();
     return filesData.map((fileData: any) => this.convertCanvasFileDetails(fileData));
@@ -315,7 +332,7 @@ class CanvasProvider extends LMSProvider {
       },
     });
     if (!response.ok) {
-      throw new Error(`Failed to fetch page ${url}`);
+      await this.handleFetchError(response, `Failed to fetch page ${url}`);
     }
     const pageData = await response.json();
     return pageData as Page;

@@ -1,62 +1,8 @@
-from dataclasses import dataclass, field
+"""
+Chat session management for handling conversations, message buffering, and context summaries.
+"""
+
 from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, Field
-from pydantic_ai import Agent, Tool
-from shared.prompts.chat_agent_prompt import CHAT_AGENT_PROMPT
-from shared.agents.pinecone_tools import search_file_with_query
-from shared.agents.supabase_tools import (
-    get_or_create_chat_session,
-    get_chat_messages,
-    batch_save_messages,
-    get_latest_context_snapshot,
-    create_context_snapshot,
-    get_chat_message_count
-)
-from shared.agents.model import get_model
-from agents.summary_agent.agent import summarize_conversation_incremental
-
-
-class ChatAnswer(BaseModel):
-    """
-    Model for a single chat answer.
-    """
-    answer: str = Field(..., description="Assistant's reply text")
-
-
-@dataclass
-class Deps:
-    user_id: str
-    lms_api_key: str
-    lms_base_url: str
-    course_info: Dict[str, Any]
-    file_info: Dict[str, Any]
-    is_file_from_lms: bool
-    chat_id: Optional[str] = None
-    chat_history: List[Dict[str, Any]] = field(default_factory=list)
-    context_summary: Optional[str] = None
-
-SYSTEM_PROMPT = CHAT_AGENT_PROMPT
-
-
-def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
-    """
-    Create a chat agent for file Q&A with history and context support.
-    """
-    model = get_model()
-
-    return Agent[
-        Deps,
-        ChatAnswer,
-    ](
-        model,
-        output_type=ChatAnswer,
-        system_prompt=SYSTEM_PROMPT,
-        tools=[
-            Tool(search_file_with_query, takes_ctx=True),
-        ],
-        retries=3,
-        output_retries=3,
-    )
 
 
 class ChatSessionManager:
@@ -66,8 +12,8 @@ class ChatSessionManager:
     
     def __init__(self, course_info: Dict[str, Any], file_info: Dict[str, Any]):
         self.message_buffer: List[Dict[str, Any]] = []
-        self.buffer_limit = 5  # Batch save every 5 messages
-        self.summary_interval = 10  # Create summary every 10 messages
+        self.buffer_limit = 2 # Batch save every 2 messages
+        self.summary_interval = 5  # Create summary every 5 messages
         self.course_info = course_info
         self.file_info = file_info
     
@@ -83,6 +29,13 @@ class ChatSessionManager:
         Returns:
             Dictionary with chat_id, history, and context_summary
         """
+        # Import here to avoid circular imports
+        from tools.supabase_tools import (
+            get_or_create_chat_session,
+            get_chat_messages,
+            get_latest_context_snapshot
+        )
+        
         if session_id:
             # Use existing session
             chat_session = {"id": session_id}
@@ -116,6 +69,8 @@ class ChatSessionManager:
             tokens: Optional token count
             metadata: Optional metadata
         """
+        from tools.supabase_tools import batch_save_messages
+        
         message = {
             "sender": sender,
             "content": content,
@@ -139,6 +94,8 @@ class ChatSessionManager:
         if not self.message_buffer:
             return
         
+        from tools.supabase_tools import batch_save_messages
+        
         try:
             await batch_save_messages(chat_id=chat_id, messages=self.message_buffer)
             self.message_buffer.clear()
@@ -147,7 +104,14 @@ class ChatSessionManager:
             print(f"Error flushing message buffer: {e}")
             # Keep messages in buffer for retry
     
-    async def check_and_create_summary(self, chat_id: str, user_message: str, assistant_response: str):
+    async def check_and_create_summary(
+        self, 
+        chat_id: str, 
+        user_message: str, 
+        assistant_response: str,
+        existing_chat_history: Optional[List[Dict[str, Any]]] = None,
+        existing_context_summary: Optional[str] = None
+    ):
         """
         Check if we should create a new context summary and do so if needed.
         
@@ -155,18 +119,42 @@ class ChatSessionManager:
             chat_id: Chat session ID
             user_message: Latest user message
             assistant_response: Latest assistant response
+            existing_chat_history: Already-loaded chat history to avoid redundant fetches
+            existing_context_summary: Already-loaded context summary to avoid redundant fetches
         """
+        from tools.supabase_tools import get_chat_message_count
+        
         try:
-            # Get current message count
-            message_count = await get_chat_message_count(chat_id=chat_id)
+            # Calculate message count from existing history if available
+            if existing_chat_history is not None:
+                # Add 2 for the new user message and assistant response
+                message_count = len(existing_chat_history) + 2
+            else:
+                # Fall back to fetching from DB if not provided
+                message_count = await get_chat_message_count(chat_id=chat_id)
             
             # Check if we've reached a summary interval
             if message_count % self.summary_interval == 0 and message_count > 0:
-                await self.create_context_summary(chat_id=chat_id, user_message=user_message, assistant_response=assistant_response)
+                await self.create_context_summary(
+                    chat_id=chat_id, 
+                    user_message=user_message, 
+                    assistant_response=assistant_response,
+                    existing_chat_history=existing_chat_history,
+                    existing_context_summary=existing_context_summary,
+                    known_message_count=message_count
+                )
         except Exception as e:
             print(f"Error checking summary creation: {e}")
     
-    async def create_context_summary(self, chat_id: str, user_message: str, assistant_response: str):
+    async def create_context_summary(
+        self, 
+        chat_id: str, 
+        user_message: str, 
+        assistant_response: str,
+        existing_chat_history: Optional[List[Dict[str, Any]]] = None,
+        existing_context_summary: Optional[str] = None,
+        known_message_count: Optional[int] = None
+    ):
         """
         Create a new context summary for the chat session using the summary_agent.
         
@@ -174,10 +162,24 @@ class ChatSessionManager:
             chat_id: Chat session ID
             user_message: Latest user message
             assistant_response: Latest assistant response
+            existing_chat_history: Already-loaded chat history to avoid redundant fetches
+            existing_context_summary: Already-loaded context summary to avoid redundant fetches
+            known_message_count: Already-known message count to avoid redundant fetches
         """
+        from tools.supabase_tools import (
+            get_chat_messages,
+            get_latest_context_snapshot,
+            create_context_snapshot,
+            get_chat_message_count
+        )
+        from agents.summary_agent.agent import summarize_conversation, summarize_conversation_incremental
+        
         try:
-            # Get recent messages for summarization
-            recent_messages = await get_chat_messages(chat_id=chat_id, limit=20)
+            # Use existing chat history if provided, otherwise fetch
+            if existing_chat_history is not None:
+                recent_messages = existing_chat_history[-20:] if len(existing_chat_history) > 20 else existing_chat_history
+            else:
+                recent_messages = await get_chat_messages(chat_id=chat_id, limit=20)
             
             # Add current conversation to messages
             messages_to_summarize = recent_messages + [
@@ -185,12 +187,18 @@ class ChatSessionManager:
                 {"sender": "assistant", "content": assistant_response}
             ]
             
-            # Get previous summary if it exists
-            previous_snapshot = await get_latest_context_snapshot(chat_id=chat_id)
-            previous_summary = previous_snapshot["summary"] if previous_snapshot else None
+            # Use existing context summary if provided, otherwise fetch
+            if existing_context_summary is not None:
+                previous_summary = existing_context_summary
+            else:
+                previous_snapshot = await get_latest_context_snapshot(chat_id=chat_id)
+                previous_summary = previous_snapshot["summary"] if previous_snapshot else None
             
-            # Get total message count
-            message_count = await get_chat_message_count(chat_id=chat_id)
+            # Use known message count if provided, otherwise fetch
+            if known_message_count is not None:
+                message_count = known_message_count
+            else:
+                message_count = await get_chat_message_count(chat_id=chat_id)
             
             # Create additional context from deps
             course_name = self.course_info.get("name", "Unknown Course") if self.course_info else "Unknown Course"
@@ -208,7 +216,6 @@ class ChatSessionManager:
                 )
             else:
                 # First summary for this session
-                from agents.summary_agent.agent import summarize_conversation
                 summary_result = await summarize_conversation(
                     messages=messages_to_summarize,
                     additional_context=additional_context
@@ -231,5 +238,4 @@ class ChatSessionManager:
             print(f"Error creating context summary: {e}")
             import traceback
             traceback.print_exc()
-
 

@@ -2,9 +2,9 @@ from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from typing import List, Dict
 from pydantic_ai import Agent, Tool
-from shared.prompts.flashcard_agent_prompt import FLASHCARD_AGENT_PROMPT
-from shared.agents.model import get_model
-from shared.agents.tools import (
+from prompts.flashcard_agent_prompt import FLASHCARD_AGENT_PROMPT
+from shared.model import get_model
+from tools.canvas_tools import (
     get_chat_history_summary, 
     get_course_grade_details, 
     get_course_quiz_history, 

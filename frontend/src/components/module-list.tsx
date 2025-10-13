@@ -25,6 +25,7 @@ export function ModuleList({ modules, courseID }: ModuleListProps) {
     }
     setExpandedModules(newExpanded);
   };
+  
 
   return (
     <div className="space-y-4">
@@ -44,7 +45,7 @@ export function ModuleList({ modules, courseID }: ModuleListProps) {
                 <div className="text-left">
                   <h3 className="font-medium">{module.name}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {module.itemsCount} items
+                    {module.moduleItems.length} items
                   </p>
                 </div>
               </div>
