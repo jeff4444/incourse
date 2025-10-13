@@ -107,7 +107,7 @@ function CoursePage({
             </TabsList>
             <TabsContent value="notes">
               <div className="grid grid-cols-1 gap-6">
-                <Card className="pb-0 justify-between">
+                {/* <Card className="pb-0 justify-between">
                   <CardContent>
                     <SummaryViewer
                       title="Course Overview"
@@ -140,7 +140,7 @@ By the end of this course, you will have developed a comprehensive understanding
                       </div>
                     </div>
                   </CardFooter>
-                </Card>
+                </Card> */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Course Materials</CardTitle>
@@ -149,12 +149,12 @@ By the end of this course, you will have developed a comprehensive understanding
                   <CardContent>
                     <ModuleList modules={modules} courseID={courseID} />
                   </CardContent>
-                  <CardFooter className="border-t">
+                  {/* <CardFooter className="border-t">
                     <Button className="w-full">
                       <Plus className="mr-2 h-4 w-4" />
                       Add New Material
                     </Button>
-                  </CardFooter>
+                  </CardFooter> */}
                 </Card>
               </div>
             </TabsContent>
