@@ -4,7 +4,11 @@ from typing import List, Dict, Optional, Any
 from pydantic_ai import Agent, Tool
 from prompts.quiz_agent_prompt import QUIZ_AGENT_PROMPT
 from shared.model import get_model
-from tools.pinecone_tools import search_multiple_files_with_query
+from tools.pinecone_tools import (
+    search_multiple_files_with_query,
+    search_single_file_with_query,
+    search_single_file_with_chunk_index
+)
 
 class Quiz(BaseModel):
     """
@@ -47,12 +51,12 @@ class Quiz(BaseModel):
 @dataclass
 class Deps:
     user_id: str
-    lms_api_key: str
-    lms_base_url: str
     course_id: str
     file_ids: List[str]
     
-    # For Pinecone file info (similar to chat agent)
+    # Lazy-loaded fields (will be fetched by tools if needed, but can be pre-populated)
+    lms_api_key: Optional[str] = None
+    lms_base_url: Optional[str] = None
     course_info: Optional[Dict[str, Any]] = None
     files_info: Optional[List[Dict[str, Any]]] = None
     
@@ -64,8 +68,17 @@ def get_quiz_agent(**kwargs) -> Agent[Deps, List[Quiz]]:
     system_prompt = kwargs.get("prompt", None)
     if system_prompt is None:
         system_prompt = QUIZ_AGENT_PROMPT
-        
+    
+    # Add number of questions to prompt
     system_prompt = system_prompt + f"\n\nThe user has requested {kwargs.get('num_quizzes', 10)} quiz questions."
+    
+    # Inject file_ids into prompt if available
+    file_ids = kwargs.get("file_ids", [])
+    if file_ids:
+        system_prompt += f"\n\n📁 AVAILABLE FILES:\n"
+        for file_id in file_ids:
+            system_prompt += f"- {file_id}\n"
+        system_prompt += "\nUse these file_ids when calling search_single_file_with_query() or search_single_file_with_chunk_index()."
     
     model = get_model()
     
@@ -79,5 +92,7 @@ def get_quiz_agent(**kwargs) -> Agent[Deps, List[Quiz]]:
         tools=[  
             # Pinecone search tools - primary for content retrieval
             Tool(search_multiple_files_with_query, takes_ctx=True),
+            Tool(search_single_file_with_query, takes_ctx=True),
+            Tool(search_single_file_with_chunk_index, takes_ctx=True),
         ],
     )

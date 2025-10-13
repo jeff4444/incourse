@@ -23,11 +23,12 @@ from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps
 
 # Import managers and tools
 from shared.managers import ChatSessionManager
-from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id, get_course
+from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id
 from api.canvas import get_course_details, get_file_details_with_content
 from shared.utils.supabase_utils import decrypt_api_key
 from api.supabase import (
     get_user_lms_info,
+    get_course,
     create_flashcard_deck,
     create_flashcards,
     get_flashcard_deck,
@@ -137,19 +138,21 @@ async def generate_flashcards(request: FlashcardRequest):
     Generate flashcards based on course content and files, and store them in the database.
     """
     try:
-        # Create dependencies
+        # Pre-load dependencies to avoid refetching on every tool call
         lms_info = await get_user_lms_info(request.user_id)
+        course_info = await get_course(request.course_id)
         
         deps = FlashcardDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"]
+            lms_base_url=lms_info["base_url"],
+            course_info=course_info
         )
         
-        # Get the flashcard agent
-        agent = get_flashcard_agent(num_flashcards=request.num_flashcards)
+        # Get the flashcard agent with file_ids injected
+        agent = get_flashcard_agent(num_flashcards=request.num_flashcards, file_ids=request.file_ids)
         
         # Build prompt with extra context if provided
         prompt = f"Generate {request.num_flashcards} flashcards"
@@ -196,19 +199,21 @@ async def generate_quiz(request: QuizRequest):
     Generate quiz questions based on course content and files, and store them in the database.
     """
     try:
-        # Create dependencies
+        # Pre-load dependencies to avoid refetching on every tool call
         lms_info = await get_user_lms_info(request.user_id)
+        course_info = await get_course(request.course_id)
         
         deps = QuizDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"]
+            lms_base_url=lms_info["base_url"],
+            course_info=course_info
         )
         
-        # Get the quiz agent
-        agent = get_quiz_agent(num_quizzes=request.num_questions, difficulty=request.difficulty)
+        # Get the quiz agent with file_ids injected
+        agent = get_quiz_agent(num_quizzes=request.num_questions, difficulty=request.difficulty, file_ids=request.file_ids)
         
         # Build prompt with difficulty and extra context
         prompt = f"Generate {request.num_questions} {request.difficulty} difficulty quiz questions"
