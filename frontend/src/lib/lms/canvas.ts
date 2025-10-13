@@ -2,6 +2,17 @@ import { Course, FileDetails, Module, ModuleItem, DiscussionTopic, Page } from "
 import { validateFileForProcessing } from "../utils/fileValidation";
 import LMSProvider from "./lms-provider";
 
+
+const ALLOWED_FILE_CONTENT_TYPES = [
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+]
+
 class CanvasProvider extends LMSProvider {
   apiBaseUrl: string;
   apiKey: string;
@@ -98,13 +109,22 @@ class CanvasProvider extends LMSProvider {
       ? moduleItemData.page_url 
       : moduleItemData.content_id;
 
+    let type: string | null = null;
+    if (!moduleItemData.type && ALLOWED_FILE_CONTENT_TYPES.includes(moduleItemData["content-type"])) {
+      type = 'File';
+    } else if (!moduleItemData.type) {
+      type = moduleItemData["content-type"];
+    } else {
+      type = moduleItemData.type;
+    }
+
     const moduleItem: ModuleItem = {
       id: moduleItemData.id,
       lmsId: moduleItemData.id,
       name: moduleItemData.title,
       moduleId: moduleId,
       courseId: courseId,
-      type: moduleItemData.type || moduleItemData["content-type"],
+      type: type || '',
       contentType: moduleItemData["content-type"],
       url: moduleItemData.url,
       lmsContentId: lmsContentId,
@@ -125,13 +145,22 @@ class CanvasProvider extends LMSProvider {
       fileSize
     );
 
+    let type: string | null = null;
+    if (!fileDetailsData.type && ALLOWED_FILE_CONTENT_TYPES.includes(contentType)) {
+      type = 'File';
+    } else if (!fileDetailsData.type) {
+      type = contentType;
+    } else {
+      type = fileDetailsData.type;
+    }
+
     const fileDetails: FileDetails = {
       id: fileDetailsData.id,
       canvasId: fileDetailsData.id,
       name: fileName,
       url: fileDetailsData.url,
       size: fileSize,
-      type: fileDetailsData.type || fileDetailsData["content-type"],
+      type: type || '',
       contentType: contentType,
       isValidForProcessing: validation.isValid,
       validationError: validation.error || null,
@@ -319,7 +348,12 @@ class CanvasProvider extends LMSProvider {
       return [];
     }
     const filesData = await filesResponse.json();
-    return filesData.map((fileData: any) => this.convertCanvasFileDetails(fileData));
+    const fileDetailsList: FileDetails[] = [];
+    for (const fileData of filesData) {
+      const fileDetails = await this.getFileDetails(fileData.id, courseId);
+      fileDetailsList.push(fileDetails);
+    }
+    return fileDetailsList;
   }
 
   async getPage(pageUrl: string, courseId: string): Promise<Page> {
