@@ -12,8 +12,8 @@ class ChatSessionManager:
     
     def __init__(self, course_info: Dict[str, Any], file_info: Dict[str, Any]):
         self.message_buffer: List[Dict[str, Any]] = []
-        self.buffer_limit = 5  # Batch save every 5 messages
-        self.summary_interval = 10  # Create summary every 10 messages
+        self.buffer_limit = 2 # Batch save every 2 messages
+        self.summary_interval = 5  # Create summary every 5 messages
         self.course_info = course_info
         self.file_info = file_info
     

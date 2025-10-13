@@ -20,13 +20,14 @@ EXAMPLES:
 
 🔧 TOOL 2: get_chat_context(ctx)
 WHAT IT DOES: Fetches recent conversation history and summary of what was discussed before.
-WHEN TO USE: User makes a follow-up question that requires previous context.
+WHEN TO USE: User makes a follow-up question that requires previous context and before calling search_file_with_query.
 WHEN NOT TO USE: Fresh questions, greetings, or when user provides full context in their message.
 
 EXAMPLES:
 ✅ "How do I do that?" → CALL THIS (needs previous context)
 ✅ "Can you explain that again?" → CALL THIS
 ✅ "What did we discuss earlier?" → CALL THIS
+✅ "What is the professor's name?" → CALL THIS FIRST
 ❌ "Explain photosynthesis" → DON'T CALL (standalone question)
 ❌ "Hi, what's up?" → DON'T CALL
 
@@ -36,6 +37,8 @@ EXAMPLES:
 WHAT IT DOES: Searches the document for relevant content using vector search.
 WHEN TO USE: User asks about specific document content and you need to find it.
 WHEN NOT TO USE: User already provided highlighted text, or asking general questions.
+
+Always call get_chat_context before calling this tool to ensure you have the latest context as it may contain summarized version of the file content for quicker response.
 
 EXAMPLES:
 ✅ "What does the document say about Newton's Laws?" → CALL THIS with query="Newton's Laws mechanics"

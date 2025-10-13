@@ -54,11 +54,11 @@ async def get_course_and_file_info(ctx: RunContext) -> Dict[str, Any]:
     Returns:
         Dictionary with course_name, course_code, file_name, and file_type
     """
-    from api.supabase import get_user_api_keys
+    from api.supabase import get_user_lms_info
     
     # Fetch LMS info if not already loaded
     if not ctx.deps.lms_api_key or not ctx.deps.lms_base_url:
-        lms_info = await get_user_api_keys(user_id=ctx.deps.user_id)
+        lms_info = await get_user_lms_info(user_id=ctx.deps.user_id)
         ctx.deps.lms_api_key = lms_info["api_key"]
         ctx.deps.lms_base_url = lms_info["base_url"]
     
@@ -78,8 +78,8 @@ async def get_course_and_file_info(ctx: RunContext) -> Dict[str, Any]:
             ctx.deps.file_info = file_info
         except Exception:
             # Fall back to LMS API
-            from api.canvas import get_file_details
-            file_info = await get_file_details(
+            from api.canvas import get_file_details_with_content
+            file_info = await get_file_details_with_content(
                 api_key=ctx.deps.lms_api_key,
                 api_base_url=ctx.deps.lms_base_url,
                 course_id=ctx.deps.course_info["lms_id"],

@@ -48,7 +48,7 @@ async def search_file_with_query(
     
     if not ctx.deps.file_info:
         from api.supabase import get_module_items_by_course_id
-        from api.canvas import get_file_details
+        from api.canvas import get_file_details_with_content
         
         try:
             # Try to get from our database first
@@ -60,7 +60,7 @@ async def search_file_with_query(
             ctx.deps.file_info = file_info
         except Exception:
             # Fall back to LMS API
-            file_info = await get_file_details(
+            file_info = await get_file_details_with_content(
                 api_key=ctx.deps.lms_api_key,
                 api_base_url=ctx.deps.lms_base_url,
                 course_id=ctx.deps.course_info["lms_id"],

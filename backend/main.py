@@ -293,98 +293,95 @@ async def chat(request: ChatRequest):
         agent = get_chat_agent()
         result = await agent.run(user_prompt, deps=deps)
         
-        # Only do session management if agent actually used chat context
-        # This means it was a context-dependent query worth saving
-        session_id = None
+        # Always do session management - we need to save all messages
+        # However, we minimize API calls by reusing data the agent already fetched
         
-        if deps.chat_history is not None or deps.context_summary is not None:
-            # Agent fetched chat context, so this is part of an ongoing conversation
-            # We should save the messages and potentially update the summary
+        # 1. Ensure we have a chat_id
+        if not deps.chat_id:
+            from tools.supabase_tools import get_or_create_chat_session
             
-            if not deps.chat_id:
-                # Shouldn't happen, but handle just in case
-                from tools.supabase_tools import get_or_create_chat_session
-                
-                if not deps.file_info:
-                    # Need file_info to get document_id
-                    try:
-                        file_info = await get_module_items_by_course_id(
-                            course_id=deps.course_id,
-                            lms_id=request.file_ids[0]
-                        )
-                        document_id = file_info["id"]
-                        deps.file_info = file_info
-                        deps.is_file_from_lms = False
-                    except Exception:
-                        document_id = request.file_ids[0]
-                        deps.is_file_from_lms = True
-                else:
-                    document_id = deps.file_info["id"] if not deps.is_file_from_lms else request.file_ids[0]
-                
-                chat_session = await get_or_create_chat_session(
-                    user_id=request.user_id,
-                    document_id=document_id
-                )
-                deps.chat_id = chat_session["id"]
-            
-            # Ensure we have course_info and file_info for session manager
-            if not deps.course_info:
-                deps.course_info = await get_course(course_id=request.course_id)
-            
+            # Need document_id for chat session
             if not deps.file_info:
+                # Try to get from Supabase first (cheapest call)
+                try:
+                    file_info = await get_module_items_by_course_id(
+                        course_id=deps.course_id,
+                        lms_id=request.file_ids[0]
+                    )
+                    document_id = file_info["id"]
+                    deps.file_info = file_info
+                    deps.is_file_from_lms = False
+                except Exception:
+                    # Fall back to using LMS file ID directly
+                    document_id = request.file_ids[0]
+                    deps.is_file_from_lms = True
+            else:
+                document_id = deps.file_info["id"] if not deps.is_file_from_lms else request.file_ids[0]
+            
+            chat_session = await get_or_create_chat_session(
+                user_id=request.user_id,
+                document_id=document_id
+            )
+            deps.chat_id = chat_session["id"]
+        
+        # 2. Ensure we have minimal info for session manager (lazy fetch only what's needed)
+        if not deps.course_info:
+            deps.course_info = await get_course(course_id=request.course_id)
+        
+        if not deps.file_info:
+            # Try Supabase first (faster), then fallback to LMS
+            try:
+                deps.file_info = await get_module_items_by_course_id(
+                    course_id=deps.course_info["id"],
+                    lms_id=request.file_ids[0]
+                )
+                deps.is_file_from_lms = False
+            except Exception:
+                # Need LMS credentials
                 if not deps.lms_api_key:
                     lms_info = await get_user_lms_info(request.user_id)
                     deps.lms_api_key = lms_info["api_key"]
                     deps.lms_base_url = lms_info["base_url"]
                 
-                try:
-                    deps.file_info = await get_module_items_by_course_id(
-                        course_id=deps.course_info["id"],
-                        lms_id=request.file_ids[0]
-                    )
-                    deps.is_file_from_lms = False
-                except Exception:
-                    deps.file_info = await get_file_details_with_content(
-                        api_key=deps.lms_api_key,
-                        api_base_url=deps.lms_base_url,
-                        course_id=deps.course_info["lms_id"],
-                        file_id=request.file_ids[0]
-                    )
-                    deps.is_file_from_lms = True
-            
-            # Initialize session manager and save conversation
-            session_manager = ChatSessionManager(
-                course_info=deps.course_info,
-                file_info=deps.file_info
-            )
-            
-            # Save messages
-            await session_manager.add_message_to_buffer(
-                chat_id=deps.chat_id,
-                sender="user",
-                content=request.message
-            )
-            
-            await session_manager.add_message_to_buffer(
-                chat_id=deps.chat_id,
-                sender="assistant",
-                content=result.output.answer
-            )
-            
-            # Check if we should create a summary
-            # Pass existing data from deps to avoid redundant API calls
-            await session_manager.check_and_create_summary(
-                chat_id=deps.chat_id,
-                user_message=request.message,
-                assistant_response=result.output.answer,
-                existing_chat_history=deps.chat_history,
-                existing_context_summary=deps.context_summary
-            )
-            
-            # Flush any remaining messages in buffer
-            await session_manager.flush_buffer(chat_id=deps.chat_id)
-            
-            session_id = deps.chat_id
+                deps.file_info = await get_file_details_with_content(
+                    api_key=deps.lms_api_key,
+                    api_base_url=deps.lms_base_url,
+                    course_id=deps.course_info["lms_id"],
+                    file_id=request.file_ids[0]
+                )
+                deps.is_file_from_lms = True
+        
+        # 3. Initialize session manager and save messages
+        session_manager = ChatSessionManager(
+            course_info=deps.course_info,
+            file_info=deps.file_info
+        )
+        
+        await session_manager.add_message_to_buffer(
+            chat_id=deps.chat_id,
+            sender="user",
+            content=request.message
+        )
+        
+        await session_manager.add_message_to_buffer(
+            chat_id=deps.chat_id,
+            sender="assistant",
+            content=result.output.answer
+        )
+        
+        # 4. Check if we should create a summary (reuse existing data from agent)
+        await session_manager.check_and_create_summary(
+            chat_id=deps.chat_id,
+            user_message=request.message,
+            assistant_response=result.output.answer,
+            existing_chat_history=deps.chat_history,  # Reuse if agent fetched it
+            existing_context_summary=deps.context_summary  # Reuse if agent fetched it
+        )
+        
+        # 5. Flush any remaining messages in buffer
+        await session_manager.flush_buffer(chat_id=deps.chat_id)
+        
+        session_id = deps.chat_id
         
         return ChatResponse(
             answer=result.output.answer,
