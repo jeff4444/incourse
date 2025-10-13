@@ -4,122 +4,55 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { QuizView } from "@/components/quiz-view"
 import { Navbar } from "@/components/navbar"
+import { useQuiz, useRecordQuizAttempt } from "@/lib/hooks/useQuizzes"
 
-// Sample quiz data - in a real app, this would be fetched from an API
-const sampleQuizzes = {
-  cs101: {
-    title: "Data Structures: Arrays and Linked Lists",
-    questions: [
-      {
-        id: 1,
-        question: "Which of the following data structures allows for constant-time access to elements by index?",
-        options: ["Linked List", "Array", "Binary Search Tree", "Hash Table"],
-        correctAnswer: "Array",
-      },
-      {
-        id: 2,
-        question: "What is the time complexity of inserting an element at the beginning of a linked list?",
-        options: ["O(1)", "O(log n)", "O(n)", "O(n²)"],
-        correctAnswer: "O(1)",
-      },
-      {
-        id: 3,
-        question: "What is the space complexity of an array?",
-        options: ["O(1)", "O(n)", "O(log n)", "O(n log n)"],
-        correctAnswer: "O(n)",
-      },
-      {
-        id: 4,
-        question: "Which data structure is more efficient for frequent insertions and deletions?",
-        options: ["Array", "Linked List", "Both are equally efficient", "Depends on the implementation"],
-        correctAnswer: "Linked List",
-      },
-      {
-        id: 5,
-        question: "What is a disadvantage of using linked lists?",
-        options: [
-          "Random access is not allowed",
-          "Extra memory space for pointers",
-          "Difficult to reverse traverse",
-          "All of the above",
-        ],
-        correctAnswer: "All of the above",
-      },
-    ],
-  },
-  econ201: {
-    title: "Macroeconomics Fundamentals",
-    questions: [
-      {
-        id: 1,
-        question: "What does GDP stand for?",
-        options: [
-          "Gross Domestic Product",
-          "General Domestic Production",
-          "Global Development Process",
-          "Government Domestic Policy",
-        ],
-        correctAnswer: "Gross Domestic Product",
-      },
-      {
-        id: 2,
-        question: "Which of the following is NOT a component of aggregate demand?",
-        options: ["Consumption", "Investment", "Government Spending", "Wages"],
-        correctAnswer: "Wages",
-      },
-      // More questions would be added here
-    ],
-  },
-  psych110: {
-    title: "Introduction to Psychology",
-    questions: [
-      {
-        id: 1,
-        question: "Who is considered the father of psychoanalysis?",
-        options: ["B.F. Skinner", "Carl Jung", "Sigmund Freud", "Ivan Pavlov"],
-        correctAnswer: "Sigmund Freud",
-      },
-      {
-        id: 2,
-        question: "Which psychological perspective emphasizes observable behavior?",
-        options: ["Psychoanalytic", "Humanistic", "Cognitive", "Behaviorist"],
-        correctAnswer: "Behaviorist",
-      },
-      // More questions would be added here
-    ],
-  },
-}
-
-export default function QuizPage({ params }: { params: Promise<{ courseID: string }> }) {
+export default function QuizPage({ params }: { params: Promise<{ courseID: string; quizID: string }> }) {
   const router = useRouter()
-  const [courseID, setCourseID] = useState<string>("cs101")
-  const [quizData, setQuizData] = useState<any>(null)
+  const [courseID, setCourseID] = useState<string>("")
+  const [quizID, setQuizID] = useState<string>("")
 
   useEffect(() => {
     const getParams = async () => {
       const resolvedParams = await params;
       setCourseID(resolvedParams.courseID);
+      setQuizID(resolvedParams.quizID);
     };
     getParams();
   }, [params]);
 
+  // Fetch quiz from database
+  const { data: quiz, isLoading, error } = useQuiz(quizID);
+  const recordAttempt = useRecordQuizAttempt();
+
   useEffect(() => {
-    // In a real app, fetch quiz data from an API
-    // For now, use our sample data
-    if (sampleQuizzes[courseID as keyof typeof sampleQuizzes]) {
-      setQuizData(sampleQuizzes[courseID as keyof typeof sampleQuizzes])
-    } else {
-      // If no quiz data for this course, redirect back to course page
+    // If quiz not found after loading, redirect back to course page
+    if (!isLoading && !quiz && quizID && courseID) {
       router.push(`/courses/${courseID}`)
     }
-  }, [courseID, router])
+  }, [quiz, isLoading, quizID, courseID, router])
 
-  const handleQuizComplete = (score: number) => {
-    console.log(`Quiz completed with score: ${score}%`)
-    // In a real app, save this score to the database
-  }
+  const handleQuizComplete = async (score: number, selectedAnswers: Record<number, string>) => {
+    if (!quiz) return;
 
-  if (!quizData) {
+    // Transform answers for storage
+    const answers = quiz.questions.map((question) => ({
+      question_id: question.id,
+      selected_option_index: question.options.indexOf(selectedAnswers[parseInt(question.id)] || ""),
+      correct: selectedAnswers[parseInt(question.id)] === question.options[question.correct_option_index],
+    }));
+
+    try {
+      await recordAttempt.mutateAsync({
+        quizId: quizID,
+        score,
+        answers,
+      });
+    } catch (error) {
+      console.error('Error recording quiz attempt:', error);
+    }
+  };
+
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
         <Navbar />
@@ -130,13 +63,36 @@ export default function QuizPage({ params }: { params: Promise<{ courseID: strin
     )
   }
 
+  if (error || !quiz) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+        <Navbar />
+        <div className="container mx-auto py-12 px-4">
+          <div className="text-center text-red-500">
+            <h2 className="text-xl font-semibold mb-2">Error loading quiz</h2>
+            <p>The quiz could not be found or there was an error loading it.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Transform database quiz to match QuizView component format
+  const transformedQuestions = quiz.questions.map((question) => ({
+    id: parseInt(question.id) || 0,
+    question: question.question,
+    options: question.options,
+    correctAnswer: question.options[question.correct_option_index],
+    explanation: question.explanation,
+  }));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="container mx-auto py-12 px-4">
-        <QuizView
-          title={quizData.title}
-          questions={quizData.questions}
+        <QuizView 
+          title={quiz.name} 
+          questions={transformedQuestions} 
           onComplete={handleQuizComplete}
           courseID={courseID}
         />

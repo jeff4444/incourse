@@ -14,6 +14,9 @@ import { CourseSkeleton } from "@/components/course-skeleton"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
 import { useCourse } from "@/lib/hooks/useCourses"
 import { useModules } from "@/lib/hooks/useModules"
+import { useFlashcardDecks } from "@/lib/hooks/useFlashcards"
+import { useQuizzes } from "@/lib/hooks/useQuizzes"
+import { createClient } from "@/lib/utils/supabase/client"
 
 function CoursePage({
   params,
@@ -21,6 +24,7 @@ function CoursePage({
   params: Promise<{ courseID: string }>
 }) {
   const [courseID, setCourseID] = useState<string>("");
+  const [userId, setUserId] = useState<string>("");
 
   useEffect(() => {
     const getParams = async () => {
@@ -30,8 +34,21 @@ function CoursePage({
     getParams();
   }, [params]);
 
+  useEffect(() => {
+    const getUserId = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUserId();
+  }, []);
+
   const { data: course, isLoading: courseLoading, error: courseError } = useCourse(courseID);
   const { data: modules = [], isLoading: modulesLoading, error: modulesError } = useModules(courseID);
+  const { data: flashcardDecks = [], isLoading: flashcardsLoading } = useFlashcardDecks(courseID, userId);
+  const { data: quizzes = [], isLoading: quizzesLoading } = useQuizzes(courseID, userId);
 
   const loading = courseLoading || modulesLoading;
   const error = courseError || modulesError;
@@ -149,64 +166,47 @@ By the end of this course, you will have developed a comprehensive understanding
                     <CardDescription>Test your knowledge with AI-generated quizzes</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid gap-4">
-                      {[
-                        {
-                          id: "quiz1",
-                          title: "Fundamentals Quiz",
-                          questions: 10,
-                          completed: true,
-                          score: "85%",
-                          date: "Sep 10, 2023",
-                        },
-                        {
-                          id: "quiz2",
-                          title: "Core Concepts",
-                          questions: 15,
-                          completed: true,
-                          score: "92%",
-                          date: "Sep 15, 2023",
-                        },
-                        {
-                          id: "quiz3",
-                          title: "Advanced Topics",
-                          questions: 12,
-                          completed: false,
-                          date: "Not started",
-                        },
-                      ].map((quiz) => (
-                        <div
-                          key={quiz.id}
-                          className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
-                        >
-                          <div className="flex items-center gap-4">
+                    {quizzesLoading ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading quizzes...</div>
+                    ) : quizzes.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No quizzes yet. Generate your first quiz to get started!</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {quizzes.map((quiz) => {
+                          const formattedDate = new Date(quiz.created_at).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          });
+
+                          return (
                             <div
-                              className={`rounded-full p-2 ${
-                                quiz.completed ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
-                              }`}
+                              key={quiz.id}
+                              className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
                             >
-                              {quiz.completed ? <ThumbsUp className="h-5 w-5" /> : <Play className="h-5 w-5" />}
+                              <div className="flex items-center gap-4">
+                                <div className="rounded-full p-2 bg-blue-100 text-blue-600">
+                                  <Play className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{quiz.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {quiz.question_count} questions • {formattedDate}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <Link href={`/courses/${courseID}/quiz/${quiz.id}`}>
+                                  <Button size="sm">Start Quiz</Button>
+                                </Link>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium">{quiz.title}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {quiz.questions} questions • {quiz.date}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            {quiz.completed && (
-                              <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200">
-                                {quiz.score}
-                              </Badge>
-                            )}
-                            <Link href={`/courses/${courseID}/quiz/${"cs101"}`}>
-                              <Button size="sm">{quiz.completed ? "Review" : "Start Quiz"}</Button>
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                   <CardFooter className="border-t">
                     <Link href={`/courses/${courseID}/generate-quiz`} className="w-full">
@@ -228,54 +228,47 @@ By the end of this course, you will have developed a comprehensive understanding
                     <CardDescription>Practice with spaced repetition flashcards</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid gap-4">
-                      {[
-                        {
-                          id: "deck1",
-                          title: "Key Terminology",
-                          cards: 24,
-                          mastered: 18,
-                          lastPracticed: "Yesterday",
-                        },
-                        {
-                          id: "deck2",
-                          title: "Core Concepts",
-                          cards: 32,
-                          mastered: 15,
-                          lastPracticed: "3 days ago",
-                        },
-                        {
-                          id: "deck3",
-                          title: "Formulas & Equations",
-                          cards: 16,
-                          mastered: 8,
-                          lastPracticed: "1 week ago",
-                        },
-                      ].map((deck) => (
-                        <div
-                          key={deck.id}
-                          className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="rounded-full p-2 bg-purple-100 text-purple-600">
-                              <BookOpen className="h-5 w-5" />
+                    {flashcardsLoading ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading flashcard decks...</div>
+                    ) : flashcardDecks.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <p>No flashcard decks yet. Create your first deck to get started!</p>
+                      </div>
+                    ) : (
+                      <div className="grid gap-4">
+                        {flashcardDecks.map((deck) => {
+                          const formattedDate = new Date(deck.created_at).toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          });
+
+                          return (
+                            <div
+                              key={deck.id}
+                              className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className="rounded-full p-2 bg-purple-100 text-purple-600">
+                                  <BookOpen className="h-5 w-5" />
+                                </div>
+                                <div>
+                                  <p className="font-medium">{deck.name}</p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {deck.card_count} cards • Created {formattedDate}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Link href={`/courses/${courseID}/flashcards/${deck.id}`}>
+                                  <Button size="sm">Practice</Button>
+                                </Link>
+                              </div>
                             </div>
-                            <div>
-                              <p className="font-medium">{deck.title}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {deck.cards} cards • {deck.mastered} mastered
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-muted-foreground mr-2">Last practiced: {deck.lastPracticed}</p>
-                            <Link href={`/courses/${courseID}/flashcards/${deck.id}`}>
-                              <Button size="sm">Practice</Button>
-                            </Link>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </CardContent>
                   <CardFooter className="border-t">
                     <Link href={`/courses/${courseID}/create-flashcards`} className="w-full">

@@ -169,7 +169,8 @@ async def search_file_with_chunk_index(
     filename: str,
     chunk_index: int,
     is_file_from_lms: bool = False,
-    file_info: Dict[str, Any] = None
+    file_info: Dict[str, Any] = None,
+    top_k: int = 3
 ) -> Dict[str, Any]:
     """
     Search for a specific chunk in a course file using Pinecone.
@@ -225,7 +226,7 @@ async def search_file_with_chunk_index(
             namespace=namespace,
             query={
                 "id": chunk_id,  # For integrated inference, id is a direct query parameter
-                "top_k": 3
+                "top_k": top_k
             },
             fields=["text", "chunk_index", "filename", "file_id", "total_chunks"]
         )
@@ -275,7 +276,8 @@ async def search_file_with_query(
     filename: str,
     query: str,
     is_file_from_lms: bool = False,
-    file_info: Dict[str, Any] = None
+    file_info: Dict[str, Any] = None,
+    top_k: int = 3
 ) -> Dict[str, Any]:
     """
     Search for relevant chunks in a course file using Pinecone.
@@ -350,7 +352,7 @@ async def search_file_with_query(
             namespace=namespace,
             query={
                 "inputs": {"text": query},
-                "top_k": 3
+                "top_k": top_k
             },
             fields=["text", "chunk_index", "filename", "file_id", "total_chunks"]
         )

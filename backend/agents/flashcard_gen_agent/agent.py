@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from pydantic_ai import Agent, Tool
 from prompts.flashcard_agent_prompt import FLASHCARD_AGENT_PROMPT
 from shared.model import get_model
+from tools.pinecone_tools import search_multiple_files_with_query
 from tools.canvas_tools import (
     get_chat_history_summary, 
     get_course_grade_details, 
@@ -65,6 +66,10 @@ class Deps:
     course_id: str
     file_ids: List[str]
     
+    # For Pinecone file info (similar to chat agent)
+    course_info: Optional[Dict[str, Any]] = None
+    files_info: Optional[List[Dict[str, Any]]] = None
+    
     
 def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
     """
@@ -84,6 +89,9 @@ def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
         output_type=List[Flashcard],
         system_prompt=system_prompt,
         tools=[  
+            # Pinecone search tools - primary for content retrieval
+            Tool(search_multiple_files_with_query, takes_ctx=True),
+            # Canvas tools - for additional context if needed
             Tool(get_overall_course_performance, takes_ctx=True),
             Tool(get_chat_history_summary, takes_ctx=True),
             Tool(get_course_quiz_history, takes_ctx=True),

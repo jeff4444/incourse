@@ -869,3 +869,477 @@ async def get_chat_message_count(
     response = supabase.table("chat_messages").select("id", count="exact").eq("chat_id", chat_id).execute()
     
     return response.count or 0
+
+
+# =====================================================
+# Flashcard Functions
+# =====================================================
+
+async def create_flashcard_deck(
+    user_id: str,
+    course_id: str,
+    name: str,
+    file_ids: List[str],
+    card_count: int,
+    extra_context: str = None,
+    card_type: str = "term-definition"
+) -> str:
+    """
+    Create a new flashcard deck.
+    
+    Args:
+        user_id: User ID
+        course_id: Course ID
+        name: Deck name
+        file_ids: List of file IDs used for generation
+        card_count: Number of cards in the deck
+        extra_context: User's additional instructions
+        card_type: Type of cards (term-definition, question-answer, concept-example)
+    
+    Returns:
+        Created deck ID
+    """
+    print(f"calling create_flashcard_deck with user_id={user_id}, course_id={course_id}, name={name}, card_count={card_count}")
+    
+    supabase = get_supabase_client()
+    
+    deck_data = {
+        "user_id": user_id,
+        "course_id": course_id,
+        "name": name,
+        "file_ids": file_ids,
+        "card_type": card_type,
+        "card_count": card_count
+    }
+    
+    if extra_context:
+        deck_data["extra_context"] = extra_context
+    
+    response = (
+        supabase.table("flashcard_decks")
+        .insert(deck_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create flashcard deck")
+    
+    return response.data[0]["id"]
+
+
+async def create_flashcards(
+    deck_id: str,
+    flashcards: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Create multiple flashcards for a deck.
+    
+    Args:
+        deck_id: Deck ID
+        flashcards: List of flashcard dictionaries with question, answer, hint, position
+    
+    Returns:
+        Created flashcards
+    """
+    print(f"calling create_flashcards with deck_id={deck_id}, count={len(flashcards)}")
+    
+    supabase = get_supabase_client()
+    
+    cards_data = []
+    for idx, card in enumerate(flashcards):
+        cards_data.append({
+            "deck_id": deck_id,
+            "question": card["question"],
+            "answer": card["answer"],
+            "hint": card.get("hint", ""),
+            "position": idx
+        })
+    
+    response = (
+        supabase.table("flashcards")
+        .insert(cards_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create flashcards")
+    
+    return response.data
+
+
+async def get_flashcard_deck(
+    deck_id: str
+) -> Dict[str, Any]:
+    """
+    Get a flashcard deck with all its cards.
+    
+    Args:
+        deck_id: Deck ID
+    
+    Returns:
+        Deck dictionary with cards nested
+    """
+    print(f"calling get_flashcard_deck with deck_id={deck_id}")
+    
+    supabase = get_supabase_client()
+    
+    # Get deck
+    deck_response = (
+        supabase.table("flashcard_decks")
+        .select("*")
+        .eq("id", deck_id)
+        .execute()
+    )
+    
+    if not deck_response.data:
+        raise Exception("Flashcard deck not found")
+    
+    deck = deck_response.data[0]
+    
+    # Get cards
+    cards_response = (
+        supabase.table("flashcards")
+        .select("*")
+        .eq("deck_id", deck_id)
+        .order("position")
+        .execute()
+    )
+    
+    deck["flashcards"] = cards_response.data
+    
+    return deck
+
+
+async def get_flashcard_decks_by_course(
+    course_id: str,
+    user_id: str
+) -> List[Dict[str, Any]]:
+    """
+    Get all flashcard decks for a course and user.
+    
+    Args:
+        course_id: Course ID
+        user_id: User ID
+    
+    Returns:
+        List of deck dictionaries
+    """
+    print(f"calling get_flashcard_decks_by_course with course_id={course_id}, user_id={user_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("flashcard_decks")
+        .select("*")
+        .eq("course_id", course_id)
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data
+
+
+async def update_flashcard_analytics(
+    flashcard_id: str,
+    viewed: bool = False,
+    correct: bool = None,
+    confidence_level: int = None
+) -> Dict[str, Any]:
+    """
+    Update analytics for a flashcard.
+    
+    Args:
+        flashcard_id: Flashcard ID
+        viewed: Whether the card was viewed
+        correct: Whether the user got it correct (None if not answered)
+        confidence_level: User's confidence level (1-5)
+    
+    Returns:
+        Updated flashcard data
+    """
+    print(f"calling update_flashcard_analytics with flashcard_id={flashcard_id}")
+    
+    supabase = get_supabase_client()
+    
+    # First get current values
+    current = (
+        supabase.table("flashcards")
+        .select("times_viewed, times_correct, times_incorrect")
+        .eq("id", flashcard_id)
+        .execute()
+    )
+    
+    if not current.data:
+        raise Exception("Flashcard not found")
+    
+    current_data = current.data[0]
+    
+    update_data = {}
+    
+    if viewed:
+        update_data["times_viewed"] = current_data["times_viewed"] + 1
+        update_data["last_viewed_at"] = "now()"
+    
+    if correct is True:
+        update_data["times_correct"] = current_data["times_correct"] + 1
+    elif correct is False:
+        update_data["times_incorrect"] = current_data["times_incorrect"] + 1
+    
+    if confidence_level is not None:
+        update_data["confidence_level"] = confidence_level
+    
+    response = (
+        supabase.table("flashcards")
+        .update(update_data)
+        .eq("id", flashcard_id)
+        .execute()
+    )
+    
+    return response.data[0] if response.data else {}
+
+
+# =====================================================
+# Quiz Functions
+# =====================================================
+
+async def create_quiz(
+    user_id: str,
+    course_id: str,
+    name: str,
+    file_ids: List[str],
+    question_count: int,
+    extra_context: str = None,
+    difficulty: str = "medium"
+) -> str:
+    """
+    Create a new quiz.
+    
+    Args:
+        user_id: User ID
+        course_id: Course ID
+        name: Quiz name
+        file_ids: List of file IDs used for generation
+        question_count: Number of questions in the quiz
+        extra_context: User's additional instructions
+        difficulty: Difficulty level (easy, medium, hard)
+    
+    Returns:
+        Created quiz ID
+    """
+    print(f"calling create_quiz with user_id={user_id}, course_id={course_id}, name={name}, question_count={question_count}")
+    
+    supabase = get_supabase_client()
+    
+    quiz_data = {
+        "user_id": user_id,
+        "course_id": course_id,
+        "name": name,
+        "file_ids": file_ids,
+        "difficulty": difficulty,
+        "question_count": question_count
+    }
+    
+    if extra_context:
+        quiz_data["extra_context"] = extra_context
+    
+    response = (
+        supabase.table("quizzes")
+        .insert(quiz_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create quiz")
+    
+    return response.data[0]["id"]
+
+
+async def create_quiz_questions(
+    quiz_id: str,
+    questions: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Create multiple quiz questions.
+    
+    Args:
+        quiz_id: Quiz ID
+        questions: List of question dictionaries with question, options, correct_option_index, explanation, position
+    
+    Returns:
+        Created questions
+    """
+    print(f"calling create_quiz_questions with quiz_id={quiz_id}, count={len(questions)}")
+    
+    supabase = get_supabase_client()
+    
+    questions_data = []
+    for idx, q in enumerate(questions):
+        questions_data.append({
+            "quiz_id": quiz_id,
+            "question": q["question"],
+            "options": q["options"],
+            "correct_option_index": q["response_index"],
+            "explanation": q["explanation"],
+            "position": idx
+        })
+    
+    response = (
+        supabase.table("quiz_questions")
+        .insert(questions_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create quiz questions")
+    
+    return response.data
+
+
+async def get_quiz(
+    quiz_id: str
+) -> Dict[str, Any]:
+    """
+    Get a quiz with all its questions.
+    
+    Args:
+        quiz_id: Quiz ID
+    
+    Returns:
+        Quiz dictionary with questions nested
+    """
+    print(f"calling get_quiz with quiz_id={quiz_id}")
+    
+    supabase = get_supabase_client()
+    
+    # Get quiz
+    quiz_response = (
+        supabase.table("quizzes")
+        .select("*")
+        .eq("id", quiz_id)
+        .execute()
+    )
+    
+    if not quiz_response.data:
+        raise Exception("Quiz not found")
+    
+    quiz = quiz_response.data[0]
+    
+    # Get questions
+    questions_response = (
+        supabase.table("quiz_questions")
+        .select("*")
+        .eq("quiz_id", quiz_id)
+        .order("position")
+        .execute()
+    )
+    
+    quiz["questions"] = questions_response.data
+    
+    return quiz
+
+
+async def get_quizzes_by_course(
+    course_id: str,
+    user_id: str
+) -> List[Dict[str, Any]]:
+    """
+    Get all quizzes for a course and user.
+    
+    Args:
+        course_id: Course ID
+        user_id: User ID
+    
+    Returns:
+        List of quiz dictionaries
+    """
+    print(f"calling get_quizzes_by_course with course_id={course_id}, user_id={user_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("quizzes")
+        .select("*")
+        .eq("course_id", course_id)
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data
+
+
+async def record_quiz_attempt(
+    quiz_id: str,
+    user_id: str,
+    score: float,
+    answers: List[Dict[str, Any]],
+    time_spent_seconds: int = None
+) -> Dict[str, Any]:
+    """
+    Record a quiz attempt.
+    
+    Args:
+        quiz_id: Quiz ID
+        user_id: User ID
+        score: Score percentage (0-100)
+        answers: List of answer dictionaries with question_id, selected_option_index, correct
+        time_spent_seconds: Time spent on quiz in seconds
+    
+    Returns:
+        Created attempt data
+    """
+    print(f"calling record_quiz_attempt with quiz_id={quiz_id}, user_id={user_id}, score={score}")
+    
+    supabase = get_supabase_client()
+    
+    attempt_data = {
+        "quiz_id": quiz_id,
+        "user_id": user_id,
+        "score": score,
+        "answers": answers
+    }
+    
+    if time_spent_seconds is not None:
+        attempt_data["time_spent_seconds"] = time_spent_seconds
+    
+    response = (
+        supabase.table("quiz_attempts")
+        .insert(attempt_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to record quiz attempt")
+    
+    return response.data[0]
+
+
+async def get_quiz_attempts(
+    quiz_id: str,
+    user_id: str
+) -> List[Dict[str, Any]]:
+    """
+    Get all attempts for a quiz by a user.
+    
+    Args:
+        quiz_id: Quiz ID
+        user_id: User ID
+    
+    Returns:
+        List of attempt dictionaries
+    """
+    print(f"calling get_quiz_attempts with quiz_id={quiz_id}, user_id={user_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("quiz_attempts")
+        .select("*")
+        .eq("quiz_id", quiz_id)
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data

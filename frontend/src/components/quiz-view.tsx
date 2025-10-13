@@ -12,12 +12,13 @@ interface QuizQuestion {
   question: string
   options: string[]
   correctAnswer: string
+  explanation?: string
 }
 
 interface QuizViewProps {
   title: string
   questions: QuizQuestion[]
-  onComplete?: (score: number) => void
+  onComplete?: (score: number, selectedAnswers: Record<number, string>) => void
   courseID: string
 }
 
@@ -45,7 +46,7 @@ export function QuizView({ title, questions, onComplete, courseID }: QuizViewPro
     } else {
       // Calculate score and show results
       const score = calculateScore()
-      if (onComplete) onComplete(score)
+      if (onComplete) onComplete(score, selectedAnswers)
       setShowResults(true)
     }
   }
@@ -165,6 +166,13 @@ export function QuizView({ title, questions, onComplete, courseID }: QuizViewPro
               )
             })}
           </RadioGroup>
+
+          {checkedAnswer && currentQuestion.explanation && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm font-medium text-blue-900">Explanation:</p>
+              <p className="text-sm text-blue-800 mt-1">{currentQuestion.explanation}</p>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between">

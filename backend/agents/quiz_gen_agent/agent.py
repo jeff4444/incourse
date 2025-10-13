@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
-from typing import List, Dict
+from typing import List, Dict, Optional, Any
 from pydantic_ai import Agent, Tool
 from prompts.quiz_agent_prompt import QUIZ_AGENT_PROMPT
 from shared.model import get_model
+from tools.pinecone_tools import search_multiple_files_with_query
 from tools.canvas_tools import (
     get_chat_history_summary, 
     get_course_grade_details, 
@@ -49,14 +50,14 @@ class Quiz(BaseModel):
         description="Optional. A prompt for generating a helper image related to the quiz question."
     )
     
-    def to_dict(self) -> Dict[str, str]:
+    def to_dict(self) -> Dict[str, Any]:
         """
         Convert the Quiz object to a dictionary.
         """
         return {
             "question": self.question,
-            "options": ", ".join(self.options),
-            "response_index": str(self.response_index),
+            "options": self.options,  # Keep as list for JSONB storage
+            "response_index": self.response_index,
             "explanation": self.explanation,
             "helper_image_prompt": self.helper_image_prompt
         }
@@ -69,6 +70,10 @@ class Deps:
     lms_base_url: str
     course_id: str
     file_ids: List[str]
+    
+    # For Pinecone file info (similar to chat agent)
+    course_info: Optional[Dict[str, Any]] = None
+    files_info: Optional[List[Dict[str, Any]]] = None
     
     
 def get_quiz_agent(**kwargs) -> Agent[Deps, List[Quiz]]:
@@ -91,6 +96,9 @@ def get_quiz_agent(**kwargs) -> Agent[Deps, List[Quiz]]:
         output_type=List[Quiz],
         system_prompt=system_prompt,
         tools=[  
+            # Pinecone search tools - primary for content retrieval
+            Tool(search_multiple_files_with_query, takes_ctx=True),
+            # Canvas tools - for additional context if needed
             Tool(get_overall_course_performance, takes_ctx=True),
             Tool(get_chat_history_summary, takes_ctx=True),
             Tool(get_course_quiz_history, takes_ctx=True),
