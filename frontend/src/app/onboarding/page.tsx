@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/utils/supabase/client";
 import { encryptApiKey } from "@/lib/utils/encryption";
 import { Button } from "@/components/ui/button";
+import { SUPPORTED_SCHOOLS } from "@/constants/supported_schools";
 import {
   Card,
   CardContent,
@@ -32,8 +33,7 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(0); // -1 for back, 1 for forward
   const totalSteps = 2;
-  const [canvasUrl, setCanvasUrl] = useState("");
-  const [urlError, setUrlError] = useState("");
+  const [schoolName, setSchoolName] = useState<string>("");
   const [apiKey, setApiKey] = useState("");
   const [apiKeyError, setApiKeyError] = useState("");
   
@@ -46,37 +46,16 @@ export default function OnboardingPage() {
     detail?: string;
   }[]>([]);
 
-  // Canvas URL validation and formatting
-  const validateAndFormatCanvasUrl = (url: string): { isValid: boolean; formattedUrl: string; error: string } => {
-    if (!url.trim()) {
-      return { isValid: false, formattedUrl: "", error: "Canvas URL is required" };
-    }
-
-    let formattedUrl = url.trim();
-    
-    // Add https:// if not present
-    if (!formattedUrl.startsWith("http://") && !formattedUrl.startsWith("https://")) {
-      formattedUrl = "https://" + formattedUrl;
-    }
-
-    // Validate the format: https://canvas.{university}.edu
-    const canvasUrlRegex = /^https:\/\/canvas\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.edu(\/.*)?$/;
-    
-    if (!canvasUrlRegex.test(formattedUrl)) {
-      return { 
-        isValid: false, 
-        formattedUrl: "", 
-        error: "Please enter a valid Canvas URL in the format: https://canvas.university.edu" 
-      };
-    }
-
-    return { isValid: true, formattedUrl, error: "" };
-  };
-
-  const handleUrlChange = (value: string) => {
-    setCanvasUrl(value);
-    setUrlError(""); // Clear error when user types
-  };
+  // Fetch user's school on mount
+  useEffect(() => {
+    const fetchUserSchool = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.school_name) {
+        setSchoolName(user.user_metadata.school_name);
+      }
+    };
+    fetchUserSchool();
+  }, []);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -97,13 +76,19 @@ export default function OnboardingPage() {
   };
 
   // Store Canvas credentials to database
-  const storeCanvasCredentials = async (url: string, key: string) => {
+  const storeCanvasCredentials = async (key: string) => {
     try {
       updateSyncProgress('Saving credentials', 'loading');
       
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         throw new Error("User not authenticated");
+      }
+
+      // Get the Canvas URL from the school configuration
+      const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
+      if (!schoolConfig) {
+        throw new Error("School not supported");
       }
 
       const encryptedApiKey = encryptApiKey(key);
@@ -114,7 +99,7 @@ export default function OnboardingPage() {
           user_id: user.id,
           lms_provider: 'canvas',
           encrypted_api_key: encryptedApiKey,
-          api_base_url: url,
+          api_base_url: schoolConfig.api_url,
           is_active: true
         });
 
@@ -132,7 +117,7 @@ export default function OnboardingPage() {
   };
 
   // Fetch and sync courses to database
-  const syncCoursesToDatabase = async (apiBaseUrl: string, apiKey: string) => {
+  const syncCoursesToDatabase = async (apiKey: string) => {
     try {
       updateSyncProgress('Connecting to Canvas', 'loading');
       console.log('Syncing courses to database...');
@@ -141,6 +126,12 @@ export default function OnboardingPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("No active session");
+      }
+
+      // Get the Canvas URL from the school configuration
+      const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
+      if (!schoolConfig) {
+        throw new Error("School not supported");
       }
 
       updateSyncProgress('Connecting to Canvas', 'complete');
@@ -155,7 +146,7 @@ export default function OnboardingPage() {
         },
         body: JSON.stringify({ 
           apiKey,
-          apiBaseUrl: `${apiBaseUrl}/api/v1`
+          apiBaseUrl: `${schoolConfig.api_url}/api/v1`
         }),
       });
 
@@ -191,12 +182,12 @@ export default function OnboardingPage() {
   };
 
   const nextStep = async () => {
-    // Validate Canvas URL and API key on step 1
+    // Validate API key on step 1
     if (step === 1) {
-      const validation = validateAndFormatCanvasUrl(canvasUrl);
-      if (!validation.isValid) {
-        setUrlError(validation.error);
-        return; // Don't proceed to next step if validation fails
+      // Validate school is set
+      if (!schoolName) {
+        setApiKeyError("School information not found. Please sign up again.");
+        return;
       }
 
       // Validate API key
@@ -205,15 +196,12 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Update the URL with the formatted version
-      setCanvasUrl(validation.formattedUrl);
-
       // Start syncing process
       setIsSyncing(true);
       setSyncProgress([]);
 
       // Store credentials to database
-      const storeResult = await storeCanvasCredentials(validation.formattedUrl, apiKey);
+      const storeResult = await storeCanvasCredentials(apiKey);
       if (!storeResult.success) {
         setApiKeyError(`Failed to save credentials: ${storeResult.error}`);
         setIsSyncing(false);
@@ -221,8 +209,7 @@ export default function OnboardingPage() {
       }
 
       // Sync courses to database after storing credentials
-      // Use the API key and URL that were just entered
-      const syncResult = await syncCoursesToDatabase(validation.formattedUrl, apiKey);
+      const syncResult = await syncCoursesToDatabase(apiKey);
       if (!syncResult.success) {
         // Log the error but don't block onboarding
         console.error('Failed to sync courses during onboarding:', syncResult.error);
@@ -489,23 +476,24 @@ export default function OnboardingPage() {
                         <motion.div variants={itemVariants}>
                           <div className="grid gap-4">
                             <div className="grid gap-2">
-                              <Label htmlFor="canvas-url">Canvas URL</Label>
-                              <Input
-                                id="canvas-url"
-                                placeholder="https://canvas.university.edu"
-                                value={canvasUrl}
-                                onChange={(e) => handleUrlChange(e.target.value)}
-                                className={urlError ? "border-red-500 focus:border-red-500" : ""}
-                              />
-                              {urlError && (
-                                <p className="text-sm text-red-500 mt-1">{urlError}</p>
-                              )}
+                              <Label>Your School</Label>
+                              <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                <p className="font-medium text-gray-900">
+                                  {schoolName || "Loading..."}
+                                </p>
+                                {schoolName && SUPPORTED_SCHOOLS[schoolName] && (
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    Canvas URL: {SUPPORTED_SCHOOLS[schoolName].api_url}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                             <div className="grid gap-2">
-                              <Label htmlFor="api-token">API Token</Label>
+                              <Label htmlFor="api-token">Canvas API Token</Label>
                               <Input 
                                 id="api-token" 
                                 type="password"
+                                placeholder="Enter your Canvas API token"
                                 value={apiKey}
                                 onChange={(e) => handleApiKeyChange(e.target.value)}
                                 className={apiKeyError ? "border-red-500 focus:border-red-500" : ""}

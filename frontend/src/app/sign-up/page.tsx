@@ -20,6 +20,15 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { createClient } from "@/lib/utils/supabase/client";
 import { FcGoogle } from "react-icons/fc";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { SUPPORTED_SCHOOLS, validateEmailForSchool } from "@/constants/supported_schools";
+import { isSuperUser } from "@/constants/super_users";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -34,11 +43,31 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
+  const [selectedSchool, setSelectedSchool] = useState<string>("");
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    
+    // Validate school selection
+    if (!selectedSchool) {
+      setError("Please select your school");
+      setLoading(false);
+      return;
+    }
+    
+    const isSuper = isSuperUser(email);
+    
+    // Validate email domain matches selected school (skip for super users)
+    if (!isSuper && !validateEmailForSchool(email, selectedSchool)) {
+      const schoolConfig = SUPPORTED_SCHOOLS[selectedSchool];
+      const domains = schoolConfig.acceptable_domains.join(", ");
+      setError(`Please use a valid ${selectedSchool} email address (${domains})`);
+      setLoading(false);
+      return;
+    }
+    
     try {
       const { data, error } = await supabase.auth.signUp({
         email: email,
@@ -46,6 +75,7 @@ export default function SignUpPage() {
         options: {
           data: {
             full_name: fullName,
+            school_name: selectedSchool,
             passed_onboarding: false,
           },
         },
@@ -54,8 +84,7 @@ export default function SignUpPage() {
       if (error) {
         setError(error.message);
       } else if (data.user) {
-        // Since email confirmation is enabled, Supabase sends a confirmation link.
-        // Redirect to sign-in page with confirmation message
+        // All users need to confirm email, regardless of super user status
         router.push("/sign-in?message=confirm-email");
       }
     } catch (e) {
@@ -73,6 +102,22 @@ export default function SignUpPage() {
     e.preventDefault();
 
     if (!magicLinkSent) {
+      // Validate school selection
+      if (!selectedSchool) {
+        setError("Please select your school");
+        return;
+      }
+      
+      const isSuper = isSuperUser(email);
+      
+      // Validate email domain matches selected school (skip for super users)
+      if (!isSuper && !validateEmailForSchool(email, selectedSchool)) {
+        const schoolConfig = SUPPORTED_SCHOOLS[selectedSchool];
+        const domains = schoolConfig.acceptable_domains.join(", ");
+        setError(`Please use a valid ${selectedSchool} email address (${domains})`);
+        return;
+      }
+      
       setLoading(true);
       setError(null);
       try {
@@ -80,6 +125,9 @@ export default function SignUpPage() {
           email,
           options: {
             emailRedirectTo: `${window.location.origin}/dashboard`,
+            data: {
+              school_name: selectedSchool,
+            },
           },
         });
 
@@ -409,6 +457,25 @@ export default function SignUpPage() {
                         />
                       </div>
                       <div className="grid gap-2">
+                        <Label htmlFor="school">School</Label>
+                        <Select
+                          value={selectedSchool}
+                          onValueChange={setSelectedSchool}
+                          disabled={loading}
+                        >
+                          <SelectTrigger id="school">
+                            <SelectValue placeholder="Select your school" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(SUPPORTED_SCHOOLS).map((school) => (
+                              <SelectItem key={school} value={school}>
+                                {school}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
                         <Label htmlFor="email">School Email</Label>
                         <Input
                           id="email"
@@ -419,6 +486,22 @@ export default function SignUpPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={loading}
                         />
+                        {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
+                          <p className="text-xs text-green-600 font-medium">
+                            ✓ Valid {selectedSchool} email
+                          </p>
+                        )}
+                        {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
+                          <p className="text-xs text-muted-foreground">
+                            Use your {selectedSchool} email (
+                            {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
+                          </p>
+                        )}
+                        {isSuperUser(email) && (
+                          <p className="text-xs text-green-600 font-medium">
+                            ✓ Super user - can use any email domain
+                          </p>
+                        )}
                       </div>
                       <div className="grid gap-2">
                         <Label htmlFor="password">Password</Label>
@@ -465,6 +548,25 @@ export default function SignUpPage() {
                         </motion.div>
                       )}
                       <div className="grid gap-2">
+                        <Label htmlFor="magic-school">School</Label>
+                        <Select
+                          value={selectedSchool}
+                          onValueChange={setSelectedSchool}
+                          disabled={loading || magicLinkSent}
+                        >
+                          <SelectTrigger id="magic-school">
+                            <SelectValue placeholder="Select your school" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.keys(SUPPORTED_SCHOOLS).map((school) => (
+                              <SelectItem key={school} value={school}>
+                                {school}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
                         <Label htmlFor="magic-email">School Email</Label>
                         <Input
                           id="magic-email"
@@ -475,6 +577,22 @@ export default function SignUpPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={loading || magicLinkSent}
                         />
+                        {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
+                          <p className="text-xs text-green-600 font-medium">
+                            ✓ Valid {selectedSchool} email
+                          </p>
+                        )}
+                        {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
+                          <p className="text-xs text-muted-foreground">
+                            Use your {selectedSchool} email (
+                            {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
+                          </p>
+                        )}
+                        {isSuperUser(email) && (
+                          <p className="text-xs text-green-600 font-medium">
+                            ✓ Super user - can use any email domain
+                          </p>
+                        )}
                       </div>
                       {magicLinkSent && (
                         <motion.div
