@@ -88,7 +88,183 @@ def create_and_populate_namespace(
         records=records
     )
     print(f"Successfully populated namespace '{namespace}' with {len(records)} chunks")
+    
 
+async def set_index_and_namespace(
+    pc: Pinecone,
+    index_name: str,
+    namespace: str,
+    is_file_from_lms: bool = False,
+    api_key: str = None,
+    api_base_url: str = None,
+    course_id: str = None,
+    file_id: str = None,
+    file_info: Dict[str, Any] = None,
+    filename: str = None,
+    course_name: str = None
+):
+    print(f"Using index: '{index_name}', namespace: '{namespace}'")
+    
+    created_new_index = False
+    created_new_namespace = False
+    
+    # Check if index exists before creating
+    existing_indexes = [index.name for index in pc.list_indexes()]
+    if index_name not in existing_indexes:
+        created_new_index = True
+    
+    # Create index if it doesn't exist
+    create_index_if_not_exists(pc, index_name)
+        
+    # Connect to index
+    index = pc.Index(index_name)
+    
+    # Check if namespace exists and has content
+    namespace_exists = check_namespace_exists(index, namespace)
+    
+    if not namespace_exists:
+        print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
+        if not is_file_from_lms:
+            try:
+                file_details = await get_file_details_with_content(api_key, api_base_url, course_id, file_id)
+            except Exception as e:
+                print(f"Error getting file details with content: {e}")
+                file_details = {}
+        else:
+            file_details = file_info if file_info else {}
+        
+        file_content = file_details.get('parsed_content', '')
+        
+        # Validate we have content to index
+        if not file_content or file_content.startswith("[Error") or file_content.startswith("[File too large"):
+            return ({
+                "is_error": True,
+                "error": file_content
+            }, None)
+        
+        # Create and populate namespace
+        create_and_populate_namespace(
+            index=index,
+            namespace=namespace,
+            file_content=file_content,
+            file_id=file_id,
+            filename=filename,
+            course_id=course_id,
+            course_name=course_name
+        )
+    
+    return ({
+        "created_new_index": created_new_index,
+        "created_new_namespace": created_new_namespace,
+        "is_error": False
+    }, index)
+
+
+async def search_file_with_chunk_index(
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    course_name: str,
+    file_id: str,
+    filename: str,
+    chunk_index: int,
+    is_file_from_lms: bool = False,
+    file_info: Dict[str, Any] = None
+) -> Dict[str, Any]:
+    """
+    Search for a specific chunk in a course file using Pinecone.
+    """
+    print(f"search_file_with_chunk_index called with file_id={file_id}, chunk_index={chunk_index}")
+    
+    # Get Pinecone API key
+
+    pinecone_api_key = os.getenv("PINECONE_API_KEY")
+    if not pinecone_api_key:
+        raise Exception("PINECONE_API_KEY environment variable not set")
+    
+    # Initialize Pinecone client
+    pc = Pinecone(api_key=pinecone_api_key)
+
+    # Generate index and namespace names
+    index_name = sanitize_index_name(f"{course_id}-{course_name}")
+    namespace = sanitize_namespace_name(f"{file_id}-{filename}")
+    
+    res, index = await set_index_and_namespace(
+        pc=pc,
+        index_name=index_name,
+        namespace=namespace,
+        is_file_from_lms=is_file_from_lms,
+        api_key=api_key,
+        api_base_url=api_base_url,
+        course_id=course_id,
+        file_id=file_id,
+        file_info=file_info,
+        filename=filename,
+        course_name=course_name
+    )
+    if res["is_error"]:
+        return {
+            "chunk_index": chunk_index,
+            "file_id": file_id,
+            "file_name": filename,
+            "chunks": [],
+            "error": res["error"],
+            "created_new_index": res["created_new_index"],
+            "created_new_namespace": res["created_new_namespace"]
+        }
+    
+    created_new_index = res["created_new_index"]
+    created_new_namespace = res["created_new_namespace"]
+    
+    chunk_id = f"{file_id}_chunk_{chunk_index}"
+    
+    # Search the index
+    print(f"Searching for chunk index: {chunk_index}...")
+    try:
+        results = index.search(
+            namespace=namespace,
+            query={
+                "id": chunk_id,  # For integrated inference, id is a direct query parameter
+                "top_k": 3
+            },
+            fields=["text", "chunk_index", "filename", "file_id", "total_chunks"]
+        )
+        
+        # Parse results
+        hits = results.get('result', {}).get('hits', [])
+        chunks = []
+        
+        for hit in hits:
+            chunk_data = {
+                "score": hit.get('_score', 0),
+                "text": hit.get('fields', {}).get('text', ''),
+                "chunk_index": hit.get('fields', {}).get('chunk_index', 0),
+                "filename": hit.get('fields', {}).get('filename', ''),
+                "file_id": hit.get('fields', {}).get('file_id', ''),
+                "total_chunks": hit.get('fields', {}).get('total_chunks', 0)
+            }
+            chunks.append(chunk_data)
+        print(chunks)
+        return {
+            "chunk_index": chunk_index,
+            "file_id": file_id,
+            "file_name": filename,
+            "chunks": chunks,
+            "created_new_index": created_new_index,
+            "created_new_namespace": created_new_namespace
+        }
+        
+    except Exception as e:
+        print(f"Search failed: {e}")
+        return {
+            "chunk_index": chunk_index,
+            "file_id": file_id,
+            "file_name": filename,
+            "chunks": [],
+            "error": f"Search failed: {str(e)}",
+            "created_new_index": created_new_index,
+            "created_new_namespace": created_new_namespace
+        }
 
 async def search_file_with_query(
     api_key: str,
@@ -140,60 +316,32 @@ async def search_file_with_query(
     index_name = sanitize_index_name(f"{course_id}-{course_name}")
     namespace = sanitize_namespace_name(f"{file_id}-{filename}")
     
-    print(f"Using index: '{index_name}', namespace: '{namespace}'")
+    res, index = await set_index_and_namespace(
+        pc=pc,
+        index_name=index_name,
+        namespace=namespace,
+        is_file_from_lms=is_file_from_lms,
+        api_key=api_key,
+        api_base_url=api_base_url,
+        course_id=course_id,
+        file_id=file_id,
+        file_info=file_info,
+        filename=filename,
+        course_name=course_name
+    )
+    if res["is_error"]:
+        return {
+            "query": query,
+            "file_id": file_id,
+            "file_name": filename,
+            "chunks": [],
+            "error": res["error"],
+            "created_new_index": res["created_new_index"],
+            "created_new_namespace": res["created_new_namespace"]
+        }
     
-    created_new_index = False
-    created_new_namespace = False
-    
-    # Check if index exists before creating
-    existing_indexes = [index.name for index in pc.list_indexes()]
-    if index_name not in existing_indexes:
-        created_new_index = True
-    
-    # Create index if it doesn't exist
-    create_index_if_not_exists(pc, index_name)
-        
-    # Connect to index
-    index = pc.Index(index_name)
-    
-    # Check if namespace exists and has content
-    namespace_exists = check_namespace_exists(index, namespace)
-    
-    if not namespace_exists:
-        print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
-        if not is_file_from_lms:
-            try:
-                file_details = await get_file_details_with_content(api_key, api_base_url, course_id, file_id)
-            except Exception as e:
-                print(f"Error getting file details with content: {e}")
-                file_details = {}
-        else:
-            file_details = file_info if file_info else {}
-        
-        file_content = file_details.get('parsed_content', '')
-        
-        # Validate we have content to index
-        if not file_content or file_content.startswith("[Error") or file_content.startswith("[File too large"):
-            return {
-                "query": query,
-                "file_id": file_id,
-                "file_name": filename,
-                "chunks": [],
-                "error": f"Cannot index file: {file_content}",
-                "created_new_index": created_new_index,
-                "created_new_namespace": created_new_namespace
-            }
-        
-        # Create and populate namespace
-        create_and_populate_namespace(
-            index=index,
-            namespace=namespace,
-            file_content=file_content,
-            file_id=file_id,
-            filename=filename,
-            course_id=course_id,
-            course_name=course_name
-        )
+    created_new_index = res["created_new_index"]
+    created_new_namespace = res["created_new_namespace"]
     
     # Search the index
     print(f"Searching for query: '{query}'...")
@@ -204,7 +352,7 @@ async def search_file_with_query(
                 "inputs": {"text": query},
                 "top_k": 3
             },
-            fields=["text", "chunk_index", "filename", "file_id"]
+            fields=["text", "chunk_index", "filename", "file_id", "total_chunks"]
         )
         
         # Parse results
@@ -217,7 +365,8 @@ async def search_file_with_query(
                 "text": hit.get('fields', {}).get('text', ''),
                 "chunk_index": hit.get('fields', {}).get('chunk_index', 0),
                 "filename": hit.get('fields', {}).get('filename', ''),
-                "file_id": hit.get('fields', {}).get('file_id', '')
+                "file_id": hit.get('fields', {}).get('file_id', ''),
+                "total_chunks": hit.get('fields', {}).get('total_chunks', 0)
             }
             chunks.append(chunk_data)
         
