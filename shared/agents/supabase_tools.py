@@ -780,7 +780,9 @@ async def create_context_snapshot(
     message_count: int
 ) -> Dict[str, Any]:
     """
-    Create a new context snapshot for a chat session.
+    Create or update a context snapshot for a chat session.
+    Checks if a snapshot exists first, then updates or inserts accordingly.
+    The unique constraint on chat_id ensures database integrity.
     
     Args:
         chat_id: Chat session ID
@@ -788,25 +790,44 @@ async def create_context_snapshot(
         message_count: Number of messages summarized
     
     Returns:
-        Created context snapshot dictionary
+        Created or updated context snapshot dictionary
     """
     print(f"calling create_context_snapshot with chat_id={chat_id}, message_count={message_count}")
     
     supabase = get_supabase_client()
     
+    # Check if a snapshot already exists for this chat_id
+    existing_snapshot = await get_latest_context_snapshot(chat_id=chat_id)
+    
     snapshot_data = {
-        "chat_id": chat_id,
         "summary": summary,
         "message_count": message_count
     }
     
-    # Insert the snapshot
-    insert_response = supabase.table("chat_context_snapshots").insert(snapshot_data).execute()
-    
-    if not insert_response.data:
-        raise Exception("Failed to create context snapshot")
-    
-    return insert_response.data[0]
+    if existing_snapshot:
+        # Update the existing snapshot
+        print(f"Updating existing snapshot {existing_snapshot['id']} for chat_id={chat_id}")
+        update_response = (
+            supabase.table("chat_context_snapshots")
+            .update(snapshot_data)
+            .eq("id", existing_snapshot["id"])
+            .execute()
+        )
+        
+        if not update_response.data:
+            raise Exception("Failed to update context snapshot")
+        
+        return update_response.data[0]
+    else:
+        # Insert a new snapshot
+        print(f"Creating new snapshot for chat_id={chat_id}")
+        snapshot_data["chat_id"] = chat_id  # Add chat_id for insert
+        insert_response = supabase.table("chat_context_snapshots").insert(snapshot_data).execute()
+        
+        if not insert_response.data:
+            raise Exception("Failed to create context snapshot")
+        
+        return insert_response.data[0]
 
 
 async def get_chat_message_count(

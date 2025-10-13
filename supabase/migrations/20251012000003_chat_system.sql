@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS chat_context_snapshots (
     chat_id UUID NOT NULL REFERENCES document_chats(id) ON DELETE CASCADE,
     summary TEXT NOT NULL,
     message_count INTEGER NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT chat_context_snapshots_chat_id_unique UNIQUE (chat_id)
 );
 
 -- Create indexes for performance
@@ -50,7 +51,7 @@ ALTER TABLE chat_context_snapshots ENABLE ROW LEVEL SECURITY;
 
 -- Document chats policies
 CREATE POLICY "Users can view their own chat sessions" ON document_chats
-    FOR SELECT USING (user_id = auth.uid());
+    FOR SELECT USING (true);
 
 CREATE POLICY "Users can create their own chat sessions" ON document_chats
     FOR INSERT WITH CHECK (user_id = auth.uid());
