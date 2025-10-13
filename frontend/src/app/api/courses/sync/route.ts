@@ -34,6 +34,7 @@ async function syncModulesForCourse(
       .limit(1);
 
     if (checkError) {
+      console.error(`Failed to check existing modules: ${checkError.message}`);
       result.errors.push(`Failed to check existing modules: ${checkError.message}`);
       return result;
     }
@@ -91,6 +92,7 @@ async function syncModulesForCourse(
                 course_id: courseId,
                 name: item.name,
                 type: item.type,
+                content_type: item.contentType,
                 url: item.url,
                 position: item.position,
               }, {
@@ -99,6 +101,7 @@ async function syncModulesForCourse(
               });
 
             if (itemError) {
+              console.error(`Failed to upsert module item ${item.name}:`, JSON.stringify(item, null, 2), `Error: ${itemError.message}`);
               result.errors.push(`Failed to upsert module item ${item.name}: ${itemError.message}`);
               continue;
             }

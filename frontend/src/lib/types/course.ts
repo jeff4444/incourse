@@ -29,6 +29,7 @@ export interface ModuleItem {
   moduleId: string;
   courseId: string;
   type: string;
+  contentType: string | null;
   url: string | null;
   position: number | null;
 }
@@ -75,6 +76,7 @@ export interface FileDetails {
   name: string;
   size: number;
   type: string;
+  contentType: string | null;
   url: string;
   isValidForProcessing?: boolean;
   validationError?: string | null;

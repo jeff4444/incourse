@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field
 from pydantic_ai import Agent, Tool
 from prompts.chat_agent_prompt import CHAT_AGENT_PROMPT
 from tools.pinecone_tools import search_file_with_query
+from tools.supabase_tools import get_course_and_file_info, get_chat_context
 from shared.model import get_model
 from shared.managers import ChatSessionManager
 
@@ -18,13 +19,18 @@ class ChatAnswer(BaseModel):
 @dataclass
 class Deps:
     user_id: str
-    lms_api_key: str
-    lms_base_url: str
-    course_info: Dict[str, Any]
-    file_info: Dict[str, Any]
-    is_file_from_lms: bool
+    course_id: str  # Internal course ID (not LMS ID)
+    file_id: str  # The file/module_item ID
+    session_id: Optional[str] = None  # Existing chat session ID
+    
+    # Lazy-loaded fields (fetched by agent tools when needed)
+    lms_api_key: Optional[str] = None
+    lms_base_url: Optional[str] = None
+    course_info: Optional[Dict[str, Any]] = None
+    file_info: Optional[Dict[str, Any]] = None
+    is_file_from_lms: Optional[bool] = None
     chat_id: Optional[str] = None
-    chat_history: List[Dict[str, Any]] = field(default_factory=list)
+    chat_history: Optional[List[Dict[str, Any]]] = None
     context_summary: Optional[str] = None
 
 SYSTEM_PROMPT = CHAT_AGENT_PROMPT
@@ -33,6 +39,7 @@ SYSTEM_PROMPT = CHAT_AGENT_PROMPT
 def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
     """
     Create a chat agent for file Q&A with history and context support.
+    The agent can intelligently fetch context only when needed.
     """
     model = get_model()
 
@@ -44,13 +51,11 @@ def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
         output_type=ChatAnswer,
         system_prompt=SYSTEM_PROMPT,
         tools=[
+            Tool(get_course_and_file_info, takes_ctx=True),
+            Tool(get_chat_context, takes_ctx=True),
             Tool(search_file_with_query, takes_ctx=True),
         ],
         retries=3,
         output_retries=3,
     )
-
-
-# Note: ChatSessionManager has been moved to shared.managers
-# Import it from there: from shared.managers import ChatSessionManager
 

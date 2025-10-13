@@ -8,7 +8,7 @@ from docx import Document
 from pptx import Presentation
 
 
-async def parse_file_content(file_path: str, content_type: str, filename: str) -> str:
+async def parse_file_content(file_path: str, content_type: str, filename: str, file_extension: str) -> str:
     """
     Parse file content based on file type and return text content from local file.
     
@@ -16,7 +16,7 @@ async def parse_file_content(file_path: str, content_type: str, filename: str) -
         file_path: Path to the local file
         content_type: MIME type of the file
         filename: Original filename
-        
+        file_extension: File extension
     Returns:
         Extracted text content or error message
     """
@@ -31,7 +31,15 @@ async def parse_file_content(file_path: str, content_type: str, filename: str) -
             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                 return f.read()
         else:
-            return f"[File type {content_type} not supported for text extraction]"
+            # try to parse the file based on the extension
+            if file_extension == 'pdf':
+                return await parse_pdf_content(file_path)
+            elif file_extension == 'docx' or file_extension == 'doc':
+                return await parse_docx_content(file_path)
+            elif file_extension == 'pptx' or file_extension == 'ppt':
+                return await parse_pptx_content(file_path)
+            else:
+                return f"[File type {content_type} not supported for text extraction]"
     except Exception as e:
         return f"[Error parsing file content: {str(e)}]"
 

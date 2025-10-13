@@ -16,10 +16,13 @@ async def search_file_with_query(
     """
     Search for relevant chunks in a course file using Pinecone.
     
+    Automatically fetches required context (LMS credentials, course info, file info)
+    if not already loaded. This ensures the tool works regardless of call order.
+    
     If the index or namespace doesn't exist, automatically creates it and indexes the file.
     
     Args:
-        ctx: RunContext with dependencies (lms_api_key, lms_base_url, course_id, file_info, etc.)
+        ctx: RunContext with dependencies
         query: The search query
     
     Returns:
@@ -31,7 +34,42 @@ async def search_file_with_query(
         - created_new_index: Whether a new index was created
         - created_new_namespace: Whether a new namespace was created
     """
-    # Extract parameters from context
+    # Ensure required dependencies are loaded
+    # If they're not, fetch them now (this allows search to be called independently)
+    if not ctx.deps.lms_api_key or not ctx.deps.lms_base_url:
+        from api.supabase import get_user_lms_info
+        lms_info = await get_user_lms_info(user_id=ctx.deps.user_id)
+        ctx.deps.lms_api_key = lms_info["api_key"]
+        ctx.deps.lms_base_url = lms_info["base_url"]
+    
+    if not ctx.deps.course_info:
+        from api.supabase import get_course
+        ctx.deps.course_info = await get_course(course_id=ctx.deps.course_id)
+    
+    if not ctx.deps.file_info:
+        from api.supabase import get_module_items_by_course_id
+        from api.canvas import get_file_details
+        
+        try:
+            # Try to get from our database first
+            file_info = await get_module_items_by_course_id(
+                course_id=ctx.deps.course_info["id"],
+                lms_id=ctx.deps.file_id
+            )
+            ctx.deps.is_file_from_lms = False
+            ctx.deps.file_info = file_info
+        except Exception:
+            # Fall back to LMS API
+            file_info = await get_file_details(
+                api_key=ctx.deps.lms_api_key,
+                api_base_url=ctx.deps.lms_base_url,
+                course_id=ctx.deps.course_info["lms_id"],
+                file_id=ctx.deps.file_id
+            )
+            ctx.deps.is_file_from_lms = True
+            ctx.deps.file_info = file_info
+    
+    # Now extract parameters from context (guaranteed to be populated)
     api_key = ctx.deps.lms_api_key
     api_base_url = ctx.deps.lms_base_url
     course_id = ctx.deps.course_info["lms_id"]

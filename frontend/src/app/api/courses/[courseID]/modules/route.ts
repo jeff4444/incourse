@@ -36,8 +36,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                         id,
                         lms_id,
                         lms_content_id,
+                        module_id,
                         name,
                         type,
+                        content_type,
                         url,
                         position
                     )
@@ -61,9 +63,10 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                             lmsId: item.lms_id,
                             lmsContentId: item.lms_content_id,
                             name: item.name,
-                            moduleId: module.id,
+                            moduleId: item.module_id || module.id,
                             courseId: module.course_id,
                             type: item.type,
+                            contentType: item.content_type,
                             url: item.url,
                             position: item.position,
                         }))

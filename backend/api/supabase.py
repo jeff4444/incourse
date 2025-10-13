@@ -7,6 +7,7 @@ import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from shared.utils.supabase_utils import decrypt_api_key
 
 load_dotenv()
 
@@ -85,8 +86,21 @@ async def get_user_by_email(
         raise Exception(f"User not found with email: {email}")
     
     return response.data[0]
-
-
+  
+async def get_user_lms_info(user_id: str) -> str:
+    """
+    Get the LMS API key for the user.
+    """
+    api_keys = await get_user_api_keys(user_id=user_id)
+    api_key = api_keys[0]
+    encrypted_api_key = api_key["encrypted_api_key"]
+    api_base_url =f"{api_key["api_base_url"]}/api/v1"
+    decrypted_api_key = decrypt_api_key(encrypted_api_key)
+    return {
+        "api_key": decrypted_api_key,
+        "base_url": api_base_url
+    }
+    
 async def get_user_api_keys(
     user_id: str,
     lms_provider: Optional[str] = None,
@@ -855,4 +869,3 @@ async def get_chat_message_count(
     response = supabase.table("chat_messages").select("id", count="exact").eq("chat_id", chat_id).execute()
     
     return response.count or 0
-

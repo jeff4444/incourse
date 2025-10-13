@@ -9,88 +9,10 @@ import tempfile
 from typing import Dict, Any
 from pinecone import Pinecone
 from dotenv import load_dotenv
-from shared.utils.pinecone_utils import chunk_text, sanitize_index_name, sanitize_namespace_name
-from shared.utils.canvas_utils import parse_file_content
+from shared.utils.pinecone_utils import chunk_text, sanitize_index_name, sanitize_namespace_name, fix_canvas_file_url
+from api.canvas import get_file_details_with_content
 
 load_dotenv()
-
-
-async def get_course_details(
-    api_key: str,
-    api_base_url: str,
-    course_id: str
-) -> Dict[str, Any]:
-    """Fetch course details from the API."""
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            f"{api_base_url}/courses/{course_id}",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-        ) as response:
-            if not response.ok:
-                raise Exception(f"Failed to fetch course details: {response.status}")
-            return await response.json()
-
-
-async def get_file_details(
-    api_key: str,
-    api_base_url: str,
-    course_id: str,
-    file_id: str
-) -> Dict[str, Any]:
-    """Fetch file details and content from the API."""
-    print(f"calling get_file_details with file_id={file_id}, course_id={course_id}")
-    async with aiohttp.ClientSession() as session:
-        # Get file metadata
-        async with session.get(
-            f"{api_base_url}/courses/{course_id}/files/{file_id}",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            }
-        ) as response:
-            if not response.ok:
-                raise Exception(f"Failed to fetch file details: {response.status}")
-            
-            file_details = await response.json()
-        
-        # Fetch actual file content
-        file_url = file_details.get('url')
-        content_type = file_details.get('content-type', '')
-        filename = file_details.get('filename', '')
-        
-        if file_url and content_type:
-            try:
-                async with session.get(file_url) as file_response:
-                    if file_response.ok:
-                        file_content = await file_response.read()
-                        
-                        # Only parse if file is not too large (limit to 10MB)
-                        if len(file_content) < 10 * 1024 * 1024:
-                            # Create a temporary local file
-                            file_extension = filename.split('.')[-1] if '.' in filename else 'tmp'
-                            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
-                                temp_file.write(file_content)
-                                temp_file_path = temp_file.name
-                            
-                            try:
-                                parsed_content = await parse_file_content(temp_file_path, content_type, filename)
-                                file_details['parsed_content'] = parsed_content
-                            finally:
-                                # Clean up the temporary file
-                                os.unlink(temp_file_path)
-                        else:
-                            file_details['parsed_content'] = f"[File too large to parse ({len(file_content)} bytes)]"
-                    else:
-                        file_details['parsed_content'] = f"[Could not download file: HTTP {file_response.status}]"
-            except Exception as e:
-                file_details['parsed_content'] = f"[Error fetching file content: {str(e)}]"
-        else:
-            file_details['parsed_content'] = "[No file URL available]"
-        
-        return file_details
 
 
 def create_index_if_not_exists(pc: Pinecone, index_name: str) -> None:
@@ -239,11 +161,15 @@ async def search_file_with_query(
     
     if not namespace_exists:
         print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
-        created_new_namespace = True
         if not is_file_from_lms:
-            file_details = await get_file_details(api_key, api_base_url, course_id, file_id)
+            try:
+                file_details = await get_file_details_with_content(api_key, api_base_url, course_id, file_id)
+            except Exception as e:
+                print(f"Error getting file details with content: {e}")
+                file_details = {}
         else:
             file_details = file_info if file_info else {}
+        
         file_content = file_details.get('parsed_content', '')
         
         # Validate we have content to index

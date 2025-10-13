@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS module_items (
     course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     type TEXT NOT NULL, -- e.g., 'File', 'Page', 'Discussion', 'Assignment', etc.
+    content_type TEXT,
     url TEXT,
     position INTEGER,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,

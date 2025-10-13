@@ -7,8 +7,9 @@ import asyncio
 import aiohttp
 import tempfile
 import os
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from shared.utils.canvas_utils import parse_file_content
+import shutil
 
 
 async def get_overall_course_performance(
@@ -512,7 +513,7 @@ async def get_canvas_module_items(
             return module_items_data
 
 
-async def get_canvas_file_details(
+async def get_file_details_with_content(
     api_key: str,
     api_base_url: str,
     course_id: str,
@@ -521,7 +522,7 @@ async def get_canvas_file_details(
     """
     Get file details and content for a specific file from Canvas API.
     """
-    print(f"calling get_canvas_file_details with file_id={file_id}, course_id={course_id}")
+    print(f"calling get_canvas_file_details_with_content with file_id={file_id}, course_id={course_id}")
 
     async with aiohttp.ClientSession() as session:
         # First, get file metadata
@@ -555,7 +556,7 @@ async def get_canvas_file_details(
                                 temp_file.write(file_content)
                                 temp_file_path = temp_file.name
                             try:
-                                parsed_content = await parse_file_content(temp_file_path, content_type, filename)
+                                parsed_content = await parse_file_content(temp_file_path, content_type, filename, file_extension)
                                 file_details_data['parsed_content'] = parsed_content
                             finally:
                                 # Clean up the temporary file
@@ -571,12 +572,12 @@ async def get_canvas_file_details(
 
         return file_details_data
 
-
 async def get_canvas_files_details(
     api_key: str,
     api_base_url: str,
     course_id: str,
-    file_ids: List[str]
+    file_ids: List[str],
+    include_content: bool = True
 ) -> List[Dict]:
     """
     Get all files for a specific course from Canvas API.
@@ -586,7 +587,10 @@ async def get_canvas_files_details(
     file_details_list = []
     
     for file_id in file_ids:
-        file_details = await get_canvas_file_details(api_key, api_base_url, course_id, file_id)
+        if include_content:
+            file_details = await get_canvas_file_details_with_content(api_key, api_base_url, course_id, file_id, include_content)
+        else:
+            file_details = await get_canvas_file_details(api_key, api_base_url, course_id, file_id)
         file_details_list.append(file_details)
     
     return file_details_list
@@ -616,3 +620,47 @@ async def get_canvas_course_assignments(
             assignments_data = await response.json()
             return assignments_data
 
+
+
+async def get_file_details(
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    file_id: str
+) -> Dict[str, Any]:
+    """Fetch file details and content from the API."""
+    print(f"calling get_file_details with file_id={file_id}, course_id={course_id}")
+    async with aiohttp.ClientSession() as session:
+        # Get file metadata
+        async with session.get(
+            f"{api_base_url}/courses/{course_id}/files/{file_id}",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        ) as response:
+            if not response.ok:
+                raise Exception(f"Failed to fetch file details: {response.status}")
+            
+            file_details = await response.json()
+        
+        return file_details
+
+
+async def get_course_details(
+    api_key: str,
+    api_base_url: str,
+    course_id: str
+) -> Dict[str, Any]:
+    """Fetch course details from the API."""
+    async with aiohttp.ClientSession() as session:
+        async with session.get(
+            f"{api_base_url}/courses/{course_id}",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        ) as response:
+            if not response.ok:
+                raise Exception(f"Failed to fetch course details: {response.status}")
+            return await response.json()
