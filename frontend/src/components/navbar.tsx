@@ -122,13 +122,7 @@ export function Navbar() {
                 <DropdownMenuItem asChild>
                   <Link href="/profile">
                     <User className="h-4 w-4 mr-2" />
-                    Profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/settings">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Settings
+                    Profile & Settings
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -184,13 +178,13 @@ export function Navbar() {
               </Link>
             </Button>
             <Button
-              variant={isActive("/settings") ? "secondary" : "ghost"}
+              variant={isActive("/profile") ? "secondary" : "ghost"}
               className="justify-start"
               asChild
             >
-              <Link href="/settings">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
+              <Link href="/profile">
+                <User className="h-4 w-4 mr-2" />
+                Profile
               </Link>
             </Button>
           </nav>

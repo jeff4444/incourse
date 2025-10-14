@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MessageSquare, Lightbulb, Send, X, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
-import type { ReactNode } from "react"
 import type { ContextItem } from "./pdf-viewer"
 import { authenticatedFetchJson } from "@/lib/utils/apiClient"
 
@@ -44,6 +43,7 @@ export function ChatPanel({
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const suggestions = [
@@ -63,13 +63,18 @@ export function ChatPanel({
 
   // Load chat history when sessionId is provided or auto-detect existing session
   useEffect(() => {
+    // Prevent multiple load attempts
+    if (hasAttemptedLoad) return
+    
     if (initialSessionId && !sessionId) {
+      setHasAttemptedLoad(true)
       loadChatHistory(initialSessionId)
     } else if (!initialSessionId && !sessionId && courseId && fileIdList.length > 0) {
+      setHasAttemptedLoad(true)
       // Auto-detect existing session for this user-document pair
       detectAndLoadExistingSession()
     }
-  }, [initialSessionId, sessionId, courseId, fileIdList])
+  }, [initialSessionId, sessionId, courseId, fileIdList, hasAttemptedLoad])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
