@@ -149,16 +149,16 @@ export function getActivityColor(feedback: Feedback): {
     
     case 'neutral':
       return {
-        bg: 'bg-blue-100',
-        text: 'text-blue-600',
-        border: 'border-blue-200'
+        bg: 'bg-yellow-100',
+        text: 'text-yellow-600',
+        border: 'border-yellow-200'
       };
     
     case 'bad':
       return {
-        bg: 'bg-orange-100',
-        text: 'text-orange-600',
-        border: 'border-orange-200'
+        bg: 'bg-red-100',
+        text: 'text-red-600',
+        border: 'border-red-200'
       };
     
     default:
