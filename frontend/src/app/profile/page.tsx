@@ -172,7 +172,7 @@ function ProfilePage() {
         throw new Error("No active session");
       }
 
-      updateSyncProgress('Deleting old enrollments', 'loading');
+      updateSyncProgress('Fetching existing enrollments', 'loading');
       
       const response = await fetch('/api/user/enrollments/resync', {
         method: 'POST',
@@ -190,22 +190,41 @@ function ProfilePage() {
       const result = await response.json();
       const { results } = result;
 
-      updateSyncProgress('Deleting old enrollments', 'complete', `${results.enrollmentsDeleted} enrollments deleted`);
-      updateSyncProgress('Fetching courses', 'complete', `${results.coursesCreated} courses synced`);
-      
-      if (results.modulesCreated > 0) {
-        updateSyncProgress('Syncing modules', 'complete', `${results.modulesCreated} modules synced`);
+      if (results.enrollmentsDeleted > 0) {
+        updateSyncProgress('Removing dropped courses', 'complete', `${results.enrollmentsDeleted} courses removed`);
       }
       
-      if (results.moduleItemsCreated > 0) {
-        updateSyncProgress('Syncing module items', 'complete', `${results.moduleItemsCreated} items synced`);
+      updateSyncProgress('Syncing courses', 'complete', `${results.coursesCreated} courses synced`);
+      
+      // Module statistics
+      const moduleParts = [];
+      if (results.modulesCreated > 0) moduleParts.push(`${results.modulesCreated} new`);
+      if (results.modulesUpdated > 0) moduleParts.push(`${results.modulesUpdated} updated`);
+      if (results.modulesDeleted > 0) moduleParts.push(`${results.modulesDeleted} removed`);
+      
+      if (moduleParts.length > 0) {
+        updateSyncProgress('Syncing modules', 'complete', moduleParts.join(', '));
+      }
+      
+      // Module items statistics
+      const itemParts = [];
+      if (results.moduleItemsCreated > 0) itemParts.push(`${results.moduleItemsCreated} new`);
+      if (results.moduleItemsDeleted > 0) itemParts.push(`${results.moduleItemsDeleted} removed`);
+      
+      if (itemParts.length > 0) {
+        updateSyncProgress('Syncing module items', 'complete', itemParts.join(', '));
       }
 
       updateSyncProgress('Completing sync', 'complete');
       
+      const summaryParts = [];
+      if (results.enrollmentsCreated > 0) summaryParts.push(`${results.enrollmentsCreated} new`);
+      if (results.enrollmentsKept > 0) summaryParts.push(`${results.enrollmentsKept} kept`);
+      if (results.enrollmentsDeleted > 0) summaryParts.push(`${results.enrollmentsDeleted} removed`);
+      
       setMessage({
         type: "success",
-        text: `Successfully resynced! ${results.enrollmentsCreated} enrollments created.`
+        text: `Successfully resynced! Enrollments: ${summaryParts.join(', ')}`
       });
 
       // Wait a moment to show completion state
@@ -289,7 +308,7 @@ function ProfilePage() {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="profile">
                 <User className="h-4 w-4 mr-2" />
-                Profile
+            Profile
               </TabsTrigger>
               <TabsTrigger value="lms">
                 <Key className="h-4 w-4 mr-2" />
@@ -553,14 +572,33 @@ function ProfilePage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-muted-foreground mb-4">
-                        This will delete all your current enrollments and fetch fresh data
-                        from Canvas, including courses, modules, and module items.
-                      </p>
+                      <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                          This will intelligently sync your Canvas data:
+                        </p>
+                        <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
+                          <li>
+                            <strong>Compare enrollments:</strong> Check your current enrollments against Canvas
+                          </li>
+                          <li>
+                            <strong>Remove dropped courses:</strong> Delete courses you&apos;re no longer enrolled in
+                          </li>
+                          <li>
+                            <strong>Add new courses:</strong> Add any new courses from Canvas
+                          </li>
+                          <li>
+                            <strong>Keep existing enrollments:</strong> Preserve enrollments that haven&apos;t changed
+                          </li>
+                          <li>
+                            <strong>Smart module sync:</strong> For each course, compare modules and items - add new ones, update existing ones, and remove obsolete ones
+                          </li>
+                        </ul>
+                      </div>
                       <Button
                         onClick={handleResyncEnrollments}
                         disabled={isSyncing}
                         variant="outline"
+                        className="mt-4"
                       >
                         {isSyncing ? (
                           <>
@@ -695,7 +733,7 @@ function ProfilePage() {
                       >
                         Save Preferences
                       </Button>
-                    </div>
+          </div>
                   </CardContent>
                 </Card>
               </motion.div>
