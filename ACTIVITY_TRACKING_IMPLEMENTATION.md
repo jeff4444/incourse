@@ -1,7 +1,7 @@
 # Activity Tracking System - Implementation Summary
 
 ## Overview
-Successfully implemented a comprehensive activity tracking system that automatically logs user actions and displays them on the dashboard in real-time.
+Successfully implemented a comprehensive activity tracking system that automatically logs user actions and displays them on the dashboard in real-time
 
 ## What Was Implemented
 
