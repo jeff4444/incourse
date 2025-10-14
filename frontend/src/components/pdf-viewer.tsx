@@ -18,6 +18,7 @@ import { AnnotationDisplay } from "./annotation-display"
 import { nanoid } from "@/lib/utils"
 import { ChatPanel } from "./ai-chat-panel"
 import { FileDetails } from "@/lib/types/course"
+import { useReadingTracker } from "@/lib/hooks/useActivities"
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()
 
@@ -84,6 +85,21 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
   // Context for AI
   const [contextItems, setContextItems] = useState<ContextItem[]>([])
   const [selectedContextItem, setSelectedContextItem] = useState<ContextItem | null>(null)
+
+  // Track reading time
+  const { logActivity } = useReadingTracker(
+    fileDetails.id || fileDetails.canvasId || '',
+    fileDetails.name,
+    courseId || '',
+    !!courseId
+  );
+
+  // Log activity on unmount
+  useEffect(() => {
+    return () => {
+      logActivity();
+    };
+  }, [logActivity]);
 
   const onResize = useCallback<ResizeObserverCallback>((entries) => {
     const [entry] = entries

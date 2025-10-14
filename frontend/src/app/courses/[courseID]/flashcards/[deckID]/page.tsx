@@ -1,15 +1,17 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { FlashcardView } from "@/components/flashcard-view"
 import { Navbar } from "@/components/navbar"
 import { useFlashcardDeck } from "@/lib/hooks/useFlashcards"
+import { useLogFlashcardStudy } from "@/lib/hooks/useActivities"
 
 export default function FlashcardPage({ params }: { params: Promise<{ courseID: string; deckID: string }> }) {
   const router = useRouter()
   const [courseID, setCourseID] = useState<string>("")
   const [deckID, setDeckID] = useState<string>("")
+  const logStudySession = useLogFlashcardStudy()
 
   useEffect(() => {
     const getParams = async () => {
@@ -22,6 +24,26 @@ export default function FlashcardPage({ params }: { params: Promise<{ courseID: 
 
   // Fetch deck from database
   const { data: deck, isLoading, error } = useFlashcardDeck(deckID);
+
+  // Handle study session end
+  const handleStudySessionEnd = useCallback((reviewedCards: Record<number, "easy" | "hard" | null>) => {
+    if (!deckID || !deck) return;
+
+    const cardReviews = Object.entries(reviewedCards)
+      .filter(([_, difficulty]) => difficulty !== null)
+      .map(([cardId, difficulty]) => ({
+        cardId: cardId.toString(),
+        difficulty: difficulty as 'easy' | 'hard'
+      }));
+
+    if (cardReviews.length > 0) {
+      logStudySession.mutate({
+        deckId: deckID,
+        cardReviews,
+        totalCards: deck.flashcards.length
+      });
+    }
+  }, [deckID, deck, logStudySession]);
 
   useEffect(() => {
     // If deck not found after loading, redirect back to course page
@@ -67,7 +89,12 @@ export default function FlashcardPage({ params }: { params: Promise<{ courseID: 
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="container mx-auto py-12 px-4">
-        <FlashcardView title={deck.name} cards={transformedCards} courseID={courseID} />
+        <FlashcardView 
+          title={deck.name} 
+          cards={transformedCards} 
+          courseID={courseID}
+          onStudySessionEnd={handleStudySessionEnd}
+        />
       </div>
     </div>
   )

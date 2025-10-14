@@ -34,7 +34,8 @@ from api.supabase import (
     get_flashcard_deck,
     create_quiz,
     create_quiz_questions,
-    get_quiz
+    get_quiz,
+    create_activity
 )
 
 
@@ -182,6 +183,23 @@ async def generate_flashcards(request: FlashcardRequest):
         # Fetch complete deck with flashcards
         deck = await get_flashcard_deck(deck_id)
         
+        # Log activity asynchronously (fire-and-forget)
+        asyncio.create_task(
+            create_activity(
+                user_id=request.user_id,
+                course_id=request.course_id,
+                activity_type="flashcard_generation",
+                activity_summary=f"Generated {len(flashcard_dicts)} flashcards for {request.name}",
+                feedback="neutral",
+                metadata={
+                    "deck_id": deck_id,
+                    "deck_name": request.name,
+                    "card_count": len(flashcard_dicts),
+                    "card_type": request.card_type
+                }
+            )
+        )
+        
         return FlashcardResponse(
             deck_id=deck_id,
             deck=deck,
@@ -242,6 +260,23 @@ async def generate_quiz(request: QuizRequest):
         
         # Fetch complete quiz with questions
         quiz = await get_quiz(quiz_id)
+        
+        # Log activity asynchronously (fire-and-forget)
+        asyncio.create_task(
+            create_activity(
+                user_id=request.user_id,
+                course_id=request.course_id,
+                activity_type="quiz_generation",
+                activity_summary=f"Generated {request.difficulty.capitalize()} Quiz: {request.name}",
+                feedback="neutral",
+                metadata={
+                    "quiz_id": quiz_id,
+                    "quiz_name": request.name,
+                    "question_count": len(quiz_dicts),
+                    "difficulty": request.difficulty
+                }
+            )
+        )
         
         return QuizResponse(
             quiz_id=quiz_id,

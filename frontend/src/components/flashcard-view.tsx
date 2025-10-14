@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ChevronLeft, ChevronRight, RotateCcw, HelpCircle } from "lucide-react"
@@ -17,16 +17,31 @@ interface FlashcardViewProps {
   title: string
   cards: Flashcard[]
   courseID: string
+  onStudySessionEnd?: (reviewedCards: Record<number, "easy" | "hard" | null>) => void
 }
 
-export function FlashcardView({ title, cards, courseID }: FlashcardViewProps) {
+export function FlashcardView({ title, cards, courseID, onStudySessionEnd }: FlashcardViewProps) {
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [reviewedCards, setReviewedCards] = useState<Record<number, "easy" | "hard" | null>>({})
   const [showHint, setShowHint] = useState(false)
+  
+  // Use ref to store current reviewedCards for cleanup
+  const reviewedCardsRef = useRef(reviewedCards);
+  reviewedCardsRef.current = reviewedCards;
 
   const currentCard = cards[currentCardIndex]
   const progress = ((currentCardIndex + 1) / cards.length) * 100
+
+  // Track study session and call callback on unmount
+  useEffect(() => {
+    return () => {
+      // Only call if there are reviewed cards
+      if (Object.keys(reviewedCardsRef.current).length > 0 && onStudySessionEnd) {
+        onStudySessionEnd(reviewedCardsRef.current);
+      }
+    };
+  }, [onStudySessionEnd]);
 
   const handleNext = () => {
     if (currentCardIndex < cards.length - 1) {

@@ -7,12 +7,13 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ZoomIn, ZoomOut, Download, Image as ImageIcon, Loader2, Maximize2, Minimize2, RotateCw, Move, MessageSquare } from "lucide-react"
 import { ChatPanel } from "./ai-chat-panel"
 import { FileDetails } from "@/lib/types/course"
+import { useReadingTracker } from "@/lib/hooks/useActivities"
 
 const maxZoom = 5
 const minZoom = 0.1
 const zoomStep = 0.2
 
-export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails }) {
+export default function ImageViewer({ fileDetails, courseId }: { fileDetails: FileDetails, courseId?: string }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -30,6 +31,21 @@ export default function ImageViewer({ fileDetails }: { fileDetails: FileDetails 
   const [selectedContextItem, setSelectedContextItem] = useState<ContextItem | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
+
+  // Track reading time
+  const { logActivity } = useReadingTracker(
+    fileDetails.id || fileDetails.canvasId || '',
+    fileDetails.name,
+    courseId || '',
+    !!courseId
+  );
+
+  // Log activity on unmount
+  useEffect(() => {
+    return () => {
+      logActivity();
+    };
+  }, [logActivity]);
 
   const handleDownload = () => {
     const link = document.createElement("a")
