@@ -2,8 +2,9 @@
 
 import { Module } from "@/lib/types/course";
 import { Card, CardContent } from "@/components/ui/card";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useState } from "react";
+import { Input } from "@/components/ui/input";
+import { ChevronDown, ChevronRight, Search } from "lucide-react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { ReadingTile } from "@/components/reading-tile";
 
@@ -14,6 +15,7 @@ interface ModuleListProps {
 
 export function ModuleList({ modules, courseID }: ModuleListProps) {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [searchQuery, setSearchQuery] = useState("");
 
   const toggleModule = (moduleId: string | null) => {
     if (!moduleId) return;
@@ -26,10 +28,55 @@ export function ModuleList({ modules, courseID }: ModuleListProps) {
     setExpandedModules(newExpanded);
   };
   
+  // Filter modules and items based on search query
+  const filteredModules = useMemo(() => {
+    if (!searchQuery.trim()) return modules;
+    
+    const query = searchQuery.toLowerCase();
+    
+    return modules.map(module => {
+      const moduleNameMatches = module.name.toLowerCase().includes(query);
+      
+      // Filter items that match the search query
+      const filteredItems = module.moduleItems.filter(item => 
+        item.name?.toLowerCase().includes(query) || 
+        item.type?.toLowerCase().includes(query)
+      );
+      
+      // Include module if its name matches OR it has matching items
+      if (moduleNameMatches || filteredItems.length > 0) {
+        return {
+          ...module,
+          moduleItems: moduleNameMatches ? module.moduleItems : filteredItems
+        };
+      }
+      
+      return null;
+    }).filter((module): module is Module => module !== null);
+  }, [modules, searchQuery]);
+  
 
   return (
     <div className="space-y-4">
-      {modules.map((module) => (
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        <Input
+          type="text"
+          placeholder="Search modules and items..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-9"
+        />
+      </div>
+      
+      {filteredModules.length === 0 && searchQuery && (
+        <div className="text-center py-8 text-muted-foreground">
+          No modules or items found matching &quot;{searchQuery}&quot;
+        </div>
+      )}
+      
+      {filteredModules.map((module) => (
         <Card key={module.lmsId || module.id} className="overflow-hidden p-0">
           <CardContent className="p-0">
             <button
