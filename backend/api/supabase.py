@@ -1343,3 +1343,88 @@ async def get_quiz_attempts(
     )
     
     return response.data
+
+
+async def create_activity(
+    user_id: str,
+    course_id: str,
+    activity_type: str,
+    activity_summary: str,
+    feedback: str,
+    metadata: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Create an activity record.
+    
+    Args:
+        user_id: User ID
+        course_id: Course ID
+        activity_type: Type of activity ('quiz_completion', 'quiz_generation', 
+                       'flashcard_generation', 'flashcard_study', 'reading')
+        activity_summary: Human-readable summary of the activity
+        feedback: Activity feedback ('good', 'neutral', 'bad')
+        metadata: Optional additional data as JSON
+    
+    Returns:
+        Created activity data
+    """
+    print(f"Creating activity: type={activity_type}, user={user_id}, course={course_id}")
+    
+    supabase = get_supabase_client()
+    
+    activity_data = {
+        "user_id": user_id,
+        "course_id": course_id,
+        "activity_type": activity_type,
+        "activity_summary": activity_summary,
+        "feedback": feedback,
+        "metadata": metadata or {}
+    }
+    
+    response = (
+        supabase.table("activities")
+        .insert(activity_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create activity")
+    
+    return response.data[0]
+
+
+async def get_recent_activities(
+    user_id: str,
+    limit: int = 5,
+    activity_type: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Get recent activities for a user.
+    
+    Args:
+        user_id: User ID
+        limit: Number of activities to fetch (default 5)
+        activity_type: Optional filter by activity type
+    
+    Returns:
+        List of activity records with course information
+    """
+    supabase = get_supabase_client()
+    
+    query = (
+        supabase.table("activities")
+        .select("*, courses(name, lms_id)")
+        .eq("user_id", user_id)
+    )
+    
+    if activity_type:
+        query = query.eq("activity_type", activity_type)
+    
+    response = (
+        query
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    
+    return response.data

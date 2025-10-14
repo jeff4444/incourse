@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,9 +15,61 @@ import { BookOpen, Clock, FileText, Layers } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
+import { useAllActivitiesByType } from "@/lib/hooks/useActivities";
+import { getActivityIcon, getActivityColor } from "@/lib/utils/activityUtils";
+import { useMemo } from "react";
+
+// Simple time ago formatter
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+  const years = Math.floor(days / 365);
+  return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+}
 
 function DashboardPage() {
   const { user } = useAuth();
+  const [activityFilter, setActivityFilter] = useState<string>("all");
+  
+  // Fetch all activity types once and cache them
+  const { quizzes, flashcards, summaries, isLoading: activitiesLoading, refetchAll } = useAllActivitiesByType(5);
+  
+  // Filter activities based on selected tab (client-side)
+  const activities = useMemo(() => {
+    let filtered: typeof quizzes = [];
+    
+    switch (activityFilter) {
+      case 'quizzes':
+        filtered = quizzes;
+        break;
+      case 'flashcards':
+        filtered = flashcards;
+        break;
+      case 'summaries':
+        filtered = summaries;
+        break;
+      case 'all':
+      default:
+        // Merge all activities and sort by created_at
+        filtered = [...quizzes, ...flashcards, ...summaries]
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 5); // Take top 5 most recent
+        break;
+    }
+    
+    return filtered;
+  }, [activityFilter, quizzes, flashcards, summaries]);
   
   // Get user's display name
   const getUserName = () => {
@@ -28,49 +81,6 @@ function DashboardPage() {
     }
     return 'there';
   };
-
-  // Sample activity data
-  const recentActivity = [
-    {
-      id: 1,
-      course: "CS 101",
-      activity: "Completed quiz on Data Structures",
-      time: "2 hours ago",
-      score: "85%",
-      type: "quiz",
-    },
-    {
-      id: 2,
-      course: "ECON 201",
-      activity: "Read summary of Lecture 5: Fiscal Policy",
-      time: "Yesterday",
-      type: "summary",
-    },
-    {
-      id: 3,
-      course: "PSYCH 110",
-      activity: "Practiced flashcards on Research Methods",
-      time: "2 days ago",
-      retention: "High",
-      type: "flashcards",
-    },
-    {
-      id: 4,
-      course: "MATH 220",
-      activity: "Submitted Problem Set 7",
-      time: "3 days ago",
-      score: "92%",
-      type: "assignment",
-    },
-    {
-      id: 5,
-      course: "BIO 150",
-      activity: "Completed Lab Report on Cell Structure",
-      time: "1 week ago",
-      score: "88%",
-      type: "lab",
-    },
-  ];
 
   // Sample nudges
   const nudges = [
@@ -124,7 +134,11 @@ function DashboardPage() {
                     View All
                   </Button>
                 </div>
-                <Tabs defaultValue="all" className="mt-4">
+                <Tabs 
+                  value={activityFilter} 
+                  onValueChange={setActivityFilter}
+                  className="mt-4"
+                >
                   <TabsList>
                     <TabsTrigger value="all">All</TabsTrigger>
                     <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
@@ -135,61 +149,49 @@ function DashboardPage() {
               </CardHeader>
               <CardContent className="p-0">
                 <div className="divide-y max-h-[60vh] overflow-y-auto">
-                  {recentActivity.map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="flex items-start p-4 hover:bg-accent/50 transition-colors"
-                    >
-                      <div
-                        className={`rounded-full p-2 mr-4 ${
-                          activity.type === "quiz" ||
-                          activity.type === "assignment"
-                            ? "bg-blue-100 text-blue-600"
-                            : activity.type === "summary"
-                            ? "bg-green-100 text-green-600"
-                            : activity.type === "lab"
-                            ? "bg-orange-100 text-orange-600"
-                            : "bg-purple-100 text-purple-600"
-                        }`}
-                      >
-                        {activity.type === "quiz" ||
-                        activity.type === "assignment" ? (
-                          <Layers className="h-5 w-5" />
-                        ) : activity.type === "summary" ? (
-                          <FileText className="h-5 w-5" />
-                        ) : activity.type === "lab" ? (
-                          <BookOpen className="h-5 w-5" />
-                        ) : (
-                          <BookOpen className="h-5 w-5" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <p className="font-medium text-sm md:text-base">
-                              {activity.activity}
-                            </p>
-                            <p className="text-xs md:text-sm text-muted-foreground">
-                              {activity.course} • {activity.time}
-                            </p>
-                          </div>
-                          {activity.score && (
-                            <Badge variant="outline" className="ml-2">
-                              {activity.score}
-                            </Badge>
-                          )}
-                          {activity.retention && (
-                            <Badge
-                              variant="outline"
-                              className="ml-2 bg-green-50 text-green-700 hover:bg-green-100 border-green-200"
-                            >
-                              {activity.retention} Retention
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
+                  {activitiesLoading ? (
+                    <div className="p-4 text-center text-muted-foreground">
+                      Loading activities...
                     </div>
-                  ))}
+                  ) : activities.length === 0 ? (
+                    <div className="text-center text-muted-foreground py-8">
+                      <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                      <p className="text-sm">No activities yet.</p>
+                      <p className="text-xs mt-1">
+                        Start studying to see your activity here!
+                      </p>
+                    </div>
+                  ) : (
+                    activities.map((activity) => {
+                      const Icon = getActivityIcon(activity.activity_type as any);
+                      const colors = getActivityColor(activity.feedback);
+                      
+                      return (
+                        <div
+                          key={activity.id}
+                          className="flex items-start p-4 hover:bg-accent/50 transition-colors"
+                        >
+                          <div
+                            className={`rounded-full p-2 mr-4 ${colors.bg} ${colors.text}`}
+                          >
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium text-sm md:text-base">
+                                  {activity.activity_summary}
+                                </p>
+                                <p className="text-xs md:text-sm text-muted-foreground">
+                                  {activity.courses?.name || 'Unknown Course'} • {formatTimeAgo(new Date(activity.created_at))}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
                 </div>
               </CardContent>
               <CardFooter className="border-t bg-muted/50 p-3 [.border-t]:pt-3">
@@ -197,10 +199,15 @@ function DashboardPage() {
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">
-                      Updated just now
+                      {activities.length > 0 ? `Last updated ${formatTimeAgo(new Date(activities[0].created_at))}` : 'No activities'}
                     </span>
                   </div>
-                  <Button variant="ghost" size="sm">
+                  <Button 
+                    variant="ghost" 
+                    size="sm"
+                    onClick={() => refetchAll()}
+                    disabled={activitiesLoading}
+                  >
                     Refresh
                   </Button>
                 </div>
