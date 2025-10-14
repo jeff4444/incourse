@@ -45,7 +45,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
   
   // Image files
   if (fileDetails.type.startsWith("image/") || fileDetails.contentType?.startsWith("image/")) {
-    return <ImageViewer fileDetails={fileDetails} />;
+    return <ImageViewer fileDetails={fileDetails} courseId={courseID} />;
   }
   
   // Unsupported file type
