@@ -220,7 +220,7 @@ async def search_file_with_chunk_index(
     chunk_id = f"{file_id}_chunk_{chunk_index}"
     
     # Search the index
-    print(f"Searching for chunk index: {chunk_index}...")
+    print(f"Searching for chunk index: {chunk_index} with top_k: {top_k}...")
     try:
         results = index.search(
             namespace=namespace,
@@ -234,6 +234,7 @@ async def search_file_with_chunk_index(
         # Parse results
         hits = results.get('result', {}).get('hits', [])
         chunks = []
+        print(f"Found {len(hits)} hits")
         
         for hit in hits:
             chunk_data = {
@@ -245,7 +246,7 @@ async def search_file_with_chunk_index(
                 "total_chunks": hit.get('fields', {}).get('total_chunks', 0)
             }
             chunks.append(chunk_data)
-        print(chunks)
+
         return {
             "chunk_index": chunk_index,
             "file_id": file_id,
@@ -346,7 +347,7 @@ async def search_file_with_query(
     created_new_namespace = res["created_new_namespace"]
     
     # Search the index
-    print(f"Searching for query: '{query}'...")
+    print(f"Searching for query: '{query}' with top_k: {top_k}...")
     try:
         results = index.search(
             namespace=namespace,
@@ -360,7 +361,7 @@ async def search_file_with_query(
         # Parse results
         hits = results.get('result', {}).get('hits', [])
         chunks = []
-        
+        print(f"Found {len(hits)} hits")
         for hit in hits:
             chunk_data = {
                 "score": hit.get('_score', 0),

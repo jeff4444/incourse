@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MessageSquare, Lightbulb, Send, X, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import type { ContextItem } from "./pdf-viewer"
-import { authenticatedFetchJson } from "@/lib/utils/apiClient"
+import { authenticatedFetchJson, authenticatedFetch } from "@/lib/utils/apiClient"
 
 interface ChatPanelProps {
   activeTab: "chat" | "suggestions"
@@ -20,6 +20,12 @@ interface ChatPanelProps {
   courseId: string
   fileIdList: string[]
   initialSessionId?: string
+}
+
+interface ToolCall {
+  name: string;
+  displayName: string;
+  status: "executing" | "complete";
 }
 
 export function ChatPanel({
@@ -45,6 +51,11 @@ export function ChatPanel({
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  
+  // Streaming state
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [streamingMessage, setStreamingMessage] = useState("")
+  const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([])
 
   const suggestions = [
     "Summarize this document for me",
@@ -145,7 +156,7 @@ export function ChatPanel({
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputValue.trim() || isLoading || isLoadingHistory) return
+    if (!inputValue.trim() || isLoading || isLoadingHistory || isStreaming) return
 
     // Add user message
     const contextText = selectedContextItem?.text
@@ -155,11 +166,12 @@ export function ChatPanel({
           : selectedContextItem.text)
       : undefined
 
+    const userMessage = inputValue
     const newMessages = [
       ...messages,
       {
         role: "user" as const,
-        content: inputValue,
+        content: userMessage,
         timestamp: new Date(),
         contextPreview,
       },
@@ -167,7 +179,9 @@ export function ChatPanel({
 
     setMessages(newMessages)
     setInputValue("")
-    setIsLoading(true)
+    setIsStreaming(true)
+    setStreamingMessage("")
+    setActiveToolCalls([])
 
     try {
       // Optimistically clear the tagged context from the UI BEFORE the network call
@@ -175,36 +189,120 @@ export function ChatPanel({
         onRemoveContextItem(selectedContextItem.id)
       }
 
-      const data = await authenticatedFetchJson<{ answer?: string; session_id?: string }>(
-        '/api/agents/chat',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            courseId,
-            fileIds: fileIdList,
-            message: inputValue,
-            context: contextText,
-            sessionId: sessionId,
-          }),
-        }
-      )
-      const answer = data?.answer ?? 'Sorry, I could not get a response.'
-      
-      // Store sessionId if provided (for new sessions)
-      if (data?.session_id) {
-        setSessionId(data.session_id)
+      // Make streaming request with authentication
+      const response = await authenticatedFetch('/api/agents/chat/stream', {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId,
+          fileIds: fileIdList,
+          message: userMessage,
+          context: contextText,
+          sessionId: sessionId,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
-      
+
+      const reader = response.body?.getReader()
+      const decoder = new TextDecoder()
+
+      if (!reader) {
+        throw new Error('No response body')
+      }
+
+      let buffer = ''
+      let fullResponse = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+
+        // Decode the chunk and add to buffer
+        buffer += decoder.decode(value, { stream: true })
+
+        // Process complete SSE messages (ending with \n\n)
+        const lines = buffer.split('\n\n')
+        buffer = lines.pop() || '' // Keep incomplete message in buffer
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue
+
+          try {
+            const jsonStr = line.replace('data: ', '')
+            const event = JSON.parse(jsonStr)
+
+            if (event.type === 'text_delta') {
+              // Smart spacing: add space or newline based on previous character
+              let textToAdd = event.content
+              
+              if (fullResponse.length > 0) {
+                const lastChar = fullResponse[fullResponse.length - 1]
+                
+                if (lastChar === ':') {
+                  // After colon, go to next line
+                  textToAdd = '\n' + textToAdd
+                } else if (lastChar !== ' ' && lastChar !== '\n' && textToAdd[0] !== ' ' && textToAdd[0] !== '\n') {
+                  // Add space if neither end nor start has whitespace
+                  textToAdd = ' ' + textToAdd
+                }
+              }
+              
+              // Append text token
+              fullResponse += textToAdd
+              setStreamingMessage(fullResponse)
+            } else if (event.type === 'tool_call') {
+              // Add tool call indicator
+              setActiveToolCalls(prev => [
+                ...prev,
+                {
+                  name: event.name || event.data?.name || 'unknown',
+                  displayName: event.content || event.name || 'Processing',
+                  status: 'executing'
+                }
+              ])
+            } else if (event.type === 'tool_result') {
+              // Mark tool as complete
+              const toolName = event.name || event.data?.name
+              setActiveToolCalls(prev =>
+                prev.map(tool =>
+                  tool.name === toolName
+                    ? { ...tool, status: 'complete' as const }
+                    : tool
+                )
+              )
+            } else if (event.type === 'done') {
+              // Stream complete
+              if (event.content && !fullResponse) {
+                fullResponse = event.content
+              }
+            } else if (event.type === 'error') {
+              console.error('Streaming error:', event.content)
+              throw new Error(event.content || 'Streaming error')
+            }
+          } catch (parseError) {
+            console.error('Error parsing SSE event:', line, parseError)
+          }
+        }
+      }
+
+      // Add final message to history
       setMessages([
         ...newMessages,
         {
           role: "assistant",
-          content: answer,
+          content: fullResponse || 'Sorry, I could not get a response.',
           timestamp: new Date(),
         },
       ])
+
+      // Clear streaming state
+      setStreamingMessage("")
+      setActiveToolCalls([])
     } catch (err) {
+      console.error('Streaming error:', err)
       setMessages([
         ...newMessages,
         {
@@ -213,8 +311,10 @@ export function ChatPanel({
           timestamp: new Date(),
         },
       ])
+      setStreamingMessage("")
+      setActiveToolCalls([])
     } finally {
-      setIsLoading(false)
+      setIsStreaming(false)
     }
   }
 
@@ -302,8 +402,49 @@ export function ChatPanel({
               </div>
             ))}
             
-            {/* Thinking indicator */}
-            {isLoading && (
+            {/* Streaming message */}
+            {isStreaming && (
+              <div className="mb-4 pr-8">
+                {/* Tool call indicators */}
+                {activeToolCalls.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {activeToolCalls.map((tool, idx) => (
+                      <div
+                        key={idx}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                          tool.status === 'executing'
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-green-100 text-green-700'
+                        }`}
+                      >
+                        {tool.status === 'executing' ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <span className="text-green-600">✓</span>
+                        )}
+                        <span>{tool.displayName}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Streaming text */}
+                <div className="p-3 rounded-lg bg-gray-100 rounded-tr-none">
+                  <div className="prose prose-sm max-w-none">
+                    {streamingMessage ? (
+                      <div className="whitespace-pre-wrap text-sm text-gray-800">
+                        {streamingMessage}
+                      </div>
+                    ) : null}
+                    {/* Blinking cursor - always visible when streaming */}
+                    <span className="inline-block w-2 h-4 bg-blue-500 ml-0.5 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Thinking indicator (for non-streaming) */}
+            {isLoading && !isStreaming && (
               <div className="mb-4 pr-8">
                 <div className="p-3 rounded-lg bg-gray-100 rounded-tr-none">
                   <div className="flex items-center gap-2 text-gray-500">
@@ -342,10 +483,10 @@ export function ChatPanel({
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 className="flex-1"
-                disabled={isLoading}
+                disabled={isLoading || isStreaming}
               />
-              <Button type="submit" size="icon" disabled={!inputValue.trim() || isLoading}>
-                {isLoading ? (
+              <Button type="submit" size="icon" disabled={!inputValue.trim() || isLoading || isStreaming}>
+                {isLoading || isStreaming ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <Send className="h-4 w-4" />
