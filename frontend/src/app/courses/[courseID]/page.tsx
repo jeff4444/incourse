@@ -6,16 +6,18 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, ChevronLeft, Clock, Download, Play, Plus, ThumbsUp, Brain, FlaskConical } from "lucide-react"
+import { BookOpen, ChevronLeft, Clock, Download, Play, Plus, ThumbsUp, Brain, FlaskConical, ClipboardList } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { SummaryViewer } from "@/components/summary-viewer"
 import { ModuleList } from "@/components/module-list"
+import { AssignmentList } from "@/components/assignment-list"
 import { CourseSkeleton } from "@/components/course-skeleton"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
 import { useCourse } from "@/lib/hooks/useCourses"
 import { useModules } from "@/lib/hooks/useModules"
 import { useFlashcardDecks } from "@/lib/hooks/useFlashcards"
 import { useQuizzes } from "@/lib/hooks/useQuizzes"
+import { useAssignments } from "@/lib/hooks/useAssignments"
 import { createClient } from "@/lib/utils/supabase/client"
 
 function CoursePage({
@@ -49,6 +51,7 @@ function CoursePage({
   const { data: modules = [], isLoading: modulesLoading, error: modulesError } = useModules(courseID);
   const { data: flashcardDecks = [], isLoading: flashcardsLoading } = useFlashcardDecks(courseID, userId);
   const { data: quizzes = [], isLoading: quizzesLoading } = useQuizzes(courseID, userId);
+  const { data: assignments = [], isLoading: assignmentsLoading } = useAssignments(courseID);
 
   const loading = courseLoading || modulesLoading;
   const error = courseError || modulesError;
@@ -104,6 +107,7 @@ function CoursePage({
               <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
               <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
+              <TabsTrigger value="assignments">Assignments</TabsTrigger>
             </TabsList>
             <TabsContent value="notes">
               <div className="grid grid-cols-1 gap-6">
@@ -278,6 +282,27 @@ By the end of this course, you will have developed a comprehensive understanding
                       </Button>
                     </Link>
                   </CardFooter>
+                </Card>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="assignments">
+              <div className="grid gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <ClipboardList className="h-5 w-5" />
+                      Course Assignments
+                    </CardTitle>
+                    <CardDescription>View and manage your course assignments</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {assignmentsLoading ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading assignments...</div>
+                    ) : (
+                      <AssignmentList assignments={assignments} courseID={courseID} />
+                    )}
+                  </CardContent>
                 </Card>
               </div>
             </TabsContent>

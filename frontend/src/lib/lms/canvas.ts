@@ -1,4 +1,4 @@
-import { Course, FileDetails, Module, ModuleItem, DiscussionTopic, Page } from "../types/course";
+import { Course, FileDetails, Module, ModuleItem, DiscussionTopic, Page, Assignment } from "../types/course";
 import { validateFileForProcessing } from "../utils/fileValidation";
 import LMSProvider from "./lms-provider";
 
@@ -370,6 +370,43 @@ class CanvasProvider extends LMSProvider {
     }
     const pageData = await response.json();
     return pageData as Page;
+  }
+
+  convertCanvasAssignment(assignmentData: any): Assignment {
+    const assignment: Assignment = {
+      id: assignmentData.id.toString(),
+      lms_id: assignmentData.id.toString(),
+      name: assignmentData.name,
+      description: assignmentData.description || null,
+      due_at: assignmentData.due_at || null,
+      lock_at: assignmentData.lock_at || null,
+      locked_for_user: assignmentData.locked_for_user || false,
+      points_possible: assignmentData.points_possible || null,
+      html_url: assignmentData.html_url,
+      submission_types: assignmentData.submission_types || [],
+      has_submitted_submissions: assignmentData.has_submitted_submissions || false,
+    };
+    return assignment;
+  }
+
+  async getCourseAssignments(courseId: string): Promise<Assignment[]> {
+    const assignmentsResponse = await fetch(
+      `${this.apiBaseUrl}/courses/${courseId}/assignments?per_page=100`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    if (!assignmentsResponse.ok) {
+      await this.handleFetchError(assignmentsResponse, `Failed to fetch assignments for course ${courseId}`);
+    }
+    const assignmentsData = await assignmentsResponse.json();
+    
+    return assignmentsData.map((assignment: any) =>
+      this.convertCanvasAssignment(assignment)
+    );
   }
 }
 
