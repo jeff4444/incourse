@@ -11,6 +11,8 @@ import { FileDetails } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { useReadingTracker } from "@/lib/hooks/useActivities";
+import { Play, Square, Clock } from "lucide-react";
 
 function getViewer(fileDetails: FileDetails, courseID?: string) {
   // PDF files
@@ -86,6 +88,21 @@ function FileViewPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Reading tracker - only enable when we have file details
+  const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
+    fileDetails?.id || fileDetails?.canvasId || '',
+    fileDetails?.name || '',
+    courseID,
+    !!fileDetails
+  );
+
+  // Log activity on unmount
+  useEffect(() => {
+    return () => {
+      logActivity();
+    };
+  }, [logActivity]);
+
   useEffect(() => {
     const getParams = async () => {
       const resolvedParams = await params;
@@ -148,9 +165,52 @@ function FileViewPage({
 
   return (
     <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
-      <div className="flex items-center gap-2 mb-2">
-        <BackButtonClient />
-        <h1 className="text-xl font-semibold">{fileDetails.name}</h1>
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <BackButtonClient />
+          <h1 className="text-xl font-semibold">{fileDetails.name}</h1>
+        </div>
+        
+        {/* Reading Tracker Controls */}
+        <div className="flex items-center gap-3">
+          {!isTracking ? (
+            <div className="relative group">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={startTracking}
+                className="flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-40"
+              >
+                <Play className="h-4 w-4" />
+                <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+                  Enter Zen Mode
+                </span>
+              </Button>
+            </div>
+          ) : (
+            <div className="relative group">
+              <Button
+                variant="default"
+                size="sm"
+                onClick={stopTracking}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-36"
+              >
+                <Square className="h-4 w-4 flex-shrink-0" />
+                <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+                  End Zen Mode
+                </span>
+              </Button>
+            </div>
+          )}
+          
+          {/* Time Display */}
+          {timeSpent > 0 && (
+            <div className="flex items-center gap-1 text-sm text-gray-600">
+              <Clock className="h-4 w-4" />
+              <span>{Math.floor(timeSpent / 60)}:{(timeSpent % 60).toString().padStart(2, '0')}</span>
+            </div>
+          )}
+        </div>
       </div>
       {getViewer(fileDetails, courseID)}
     </div>

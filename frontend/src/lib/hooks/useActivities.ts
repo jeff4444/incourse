@@ -165,12 +165,7 @@ export function useReadingTracker(
       startTimeRef.current = 0;
     }
 
-    // Log activity when page becomes hidden (user navigates away)
-    const handleVisibilityChange = () => {
-      if (document.hidden && isTracking) {
-        stopTracking();
-      }
-    };
+    // Only log activity on page unload - let user manually control start/stop
 
     // Log activity before page unload
     const handleBeforeUnload = () => {
@@ -191,14 +186,12 @@ export function useReadingTracker(
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, [fileId, fileName, courseId, enabled, isTracking]);
