@@ -18,9 +18,14 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
   // Regex to match Canvas file URLs: https://{domain}/courses/{courseId}/files/{fileId}
   const canvasFileUrlRegex = /https:\/\/[^\/]+\/courses\/\d+\/files\/(\d+)/g;
   
-  return html.replace(canvasFileUrlRegex, (match, fileId) => {
+  let transformedHtml = html.replace(canvasFileUrlRegex, (match, fileId) => {
     return `/courses/${courseID}/autograder/${fileId}`;
   });
+  
+  // Remove target="_blank" from all links to make them open in current tab
+  transformedHtml = transformedHtml.replace(/target=\"_blank\"/gi, '');
+  
+  return transformedHtml;
 }
 
 function AssignmentDetailPage({
@@ -209,7 +214,7 @@ function AssignmentDetailPage({
             <CardContent>
               {assignment.description ? (
                 <div 
-                  className="prose prose-gray max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-a:text-blue-600 prose-a:underline hover:prose-a:text-blue-800 prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground"
+                  className="prose prose-gray max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground [&_a]:text-blue-600 [&_a]:underline hover:[&_a]:text-blue-800"
                   dangerouslySetInnerHTML={{ 
                     __html: transformedDescription 
                   }}
