@@ -5,9 +5,9 @@ python-dotenv
 pydantic
 pydantic_ai
 aiohttp
-pymupdf4llm
-python-docx
+PyMuPDF
+docx2txt
 python-pptx
 pinecone
 supabase
-pycryptodome
+pycryptodomex

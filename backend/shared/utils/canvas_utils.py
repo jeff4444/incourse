@@ -3,8 +3,8 @@ Canvas utility functions for file parsing and content extraction.
 """
 
 import os
-import pymupdf4llm
-from docx import Document
+import fitz  # PyMuPDF
+import docx2txt
 from pptx import Presentation
 
 
@@ -46,7 +46,7 @@ async def parse_file_content(file_path: str, content_type: str, filename: str, f
 
 async def parse_pdf_content(file_path: str) -> str:
     """
-    Parse PDF content and extract text using pymupdf4llm from local file.
+    Parse PDF content and extract text using PyMuPDF from local file.
     
     Args:
         file_path: Path to the local PDF file
@@ -55,8 +55,12 @@ async def parse_pdf_content(file_path: str) -> str:
         Extracted text content
     """
     try:
-        # Use pymupdf4llm to extract text with better formatting from local file
-        text = pymupdf4llm.to_markdown(file_path)
+        # Use PyMuPDF to extract text with basic formatting
+        doc = fitz.open(file_path)
+        text = ""
+        for page in doc:
+            text += page.get_text() + "\n"
+        doc.close()
         return text.strip()
     except Exception as e:
         return f"[Error parsing PDF: {str(e)}]"
@@ -73,10 +77,8 @@ async def parse_docx_content(file_path: str) -> str:
         Extracted text content
     """
     try:
-        doc = Document(file_path)
-        text = ""
-        for paragraph in doc.paragraphs:
-            text += paragraph.text + "\n"
+        # Use docx2txt for lightweight text extraction
+        text = docx2txt.process(file_path)
         return text.strip()
     except Exception as e:
         return f"[Error parsing DOCX: {str(e)}]"

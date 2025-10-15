@@ -1,7 +1,7 @@
 import os
 import base64
 import hashlib
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 from dotenv import load_dotenv
 
 load_dotenv()
