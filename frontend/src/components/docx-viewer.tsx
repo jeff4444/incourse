@@ -10,7 +10,7 @@ import PDFViewer from "./pdf-viewer"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
-export default function DOCXViewer({ fileDetails, courseId }: { fileDetails: FileDetails, courseId?: string }) {
+export default function DOCXViewer({ fileDetails, courseId, showChat = true }: { fileDetails: FileDetails, courseId?: string, showChat?: boolean }) {
   const [isConverting, setIsConverting] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null)
@@ -91,7 +91,7 @@ export default function DOCXViewer({ fileDetails, courseId }: { fileDetails: Fil
 
   // If PDF is ready, render the PDF viewer directly
   if (pdfFileDetails && !isConverting && !error) {
-    return <PDFViewer fileDetails={pdfFileDetails} courseId={courseId} />
+    return <PDFViewer fileDetails={pdfFileDetails} courseId={courseId} showChat={showChat} />
   }
 
   // Otherwise render the conversion UI (loading or error)

@@ -14,7 +14,7 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
   const canvasFileUrlRegex = /https:\/\/[^\/]+\/courses\/\d+\/files\/(\d+)/g;
   
   return html.replace(canvasFileUrlRegex, (match, fileId) => {
-    return `/courses/${courseID}/files/${fileId}`;
+    return `/courses/${courseID}/autograder/${fileId}`;
   });
 }
 

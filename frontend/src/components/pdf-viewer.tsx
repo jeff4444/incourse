@@ -54,7 +54,7 @@ export type ContextItem = {
   pageNumber: number
 }
 
-export default function PDFViewer({ fileDetails, courseId }: { fileDetails: FileDetails, courseId?: string }) {
+export default function PDFViewer({ fileDetails, courseId, showChat = true }: { fileDetails: FileDetails, courseId?: string, showChat?: boolean }) {
   const [file, setFile] = useState<PDFFile>(null)
   const [numPages, setNumPages] = useState<number>()
   const [containerRef, setContainerRef] = useState<HTMLElement | null>(null)
@@ -68,7 +68,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
   const pageRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
   const textLayerRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
   const [zenMode, setZenMode] = useState(false)
-  const [showChat, setShowChat] = useState(true)
+  const [showChatState, setShowChat] = useState(showChat)
   const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat")
 
   // Annotation states
@@ -146,7 +146,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
   }
 
   const toggleChat = () => {
-    setShowChat(!showChat)
+    setShowChat(!showChatState)
   }
 
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -492,7 +492,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
                     variant="ghost"
                     size="sm"
                     onClick={toggleChat}
-                    className={`h-8 w-8 p-0 ${showChat ? "bg-blue-100 text-blue-600" : ""}`}
+                    className={`h-8 w-8 p-0 ${showChatState ? "bg-blue-100 text-blue-600" : ""}`}
                   >
                     <MessageSquare className="h-4 w-4" />
                   </Button>
@@ -609,7 +609,7 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
         </div>
 
         {/* Chat Panel */}
-        {!zenMode && showChat && (
+        {!zenMode && showChatState && (
           <ChatPanel
             activeTab={activeTab}
             setActiveTab={setActiveTab}

@@ -11,7 +11,7 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import { Assignment } from "@/lib/types/course";
 
-// Utility function to transform Canvas file URLs to our file viewing URLs
+// Utility function to transform Canvas file URLs to our autograder URLs
 function transformCanvasFileUrls(html: string, courseID: string): string {
   if (!html) return html;
   
@@ -19,7 +19,7 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
   const canvasFileUrlRegex = /https:\/\/[^\/]+\/courses\/\d+\/files\/(\d+)/g;
   
   return html.replace(canvasFileUrlRegex, (match, fileId) => {
-    return `/courses/${courseID}/files/${fileId}`;
+    return `/courses/${courseID}/autograder/${fileId}`;
   });
 }
 

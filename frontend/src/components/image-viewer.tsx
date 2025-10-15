@@ -13,7 +13,7 @@ const maxZoom = 5
 const minZoom = 0.1
 const zoomStep = 0.2
 
-export default function ImageViewer({ fileDetails, courseId }: { fileDetails: FileDetails, courseId?: string }) {
+export default function ImageViewer({ fileDetails, courseId, showChat = true }: { fileDetails: FileDetails, courseId?: string, showChat?: boolean }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +24,7 @@ export default function ImageViewer({ fileDetails, courseId }: { fileDetails: Fi
   const [rotation, setRotation] = useState(0)
   const [zenMode, setZenMode] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
-  const [showChat, setShowChat] = useState(true)
+  const [showChatState, setShowChat] = useState(showChat)
   const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat")
   type ContextItem = { id: string; text: string; source: string; pageNumber: number }
   const [contextItems, setContextItems] = useState<ContextItem[]>([])
@@ -72,7 +72,7 @@ export default function ImageViewer({ fileDetails, courseId }: { fileDetails: Fi
   }
 
   const toggleChat = () => {
-    setShowChat(!showChat)
+    setShowChat(!showChatState)
   }
 
   const removeContextItem = (id: string) => {
@@ -256,7 +256,7 @@ export default function ImageViewer({ fileDetails, courseId }: { fileDetails: Fi
                     variant="ghost"
                     size="sm"
                     onClick={toggleChat}
-                    className={`h-8 w-8 p-0 ${showChat ? "bg-blue-100 text-blue-600" : ""}`}
+                    className={`h-8 w-8 p-0 ${showChatState ? "bg-blue-100 text-blue-600" : ""}`}
                   >
                     <MessageSquare className="h-4 w-4" />
                   </Button>
@@ -329,7 +329,7 @@ export default function ImageViewer({ fileDetails, courseId }: { fileDetails: Fi
           </Card>
         </div>
 
-        {!zenMode && showChat && (
+        {!zenMode && showChatState && (
           <ChatPanel
             activeTab={activeTab}
             setActiveTab={setActiveTab}
