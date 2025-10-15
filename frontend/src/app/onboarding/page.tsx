@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { createClient } from "@/lib/utils/supabase/client";
 import { encryptApiKey } from "@/lib/utils/encryption";
@@ -45,6 +45,16 @@ export default function OnboardingPage() {
     status: 'pending' | 'loading' | 'complete' | 'error';
     detail?: string;
   }[]>([]);
+  
+  // Course sync tracking
+  const [courseProgress, setCourseProgress] = useState<{
+    current: number;
+    total: number;
+    courseName?: string;
+  }>({ current: 0, total: 0 });
+  
+  // Ref for auto-scrolling sync progress
+  const syncProgressRef = useRef<HTMLDivElement>(null);
 
   // Fetch user's school on mount
   useEffect(() => {
@@ -56,6 +66,19 @@ export default function OnboardingPage() {
     };
     fetchUserSchool();
   }, []);
+
+  // Auto-scroll sync progress to bottom when new items are added
+  useEffect(() => {
+    if (syncProgressRef.current && syncProgress.length > 0) {
+      // Small delay to ensure the new item is rendered
+      setTimeout(() => {
+        syncProgressRef.current?.scrollTo({
+          top: syncProgressRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
+    }
+  }, [syncProgress]);
 
   const handleApiKeyChange = (value: string) => {
     setApiKey(value);
@@ -116,11 +139,10 @@ export default function OnboardingPage() {
     }
   };
 
-  // Fetch and sync courses to database
+  // Fetch and sync courses to database with streaming
   const syncCoursesToDatabase = async (apiKey: string) => {
     try {
-      updateSyncProgress('Connecting to Canvas', 'loading');
-      console.log('Syncing courses to database...');
+      console.log('Starting streaming sync...');
       
       // Get session for authentication
       const { data: { session } } = await supabase.auth.getSession();
@@ -134,11 +156,8 @@ export default function OnboardingPage() {
         throw new Error("School not supported");
       }
 
-      updateSyncProgress('Connecting to Canvas', 'complete');
-      updateSyncProgress('Syncing courses', 'loading');
-
-      // Send API credentials to server - it will fetch courses and sync them
-      const response = await fetch('/api/courses/sync', {
+      // Use streaming API endpoint
+      const response = await fetch('/api/courses/sync/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -151,28 +170,73 @@ export default function OnboardingPage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to sync courses');
+        const error = await response.text();
+        throw new Error(error || 'Failed to sync courses');
       }
 
-      const result = await response.json();
-      console.log('Courses synced successfully:', result);
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
       
-      // Update progress based on results
-      const { results } = result;
-      updateSyncProgress('Syncing courses', 'complete', `${results.coursesCreated} courses synced`);
-      
-      if (results.modulesCreated > 0) {
-        updateSyncProgress('Syncing modules', 'complete', `${results.modulesCreated} modules synced`);
+      if (!reader) {
+        throw new Error('No response body');
       }
-      
-      if (results.moduleItemsCreated > 0) {
-        updateSyncProgress('Syncing module items', 'complete', `${results.moduleItemsCreated} items synced`);
+
+      let buffer = '';
+      let finalResults: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue;
+          
+          try {
+            const jsonStr = line.replace('data: ', '');
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'progress') {
+              updateSyncProgress(event.stage, event.status, event.detail);
+              
+              // Extract course progress from stage text
+              const courseMatch = event.stage.match(/Syncing course (\d+)\/(\d+): (.+)/);
+              if (courseMatch) {
+                setCourseProgress({
+                  current: parseInt(courseMatch[1]),
+                  total: parseInt(courseMatch[2]),
+                  courseName: courseMatch[3]
+                });
+              }
+              
+              // Extract total courses from "Fetching courses" stage
+              const fetchMatch = event.stage.match(/Fetching courses/);
+              if (fetchMatch && event.detail) {
+                const totalMatch = event.detail.match(/(\d+) courses found/);
+                if (totalMatch) {
+                  setCourseProgress(prev => ({
+                    ...prev,
+                    total: parseInt(totalMatch[1])
+                  }));
+                }
+              }
+            } else if (event.type === 'done') {
+              finalResults = event.data;
+              console.log('Sync completed successfully:', finalResults);
+            } else if (event.type === 'error') {
+              throw new Error(event.detail || 'Sync failed');
+            }
+          } catch (parseError) {
+            console.error('Error parsing SSE event:', line, parseError);
+          }
+        }
       }
-      
-      updateSyncProgress('Completing setup', 'complete');
-      
-      return { success: true };
+
+      return { success: true, results: finalResults };
     } catch (error) {
       console.error('Error syncing courses:', error);
       const currentStage = syncProgress[syncProgress.length - 1]?.stage || 'Syncing courses';
@@ -199,6 +263,7 @@ export default function OnboardingPage() {
       // Start syncing process
       setIsSyncing(true);
       setSyncProgress([]);
+      setCourseProgress({ current: 0, total: 0 });
 
       // Store credentials to database
       const storeResult = await storeCanvasCredentials(apiKey);
@@ -303,7 +368,7 @@ export default function OnboardingPage() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full"
+              className="bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full"
             >
               <div className="flex flex-col items-center mb-6">
                 <div className="relative">
@@ -316,16 +381,49 @@ export default function OnboardingPage() {
                 <p className="text-gray-600 text-center mt-2">
                   Please wait while we sync your courses and materials
                 </p>
+                
+                {/* Course Progress Counter */}
+                {courseProgress.total > 0 && (
+                  <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Course Progress</span>
+                      <span className="text-sm text-gray-600">
+                        {courseProgress.current} of {courseProgress.total}
+                      </span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <motion.div
+                        className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
+                        transition={{ duration: 0.5 }}
+                      />
+                    </div>
+                    {courseProgress.courseName && (
+                      <p className="text-xs text-gray-600 mt-2 truncate">
+                        Currently syncing: {courseProgress.courseName}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="space-y-3">
+              <div ref={syncProgressRef} className="space-y-3 max-h-80 overflow-y-auto">
                 {syncProgress.map((progress, index) => (
                   <motion.div
-                    key={progress.stage}
+                    key={`${progress.stage}-${index}`}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: index * 0.1 }}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-gray-50"
+                    className={`flex items-start gap-3 p-3 rounded-lg transition-all duration-200 ${
+                      progress.status === 'loading' 
+                        ? 'bg-orange-50 border border-orange-200' 
+                        : progress.status === 'complete'
+                        ? 'bg-green-50 border border-green-200'
+                        : progress.status === 'error'
+                        ? 'bg-red-50 border border-red-200'
+                        : 'bg-gray-50 border border-gray-200'
+                    }`}
                   >
                     <div className="mt-0.5">
                       {progress.status === 'loading' && (
@@ -335,7 +433,7 @@ export default function OnboardingPage() {
                         <CheckCircle2 className="h-5 w-5 text-green-500" />
                       )}
                       {progress.status === 'error' && (
-                        <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs">
+                        <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
                           !
                         </div>
                       )}
@@ -356,6 +454,16 @@ export default function OnboardingPage() {
                           {progress.detail}
                         </p>
                       )}
+                      {progress.status === 'loading' && (
+                        <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
+                          <motion.div
+                            className="bg-orange-500 h-1 rounded-full"
+                            initial={{ width: 0 }}
+                            animate={{ width: "100%" }}
+                            transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </motion.div>
                 ))}
@@ -365,11 +473,22 @@ export default function OnboardingPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="mt-6 text-center"
+                  className="mt-6"
                 >
-                  <p className="text-sm text-gray-600">
-                    Almost done! Preparing your workspace...
-                  </p>
+                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <p className="font-medium text-green-800">Sync Complete!</p>
+                    </div>
+                    <p className="text-sm text-green-700">
+                      Your courses and materials have been successfully synced.
+                    </p>
+                  </div>
+                  <div className="mt-4 text-center">
+                    <p className="text-sm text-gray-600">
+                      Preparing your workspace...
+                    </p>
+                  </div>
                 </motion.div>
               )}
             </motion.div>
