@@ -123,3 +123,17 @@ export interface Page {
   locked_for_user: boolean;
   body: string;
 }
+
+export interface Assignment {
+  id: string;
+  lms_id: string;
+  name: string;
+  description: string | null;
+  due_at: string | null;
+  lock_at: string | null;
+  locked_for_user: boolean;
+  points_possible: number | null;
+  html_url: string;
+  submission_types: string[];
+  has_submitted_submissions: boolean;
+}
