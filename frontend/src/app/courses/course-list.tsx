@@ -72,10 +72,10 @@ export function CourseList() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Your Courses</h1>
-        <Button>
+        {/* <Button>
           <BookOpen className="h-4 w-4 mr-2" />
           Add Course
-        </Button>
+        </Button> */}
       </div>
 
       <div className="mb-6 flex gap-4">
