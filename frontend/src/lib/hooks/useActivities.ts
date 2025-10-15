@@ -132,7 +132,7 @@ export function useCreateActivity() {
 }
 
 /**
- * Hook to track reading time and automatically log activity
+ * Hook to track reading time with manual start/stop control
  */
 export function useReadingTracker(
   fileId: string,
@@ -141,34 +141,71 @@ export function useReadingTracker(
   enabled: boolean = true
 ) {
   const [timeSpent, setTimeSpent] = useState(0);
-  const startTimeRef = useRef<number>(Date.now());
+  const [isTracking, setIsTracking] = useState(false);
+  const startTimeRef = useRef<number>(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const hasLoggedRef = useRef(false);
+  const currentFileRef = useRef<string>('');
+  const totalTimeRef = useRef<number>(0);
 
   useEffect(() => {
-    if (!enabled || !fileId || !fileName || !courseId) return;
+    if (!enabled || !fileId || !fileName || !courseId || fileId === '' || fileName === '' || courseId === '') {
+      return;
+    }
 
+    const fileKey = `${fileId}-${courseId}`;
+    
     // Reset when file changes
-    startTimeRef.current = Date.now();
-    setTimeSpent(0);
-    hasLoggedRef.current = false;
+    if (currentFileRef.current !== fileKey) {
+      currentFileRef.current = fileKey;
+      setTimeSpent(0);
+      setIsTracking(false);
+      hasLoggedRef.current = false;
+      totalTimeRef.current = 0;
+      startTimeRef.current = 0;
+    }
 
-    // Update time spent every second
-    intervalRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
-      setTimeSpent(elapsed);
-    }, 1000);
+    // Log activity when page becomes hidden (user navigates away)
+    const handleVisibilityChange = () => {
+      if (document.hidden && isTracking) {
+        stopTracking();
+      }
+    };
+
+    // Log activity before page unload
+    const handleBeforeUnload = () => {
+      if (isTracking) {
+        stopTracking();
+        // Use sendBeacon for reliable logging on page unload
+        const data = JSON.stringify({
+          course_id: courseId,
+          file_id: fileId,
+          file_name: fileName,
+          time_spent_seconds: totalTimeRef.current,
+        });
+        
+        if (navigator.sendBeacon) {
+          const blob = new Blob([data], { type: 'application/json' });
+          navigator.sendBeacon('/api/activities/reading', blob);
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [fileId, fileName, courseId, enabled]);
+  }, [fileId, fileName, courseId, enabled, isTracking]);
 
-  const logActivity = async () => {
+  const logActivityWithTime = async (timeToLog: number) => {
     // Only log if we haven't already and time is at least 1 second
-    if (hasLoggedRef.current || timeSpent < 1 || !fileId || !fileName || !courseId) {
+    if (hasLoggedRef.current || timeToLog < 1 || !fileId || !fileName || !courseId) {
       return;
     }
 
@@ -181,7 +218,7 @@ export function useReadingTracker(
           course_id: courseId,
           file_id: fileId,
           file_name: fileName,
-          time_spent_seconds: timeSpent,
+          time_spent_seconds: timeToLog,
         }),
       });
     } catch (error) {
@@ -190,8 +227,50 @@ export function useReadingTracker(
     }
   };
 
+  const startTracking = () => {
+    if (!isTracking) {
+      setIsTracking(true);
+      startTimeRef.current = Date.now();
+      
+      // Update time spent every second
+      intervalRef.current = setInterval(() => {
+        if (startTimeRef.current > 0) {
+          const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
+          setTimeSpent(totalTimeRef.current + elapsed);
+        }
+      }, 1000);
+    }
+  };
+
+  const stopTracking = () => {
+    if (isTracking) {
+      setIsTracking(false);
+      
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      if (startTimeRef.current > 0) {
+        const sessionTime = Math.floor((Date.now() - startTimeRef.current) / 1000);
+        totalTimeRef.current += sessionTime;
+        setTimeSpent(totalTimeRef.current);
+        startTimeRef.current = 0;
+      }
+    }
+  };
+
+  const logActivity = async () => {
+    if (isTracking) {
+      stopTracking();
+    }
+    await logActivityWithTime(totalTimeRef.current);
+  };
+
   return {
     timeSpent,
+    isTracking,
+    startTracking,
+    stopTracking,
     logActivity,
   };
 }

@@ -12,7 +12,7 @@ import type { PDFDocumentProxy } from "pdfjs-dist"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { ZoomIn, ZoomOut, Download, FileText, Loader2, Maximize2, Minimize2, MessageSquare } from "lucide-react"
+import { ZoomIn, ZoomOut, Download, FileText, Loader2, Maximize2, Minimize2, MessageSquare, Play, Square, Clock } from "lucide-react"
 import { AnnotationPopup } from "./annotation-popup"
 import { AnnotationDisplay } from "./annotation-display"
 import { nanoid } from "@/lib/utils"
@@ -86,8 +86,8 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
   const [contextItems, setContextItems] = useState<ContextItem[]>([])
   const [selectedContextItem, setSelectedContextItem] = useState<ContextItem | null>(null)
 
-  // Track reading time
-  const { logActivity } = useReadingTracker(
+  // Track reading time with manual control
+  const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
     fileDetails.id || fileDetails.canvasId || '',
     fileDetails.name,
     courseId || '',
@@ -487,6 +487,47 @@ export default function PDFViewer({ fileDetails, courseId }: { fileDetails: File
 
               {/* Right side controls */}
               <div className="flex items-center gap-2">
+                {/* Zen Mode Study Session Button */}
+                <div className="flex items-center gap-2">
+                  {!isTracking ? (
+                    <div className="relative group">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={startTracking}
+                        className="flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-40"
+                      >
+                        <Play className="h-4 w-4" />
+                        <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+                          Enter Zen Mode
+                        </span>
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="relative group">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        onClick={stopTracking}
+                        className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-36"
+                      >
+                        <Square className="h-4 w-4 flex-shrink-0" />
+                        <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+                          End Zen Mode
+                        </span>
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {/* Time Display */}
+                  {timeSpent > 0 && (
+                    <div className={`flex items-center gap-1 text-sm ${zenMode ? "text-gray-300" : "text-gray-600"}`}>
+                      <Clock className="h-4 w-4" />
+                      <span>{Math.floor(timeSpent / 60)}:{(timeSpent % 60).toString().padStart(2, '0')}</span>
+                    </div>
+                  )}
+                </div>
+
                 {!zenMode && (
                   <Button
                     variant="ghost"

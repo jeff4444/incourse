@@ -7,7 +7,6 @@ import XLSXViewer from "@/components/xlsx-viewer";
 import DOCXViewer from "@/components/docx-viewer";
 import ImageViewer from "@/components/image-viewer";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
 import { FileDetails } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
