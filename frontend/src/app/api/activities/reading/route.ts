@@ -13,7 +13,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      // Handle both regular JSON requests and sendBeacon blob requests
+      const contentType = request.headers.get('content-type');
+      if (contentType?.includes('application/json')) {
+        body = await request.json();
+      } else {
+        // Handle sendBeacon blob requests
+        const text = await request.text();
+        body = JSON.parse(text);
+      }
+    } catch (error) {
+      console.error('Error parsing request body:', error);
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 }
+      );
+    }
+    
     const { course_id, file_id, file_name, time_spent_seconds } = body;
 
     // Validate required fields
@@ -34,6 +52,7 @@ export async function POST(request: NextRequest) {
       fileName: file_name,
       timeSpentSeconds: time_spent_seconds
     });
+
 
     const supabase = await createClient();
 
