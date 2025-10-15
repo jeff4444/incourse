@@ -24,10 +24,10 @@ function getStatusText() {
 
 function getButtonText(assignment: Assignment) {
   if (assignment.locked_for_user) {
-    return "Locked";
+    return "View Assignment";
   }
   if (assignment.has_submitted_submissions) {
-    return "View Submission";
+    return "View Assignment";
   }
   return "View Assignment";
 }
@@ -92,7 +92,7 @@ export function AssignmentTile({ assignment, courseID }: AssignmentTileProps) {
         </div>
       </div>
       <div className="flex items-center gap-2 justify-end">
-        <Link href={assignment.html_url} target="_blank">
+        <Link href={`/courses/${courseID}/assignments/${assignment.id}`}>
           <Button size="sm">
             {getButtonText(assignment)}
           </Button>
