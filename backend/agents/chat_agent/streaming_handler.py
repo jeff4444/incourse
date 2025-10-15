@@ -115,6 +115,7 @@ def parse_event(event: Any) -> StreamEvent:
         # Get tool name from the part attribute
         tool_name = 'unknown'
         tool_args = {}
+        tool_call_id = event.tool_call_id if hasattr(event, 'tool_call_id') else None
         
         if hasattr(event, 'part') and event.part:
             # The part should be a ToolCallPart with the tool name
@@ -131,30 +132,62 @@ def parse_event(event: Any) -> StreamEvent:
         }
         display_name = friendly_names.get(tool_name, tool_name)
         
+        # Add query details for search_file_with_query
+        if tool_name == "search_file_with_query" and tool_args:
+            print(f"Search file with query args: {tool_args}")
+            print(f"Tool args type: {type(tool_args)}")
+            
+            # Parse tool_args if it's a string
+            if isinstance(tool_args, str):
+                try:
+                    parsed_args = json.loads(tool_args)
+                except json.JSONDecodeError:
+                    parsed_args = {}
+            else:
+                parsed_args = tool_args
+            
+            if "query" in parsed_args:
+                query = parsed_args["query"]
+                display_name = f"Searching document for '{query}'"
+        elif tool_name == "search_file_with_chunk_index" and tool_args:
+            # Parse tool_args if it's a string
+            if isinstance(tool_args, str):
+                try:
+                    parsed_args = json.loads(tool_args)
+                except json.JSONDecodeError:
+                    parsed_args = {}
+            else:
+                parsed_args = tool_args
+            
+            if "chunk_index" in parsed_args:
+                chunk_idx = parsed_args["chunk_index"]
+                display_name = f"Getting context around chunk {chunk_idx}"
+        
         return StreamEvent(
             type=EventType.TOOL_CALL,
             content=display_name,
             data={
                 "name": tool_name,
-                "args": tool_args
+                "args": tool_args,
+                "tool_call_id": tool_call_id
             }
         )
     
     # Tool results - indicate completion
     elif isinstance(event, FunctionToolResultEvent):
-        # Get tool name from the part attribute (similar to tool call)
+        # FunctionToolResultEvent has: content, result, tool_call_id
+        # Extract tool name from the result field
         tool_name = 'unknown'
         
-        if hasattr(event, 'part') and event.part:
-            # The part should have the tool name
-            if hasattr(event.part, 'tool_name'):
-                tool_name = event.part.tool_name
+        if hasattr(event, 'result') and event.result and hasattr(event.result, 'tool_name'):
+            tool_name = event.result.tool_name
         
         return StreamEvent(
             type=EventType.TOOL_RESULT,
             content="complete",
             data={
                 "name": tool_name,
+                "tool_call_id": event.tool_call_id if hasattr(event, 'tool_call_id') else None
             }
         )
     
@@ -203,12 +236,16 @@ async def stream_chat_agent(
     
     while retry_count <= max_retries and not should_stop:
         try:
+            print(f"Starting agent iteration (attempt {retry_count + 1}/{max_retries + 1})")
             async with agent.iter(user_prompt, deps=deps) as run:
+                print("Agent iteration started successfully")
                 async for node in run:
                     if should_stop:
+                        print("Should stop flag is True, breaking from node loop")
                         break
                         
                     node_count += 1
+                    print(f"Processing node {node_count}: {type(node).__name__}")
                     
                     # Safety check: prevent infinite loops
                     if node_count > max_nodes:
@@ -267,8 +304,10 @@ async def stream_chat_agent(
                     
                     # End node - send completion
                     elif Agent.is_end_node(node):
+                        print("EndNode reached - processing final result")
                         # Extract actual answer text from ChatAnswer object
                         final_result = run.result.output
+                        
                         if hasattr(final_result, 'answer'):
                             # ChatAnswer object - extract the answer field
                             final_answer = final_result.answer
@@ -309,6 +348,9 @@ async def stream_chat_agent(
             
         except Exception as e:
             error_message = str(e)
+            print(f"Exception in streaming handler: {type(e).__name__}: {error_message}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             
             # Check if it's a throttling error
             if "ThrottlingException" in error_message or "Too many requests" in error_message:

@@ -26,6 +26,7 @@ interface ToolCall {
   name: string;
   displayName: string;
   status: "executing" | "complete";
+  toolCallId?: string;
 }
 
 export function ChatPanel({
@@ -254,25 +255,39 @@ export function ChatPanel({
               fullResponse += textToAdd
               setStreamingMessage(fullResponse)
             } else if (event.type === 'tool_call') {
+              console.log('Tool call received:', event)
               // Add tool call indicator
               setActiveToolCalls(prev => [
                 ...prev,
                 {
                   name: event.name || event.data?.name || 'unknown',
                   displayName: event.content || event.name || 'Processing',
-                  status: 'executing'
+                  status: 'executing',
+                  toolCallId: event.data?.tool_call_id
                 }
               ])
             } else if (event.type === 'tool_result') {
-              // Mark tool as complete
+              console.log('Tool result received:', event)
+              // Mark tool as complete - match by tool_call_id first, then by name
               const toolName = event.name || event.data?.name
-              setActiveToolCalls(prev =>
-                prev.map(tool =>
-                  tool.name === toolName
+              const toolCallId = event.data?.tool_call_id
+              console.log('Marking tool complete - name:', toolName, 'id:', toolCallId)
+              
+              setActiveToolCalls(prev => {
+                console.log('Current tool calls:', prev)
+                const updated = prev.map(tool => {
+                  // Match by tool_call_id if available, otherwise by name
+                  const matches = toolCallId 
+                    ? tool.toolCallId === toolCallId
+                    : tool.name === toolName
+                  
+                  return matches
                     ? { ...tool, status: 'complete' as const }
                     : tool
-                )
-              )
+                })
+                console.log('Updated tool calls:', updated)
+                return updated
+              })
             } else if (event.type === 'done') {
               // Stream complete
               if (event.content && !fullResponse) {
