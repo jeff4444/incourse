@@ -15,12 +15,12 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 from Cryptodome.Cipher import AES
 
-# Import all agents
-from agents.flashcard_gen_agent.agent import get_flashcard_agent, Flashcard, Deps as FlashcardDeps
-from agents.quiz_gen_agent.agent import get_quiz_agent, Quiz, Deps as QuizDeps
-from agents.nudge_agent.agent import get_nudge_agent, Nudge, Deps as NudgeDeps
-from agents.take_action_agent.agent import get_take_action_agent, RouteOutput, Deps as TakeActionDeps
-from agents.chat_agent.agent import get_chat_agent, ChatAnswer, Deps as ChatDeps
+# Import agent types (but not the actual agents - lazy loading)
+from agents.flashcard_gen_agent.agent import Flashcard, Deps as FlashcardDeps
+from agents.quiz_gen_agent.agent import Quiz, Deps as QuizDeps
+from agents.nudge_agent.agent import Nudge, Deps as NudgeDeps
+from agents.take_action_agent.agent import RouteOutput, Deps as TakeActionDeps
+from agents.chat_agent.agent import ChatAnswer, Deps as ChatDeps
 from agents.chat_agent.streaming_handler import stream_chat_agent
 
 # Import managers and tools
@@ -42,6 +42,27 @@ from api.supabase import (
 
 
 load_dotenv()
+
+# Lazy loading functions to avoid importing heavy dependencies at startup
+def get_flashcard_agent_lazy(**kwargs):
+    from agents.flashcard_gen_agent.agent import get_flashcard_agent
+    return get_flashcard_agent(**kwargs)
+
+def get_quiz_agent_lazy(**kwargs):
+    from agents.quiz_gen_agent.agent import get_quiz_agent
+    return get_quiz_agent(**kwargs)
+
+def get_nudge_agent_lazy(**kwargs):
+    from agents.nudge_agent.agent import get_nudge_agent
+    return get_nudge_agent(**kwargs)
+
+def get_take_action_agent_lazy(**kwargs):
+    from agents.take_action_agent.agent import get_take_action_agent
+    return get_take_action_agent(**kwargs)
+
+def get_chat_agent_lazy(**kwargs):
+    from agents.chat_agent.agent import get_chat_agent
+    return get_chat_agent(**kwargs)
 
 app = FastAPI(
     title="InCourse AI Agents API",
@@ -155,7 +176,7 @@ async def generate_flashcards(request: FlashcardRequest):
         )
         
         # Get the flashcard agent with file_ids injected
-        agent = get_flashcard_agent(num_flashcards=request.num_flashcards, file_ids=request.file_ids)
+        agent = get_flashcard_agent_lazy(num_flashcards=request.num_flashcards, file_ids=request.file_ids)
         
         # Build prompt with extra context if provided
         prompt = f"Generate {request.num_flashcards} flashcards"
@@ -233,7 +254,7 @@ async def generate_quiz(request: QuizRequest):
         )
         
         # Get the quiz agent with file_ids injected
-        agent = get_quiz_agent(num_quizzes=request.num_questions, difficulty=request.difficulty, file_ids=request.file_ids)
+        agent = get_quiz_agent_lazy(num_quizzes=request.num_questions, difficulty=request.difficulty, file_ids=request.file_ids)
         
         # Build prompt with difficulty and extra context
         prompt = f"Generate {request.num_questions} {request.difficulty} difficulty quiz questions"
@@ -307,7 +328,7 @@ async def generate_nudges(request: NudgeRequest):
         )
         
         # Get the nudge agent
-        agent = get_nudge_agent()
+        agent = get_nudge_agent_lazy()
         
         # Generate nudges
         nudges = await agent.run(request.prompt or "Generate a nudge", deps=deps)
@@ -341,7 +362,7 @@ async def take_action(request: TakeActionRequest):
         )
         
         # Get the take action agent
-        agent = get_take_action_agent()
+        agent = get_take_action_agent_lazy()
         
         # Process the action    
         result = await agent.run(request.user_input, deps=deps)
@@ -391,7 +412,7 @@ async def chat(request: ChatRequest):
 
         # Let the agent handle the query - it will fetch context as needed
         user_prompt = request.prompt or request.message
-        agent = get_chat_agent()
+        agent = get_chat_agent_lazy()
         result = await agent.run(user_prompt, deps=deps)
         
         # Always do session management - we need to save all messages
@@ -625,7 +646,7 @@ async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
             user_prompt = request.prompt or request.message
             
             # Get agent and stream response
-            agent = get_chat_agent()
+            agent = get_chat_agent_lazy()
             
             # Buffer to collect full response for session management
             full_response = ""

@@ -1,19 +1,12 @@
 """
 Shared model configuration for all agents.
 
-This module provides a centralized function to get the Bedrock model instance
+This module provides a centralized function to get the model instance
 used across all agents, making it easy to change models or configuration.
+Uses lazy loading to avoid importing all providers at startup.
 """
 
 import os
-from pydantic_ai.models.bedrock import BedrockConverseModel
-from pydantic_ai.providers.bedrock import BedrockProvider
-from pydantic_ai.models.google import GoogleModel
-from pydantic_ai.providers.google import GoogleProvider
-from pydantic_ai.models.openai import OpenAIChatModel
-from pydantic_ai.providers.openai import OpenAIProvider
-from pydantic_ai.models.anthropic import AnthropicModel
-from pydantic_ai.providers.anthropic import AnthropicProvider
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -34,6 +27,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 def get_model(model_type: str = "bedrock"):
+    # Only import and initialize the specific model provider needed
     if model_type == "bedrock":
         return get_bedrock_model()
     elif model_type == "anthropic":
@@ -45,7 +39,7 @@ def get_model(model_type: str = "bedrock"):
     else:
         raise ValueError(f"Model type {model_type} not supported")
 
-def get_bedrock_model() -> BedrockConverseModel:
+def get_bedrock_model():
     """
     Get the configured Bedrock model instance.
     
@@ -55,6 +49,9 @@ def get_bedrock_model() -> BedrockConverseModel:
     Raises:
         ValueError: If required environment variables are not set.
     """
+    from pydantic_ai.models.bedrock import BedrockConverseModel
+    from pydantic_ai.providers.bedrock import BedrockProvider
+    
     if not all([BEDROCK_ACCESS_KEY, BEDROCK_SECRET_KEY, BEDROCK_DEFAULT_LOCATION, BEDROCK_MODEL_ARN]):
         missing = []
         if not BEDROCK_ACCESS_KEY:
@@ -76,28 +73,37 @@ def get_bedrock_model() -> BedrockConverseModel:
         ),
     )
 
-def get_anthropic_model() -> AnthropicModel:
+def get_anthropic_model():
     """
     Get the configured Anthropic model instance.
     """
+    from pydantic_ai.models.anthropic import AnthropicModel
+    from pydantic_ai.providers.anthropic import AnthropicProvider
+    
     if not ANTHROPIC_API_KEY:
         raise ValueError("Anthropic API key is not set")
     provider = AnthropicProvider(api_key=ANTHROPIC_API_KEY)
     return AnthropicModel('claude-4-5-sonnet-latest', provider=provider)
 
-def get_openai_model() -> OpenAIChatModel:
+def get_openai_model():
     """
     Get the configured OpenAI model instance.
     """
+    from pydantic_ai.models.openai import OpenAIChatModel
+    from pydantic_ai.providers.openai import OpenAIProvider
+    
     if not OPENAI_API_KEY:
         raise ValueError("OpenAI API key is not set")
     provider = OpenAIProvider(api_key=OPENAI_API_KEY)
     return OpenAIChatModel('gpt-4o', provider=provider)
 
-def get_gemini_model() -> GoogleModel:
+def get_gemini_model():
     """
     Get the configured Gemini model instance.
     """
+    from pydantic_ai.models.google import GoogleModel
+    from pydantic_ai.providers.google import GoogleProvider
+    
     if not GEMINI_API_KEY:
         raise ValueError("Gemini API key is not set")
     provider = GoogleProvider(api_key=GEMINI_API_KEY)

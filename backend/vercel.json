@@ -1,0 +1,23 @@
+{
+  "functions": {
+    "run.py": {
+      "excludeFiles": [
+        "**/*.md",
+        "**/tests/**",
+        "**/test_*.py",
+        "**/__pycache__/**",
+        "**/.git/**",
+        "**/node_modules/**",
+        "**/.next/**",
+        "**/cache/**",
+        "**/temp/**",
+        "**/tmp/**",
+        "**/*.log",
+        "**/README.md",
+        "**/docs/**",
+        "**/examples/**",
+        "**/scripts/**"
+      ]
+    }
+  }
+}
