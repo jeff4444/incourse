@@ -92,7 +92,7 @@ def get_openai_model() -> OpenAIChatModel:
     if not OPENAI_API_KEY:
         raise ValueError("OpenAI API key is not set")
     provider = OpenAIProvider(api_key=OPENAI_API_KEY)
-    return OpenAIChatModel('gpt-5-mini', provider=provider)
+    return OpenAIChatModel('gpt-4o', provider=provider)
 
 def get_gemini_model() -> GoogleModel:
     """

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,16 @@ function ProfilePage() {
     status: 'pending' | 'loading' | 'complete' | 'error';
     detail?: string;
   }[]>([]);
+  
+  // Course sync tracking
+  const [courseProgress, setCourseProgress] = useState<{
+    current: number;
+    total: number;
+    courseName?: string;
+  }>({ current: 0, total: 0 });
+  
+  // Ref for auto-scrolling sync progress
+  const syncProgressRef = useRef<HTMLDivElement>(null);
 
   // Profile data
   const [fullName, setFullName] = useState("");
@@ -68,6 +78,19 @@ function ProfilePage() {
       fetchLMSTokenStatus();
     }
   }, [user]);
+
+  // Auto-scroll sync progress to bottom when new items are added
+  useEffect(() => {
+    if (syncProgressRef.current && syncProgress.length > 0) {
+      // Small delay to ensure the new item is rendered
+      setTimeout(() => {
+        syncProgressRef.current?.scrollTo({
+          top: syncProgressRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }, 100);
+    }
+  }, [syncProgress]);
 
   const fetchLMSTokenStatus = async () => {
     try {
@@ -164,6 +187,7 @@ function ProfilePage() {
   const handleResyncEnrollments = async () => {
     setIsSyncing(true);
     setSyncProgress([]);
+    setCourseProgress({ current: 0, total: 0 });
     setMessage(null);
 
     try {
@@ -172,9 +196,8 @@ function ProfilePage() {
         throw new Error("No active session");
       }
 
-      updateSyncProgress('Fetching existing enrollments', 'loading');
-      
-      const response = await fetch('/api/user/enrollments/resync', {
+      // Use streaming API endpoint
+      const response = await fetch('/api/user/enrollments/resync/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,49 +206,81 @@ function ProfilePage() {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to resync enrollments');
+        const error = await response.text();
+        throw new Error(error || 'Failed to resync enrollments');
       }
 
-      const result = await response.json();
-      const { results } = result;
-
-      if (results.enrollmentsDeleted > 0) {
-        updateSyncProgress('Removing dropped courses', 'complete', `${results.enrollmentsDeleted} courses removed`);
-      }
+      // Handle streaming response
+      const reader = response.body?.getReader();
+      const decoder = new TextDecoder();
       
-      updateSyncProgress('Syncing courses', 'complete', `${results.coursesCreated} courses synced`);
-      
-      // Module statistics
-      const moduleParts = [];
-      if (results.modulesCreated > 0) moduleParts.push(`${results.modulesCreated} new`);
-      if (results.modulesUpdated > 0) moduleParts.push(`${results.modulesUpdated} updated`);
-      if (results.modulesDeleted > 0) moduleParts.push(`${results.modulesDeleted} removed`);
-      
-      if (moduleParts.length > 0) {
-        updateSyncProgress('Syncing modules', 'complete', moduleParts.join(', '));
-      }
-      
-      // Module items statistics
-      const itemParts = [];
-      if (results.moduleItemsCreated > 0) itemParts.push(`${results.moduleItemsCreated} new`);
-      if (results.moduleItemsDeleted > 0) itemParts.push(`${results.moduleItemsDeleted} removed`);
-      
-      if (itemParts.length > 0) {
-        updateSyncProgress('Syncing module items', 'complete', itemParts.join(', '));
+      if (!reader) {
+        throw new Error('No response body');
       }
 
-      updateSyncProgress('Completing sync', 'complete');
-      
-      const summaryParts = [];
-      if (results.enrollmentsCreated > 0) summaryParts.push(`${results.enrollmentsCreated} new`);
-      if (results.enrollmentsKept > 0) summaryParts.push(`${results.enrollmentsKept} kept`);
-      if (results.enrollmentsDeleted > 0) summaryParts.push(`${results.enrollmentsDeleted} removed`);
-      
-      setMessage({
-        type: "success",
-        text: `Successfully resynced! Enrollments: ${summaryParts.join(', ')}`
-      });
+      let buffer = '';
+      let finalResults: any = null;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.trim() || !line.startsWith('data: ')) continue;
+          
+          try {
+            const jsonStr = line.replace('data: ', '');
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'progress') {
+              updateSyncProgress(event.stage, event.status, event.detail);
+              
+              // Extract course progress from stage text
+              const courseMatch = event.stage.match(/Syncing course (\d+)\/(\d+): (.+)/);
+              if (courseMatch) {
+                setCourseProgress({
+                  current: parseInt(courseMatch[1]),
+                  total: parseInt(courseMatch[2]),
+                  courseName: courseMatch[3]
+                });
+              }
+              
+              // Extract total courses from "Fetching courses from Canvas" stage
+              const fetchMatch = event.stage.match(/Fetching courses from Canvas/);
+              if (fetchMatch && event.detail) {
+                const totalMatch = event.detail.match(/(\d+) courses found/);
+                if (totalMatch) {
+                  setCourseProgress(prev => ({
+                    ...prev,
+                    total: parseInt(totalMatch[1])
+                  }));
+                }
+              }
+            } else if (event.type === 'done') {
+              finalResults = event.data;
+              console.log('Resync completed successfully:', finalResults);
+              
+              const summaryParts = [];
+              if (finalResults.enrollmentsCreated > 0) summaryParts.push(`${finalResults.enrollmentsCreated} new`);
+              if (finalResults.enrollmentsKept > 0) summaryParts.push(`${finalResults.enrollmentsKept} kept`);
+              if (finalResults.enrollmentsDeleted > 0) summaryParts.push(`${finalResults.enrollmentsDeleted} removed`);
+              
+              setMessage({
+                type: "success",
+                text: `Successfully resynced! Enrollments: ${summaryParts.join(', ')}`
+              });
+            } else if (event.type === 'error') {
+              throw new Error(event.detail || 'Resync failed');
+            }
+          } catch (parseError) {
+            console.error('Error parsing SSE event:', line, parseError);
+          }
+        }
+      }
 
       // Wait a moment to show completion state
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -515,16 +570,49 @@ function ProfilePage() {
                           <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
                           Syncing Progress
                         </CardTitle>
+                        
+                        {/* Course Progress Counter */}
+                        {courseProgress.total > 0 && (
+                          <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium text-gray-700">Course Progress</span>
+                              <span className="text-sm text-gray-600">
+                                {courseProgress.current} of {courseProgress.total}
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <motion.div
+                                className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
+                                initial={{ width: 0 }}
+                                animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
+                                transition={{ duration: 0.5 }}
+                              />
+                            </div>
+                            {courseProgress.courseName && (
+                              <p className="text-xs text-gray-600 mt-2 truncate">
+                                Currently syncing: {courseProgress.courseName}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </CardHeader>
                       <CardContent>
-                        <div className="space-y-3">
+                        <div ref={syncProgressRef} className="space-y-3 max-h-80 overflow-y-auto">
                           {syncProgress.map((progress, index) => (
                             <motion.div
-                              key={progress.stage}
+                              key={`${progress.stage}-${index}`}
                               initial={{ opacity: 0, x: -20 }}
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: index * 0.1 }}
-                              className="flex items-start gap-3 p-3 rounded-lg bg-gray-50"
+                              className={`flex items-start gap-3 p-3 rounded-lg transition-all duration-200 ${
+                                progress.status === 'loading' 
+                                  ? 'bg-orange-50 border border-orange-200' 
+                                  : progress.status === 'complete'
+                                  ? 'bg-green-50 border border-green-200'
+                                  : progress.status === 'error'
+                                  ? 'bg-red-50 border border-red-200'
+                                  : 'bg-gray-50 border border-gray-200'
+                              }`}
                             >
                               <div className="mt-0.5">
                                 {progress.status === 'loading' && (
@@ -534,7 +622,9 @@ function ProfilePage() {
                                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                                 )}
                                 {progress.status === 'error' && (
-                                  <AlertCircle className="h-5 w-5 text-red-500" />
+                                  <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
+                                    !
+                                  </div>
                                 )}
                                 {progress.status === 'pending' && (
                                   <div className="h-5 w-5 rounded-full bg-gray-300" />
@@ -553,10 +643,39 @@ function ProfilePage() {
                                     {progress.detail}
                                   </p>
                                 )}
+                                {progress.status === 'loading' && (
+                                  <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
+                                    <motion.div
+                                      className="bg-orange-500 h-1 rounded-full"
+                                      initial={{ width: 0 }}
+                                      animate={{ width: "100%" }}
+                                      transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                                    />
+                                  </div>
+                                )}
                               </div>
                             </motion.div>
                           ))}
                         </div>
+                        
+                        {/* Completion Message */}
+                        {syncProgress.length > 0 && syncProgress[syncProgress.length - 1].status === 'complete' && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="mt-6"
+                          >
+                            <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                              <div className="flex items-center gap-2 mb-2">
+                                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                <p className="font-medium text-green-800">Resync Complete!</p>
+                              </div>
+                              <p className="text-sm text-green-700">
+                                Your courses and materials have been successfully synced.
+                              </p>
+                            </div>
+                          </motion.div>
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
