@@ -1,7 +1,0 @@
-{
-  "functions": {
-    "run.py": {
-      "runtime": "python3.12"
-    }
-  }
-}
