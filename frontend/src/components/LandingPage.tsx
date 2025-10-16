@@ -95,7 +95,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-6">
+          <div className="hidden md:flex items-center justify-center gap-6 flex-1">
             <button
               className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Pricing")}
@@ -114,6 +114,9 @@ export default function LandingPage() {
             >
               Features
             </button>
+          </div>
+
+          <div className="hidden md:flex">
             <CTAButton variant="teal" onClick={handleJoinWaitlist}>
               Join the waitlist :)
             </CTAButton>
