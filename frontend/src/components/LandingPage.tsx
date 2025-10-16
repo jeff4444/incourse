@@ -89,7 +89,12 @@ export default function LandingPage() {
       {/* Navigation */}
       <nav className="fixed top-4 left-[15%] right-[15%] z-50 backdrop-blur-[15px] bg-white/40 rounded-2xl border border-white/20 shadow-lg">
         <div className="px-6 sm:px-8 lg:px-10 py-5 flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center">
+            <img
+              src="/logos/incourse_logov2_transparent.png"
+              alt="InCourse Logo"
+              className="w-8 h-8 sm:w-9 sm:h-9"
+            />
             <div className="text-2xl sm:text-3xl font-medium text-black tracking-[-1.5px] font-playfair">
               InCourse
             </div>
