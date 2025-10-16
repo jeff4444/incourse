@@ -2,11 +2,13 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, FileCheck, FileText, X, Loader2, CheckCircle } from "lucide-react"
+import { Upload, FileCheck, FileText, X, Loader2, CheckCircle, RefreshCw } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
+import { authenticatedFetchJson } from "@/lib/utils/apiClient"
+import { FeedbackTile } from "@/components/feedback-tile"
 
 interface AutograderPanelProps {
   courseId: string
@@ -21,6 +23,16 @@ interface UploadedFile {
   size: string
 }
 
+interface FeedbackItem {
+  id: string
+  assignment_id: string
+  feedback_preview: string
+  full_feedback: string
+  solution_file_names: string[]
+  created_at: string
+  created_at_formatted: string
+}
+
 export function AutograderPanel({
   courseId,
   fileId,
@@ -31,7 +43,63 @@ export function AutograderPanel({
   const [isUploading, setIsUploading] = useState(false)
   const [isGrading, setIsGrading] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [existingFeedback, setExistingFeedback] = useState<string | null>(null)
+  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false)
+  const [feedbackList, setFeedbackList] = useState<FeedbackItem[]>([])
+  const [isLoadingFeedbackList, setIsLoadingFeedbackList] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Load feedback list when component mounts
+  useEffect(() => {
+    const loadFeedbackList = async () => {
+      if (!courseId) return
+      
+      setIsLoadingFeedbackList(true)
+      try {
+        const result = await authenticatedFetchJson<{
+          success: boolean;
+          feedback: FeedbackItem[];
+          message: string;
+        }>(`/api/autograder/feedback/all?course_id=${courseId}&assignment_id=${fileId}`)
+        
+        if (result.success) {
+          setFeedbackList(result.feedback)
+          // If there's existing feedback, show the feedback tab by default
+          if (result.feedback.length > 0) {
+            setActiveTab("feedback")
+          }
+        }
+      } catch (error) {
+        console.error('Error loading feedback list:', error)
+        // Don't show error to user - just silently fail
+      } finally {
+        setIsLoadingFeedbackList(false)
+      }
+    }
+
+    loadFeedbackList()
+  }, [courseId, fileId])
+
+  const refreshFeedbackList = async () => {
+    if (!courseId) return
+    
+    setIsLoadingFeedbackList(true)
+    try {
+      const result = await authenticatedFetchJson<{
+        success: boolean;
+        feedback: FeedbackItem[];
+        message: string;
+      }>(`/api/autograder/feedback/all?course_id=${courseId}&assignment_id=${fileId}`)
+      
+      if (result.success) {
+        setFeedbackList(result.feedback)
+      }
+    } catch (error) {
+      console.error('Error refreshing feedback list:', error)
+    } finally {
+      setIsLoadingFeedbackList(false)
+    }
+  }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files
@@ -73,13 +141,42 @@ export function AutograderPanel({
     setIsGrading(true)
     setFeedback(null)
     
-    // TODO: Implement AI grading backend call
-    // For now, show a placeholder response
-    setTimeout(() => {
-      setFeedback("AI feedback will be implemented in the backend. This is a placeholder response showing what the feedback area will look like.")
-      setIsGrading(false)
+    try {
+      // Create FormData for file upload
+      const formData = new FormData()
+      formData.append('course_id', courseId)
+      formData.append('assignment_id', fileId)
+      
+      // Add all uploaded files
+      uploadedFiles.forEach((uploadedFile) => {
+        formData.append('files', uploadedFile.file)
+      })
+      
+      // Send to Next.js API route (which handles authentication and calls Python backend)
+      const result = await authenticatedFetchJson<{
+        success: boolean;
+        feedback: string;
+        message: string;
+      }>('/api/autograder', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      if (result.success) {
+        setFeedback(result.feedback)
+        setActiveTab("feedback")
+        // Refresh the feedback list to show the new feedback
+        await refreshFeedbackList()
+      } else {
+        throw new Error(result.message || 'Failed to get feedback')
+      }
+    } catch (error) {
+      console.error('Error getting feedback:', error)
+      setFeedback(`Error: ${error instanceof Error ? error.message : 'Failed to get feedback'}`)
       setActiveTab("feedback")
-    }, 2000)
+    } finally {
+      setIsGrading(false)
+    }
   }
 
   const formatFileSize = (bytes: number): string => {
@@ -209,26 +306,38 @@ export function AutograderPanel({
 
         <TabsContent value="feedback" className="flex-1 flex flex-col p-4 m-0 overflow-hidden">
           <div className="flex-1 flex flex-col">
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold mb-2">AI Feedback</h3>
-              <p className="text-sm text-gray-600">
-                Review AI feedback on your submission to improve before submitting to Canvas.
-              </p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold mb-2">AI Feedback</h3>
+                <p className="text-sm text-gray-600">
+                  Review AI feedback on your submissions to improve before submitting to Canvas.
+                </p>
+              </div>
+              <Button
+                onClick={refreshFeedbackList}
+                disabled={isLoadingFeedbackList}
+                variant="outline"
+                size="sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoadingFeedbackList ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
 
-            {/* Feedback Display */}
-            <div className="flex-1 bg-gray-50 rounded-lg p-4 overflow-y-auto">
-              {feedback ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 text-green-600">
-                    <CheckCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">Feedback Ready</span>
+            {/* Feedback List */}
+            <div className="flex-1 min-h-0 my-5">
+              {isLoadingFeedbackList ? (
+                <div className="flex items-center justify-center h-full text-gray-500">
+                  <div className="text-center">
+                    <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+                    <p className="text-sm">Loading feedback...</p>
                   </div>
-                  <div className="prose prose-sm max-w-none">
-                    <div className="whitespace-pre-wrap text-sm text-gray-800 bg-white p-4 rounded-lg border">
-                      {feedback}
-                    </div>
-                  </div>
+                </div>
+              ) : feedbackList.length > 0 ? (
+                <div className="space-y-4 max-h-150 overflow-y-auto">
+                  {feedbackList.map((feedbackItem) => (
+                    <FeedbackTile key={feedbackItem.id} feedback={feedbackItem} />
+                  ))}
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-full text-gray-500">

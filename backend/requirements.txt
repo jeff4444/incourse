@@ -11,3 +11,4 @@ python-pptx
 pinecone
 supabase
 pycryptodomex
+openai

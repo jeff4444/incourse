@@ -572,6 +572,67 @@ async def get_file_details_with_content(
 
         return file_details_data
 
+
+async def get_file_details_with_temp_file(
+    api_key: str,
+    api_base_url: str,
+    course_id: str,
+    file_id: str
+) -> tuple[Dict, str]:
+    """
+    Get file details and download the actual file to a temporary location.
+    Returns both the file details and the path to the temporary file.
+    
+    Returns:
+        tuple: (file_details_dict, temp_file_path)
+    """
+    print(f"calling get_file_details_with_temp_file with file_id={file_id}, course_id={course_id}")
+
+    async with aiohttp.ClientSession() as session:
+        # First, get file metadata
+        async with session.get(
+            f"{api_base_url}/courses/{course_id}/files/{file_id}",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            }
+        ) as response:
+            if not response.ok:
+                raise Exception("Failed to fetch file details")
+            
+            file_details_data = await response.json()
+        
+        # Try to fetch the actual file content
+        file_url = file_details_data.get('url')
+        content_type = file_details_data.get('content-type', '')
+        filename = file_details_data.get('filename', '')
+        
+        if file_url and content_type:
+            try:
+                async with session.get(file_url) as file_response:
+                    if file_response.ok:
+                        file_content = await file_response.read()
+                        # Only download if file is not too large (limit to 10MB)
+                        if len(file_content) < 10 * 1024 * 1024:
+                            # Create a temporary local file and keep it
+                            file_extension = filename.split('.')[-1] if '.' in filename else 'tmp'
+                            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                                temp_file.write(file_content)
+                                temp_file_path = temp_file.name
+                            
+                            # Add temp file path to the details
+                            file_details_data['temp_file_path'] = temp_file_path
+                            return file_details_data, temp_file_path
+                        else:
+                            raise Exception(f"File too large to download ({len(file_content)} bytes)")
+                    else:
+                        raise Exception(f"Could not download file content: HTTP {file_response.status}")
+            except Exception as e:
+                raise Exception(f"Error fetching file content: {str(e)}")
+        else:
+            raise Exception("No file URL or content type available")
+
+
 async def get_canvas_files_details(
     api_key: str,
     api_base_url: str,
@@ -588,9 +649,10 @@ async def get_canvas_files_details(
     
     for file_id in file_ids:
         if include_content:
-            file_details = await get_canvas_file_details_with_content(api_key, api_base_url, course_id, file_id, include_content)
+            file_details = await get_file_details_with_content(api_key, api_base_url, course_id, file_id)
         else:
-            file_details = await get_canvas_file_details(api_key, api_base_url, course_id, file_id)
+            file_details = await get_file_details_with_temp_file(api_key, api_base_url, course_id, file_id)
+            file_details = file_details[0]  # Extract just the details, not the temp path
         file_details_list.append(file_details)
     
     return file_details_list
