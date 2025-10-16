@@ -12,7 +12,8 @@ import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useReadingTracker } from "@/lib/hooks/useActivities";
-import { Play, Square, Clock } from "lucide-react";
+import { Play, Square, Clock, FileCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 function getViewer(fileDetails: FileDetails, courseID?: string) {
   // PDF files
@@ -87,6 +88,15 @@ function FileViewPage({
   const [fileDetails, setFileDetails] = useState<FileDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
+
+  // Check if filename contains "homework" or "assignment" (case insensitive)
+  const shouldShowAutogradeButton = fileDetails?.name && 
+    (fileDetails.name.toLowerCase().includes('homework') || 
+     fileDetails.name.toLowerCase().includes('assignment') ||
+     fileDetails.name.toLowerCase().includes('quiz') ||
+     fileDetails.name.toLowerCase().includes('test') ||
+     fileDetails.name.toLowerCase().includes('exam'));
 
   // Reading tracker - only enable when we have file details
   const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
@@ -179,7 +189,7 @@ function FileViewPage({
                 variant="outline"
                 size="sm"
                 onClick={startTracking}
-                className="flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-40"
+                className="flex items-center gap-2 bg-blue-200 hover:bg-blue-300 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-40"
               >
                 <Play className="h-4 w-4" />
                 <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
@@ -198,6 +208,23 @@ function FileViewPage({
                 <Square className="h-4 w-4 flex-shrink-0" />
                 <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
                   End Zen Mode
+                </span>
+              </Button>
+            </div>
+          )}
+          
+          {/* Autograde Button - only show for homework/assignment files */}
+          {shouldShowAutogradeButton && (
+            <div className="relative group">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/courses/${courseID}/autograder/${fileID}`)}
+                className="flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-32 bg-green-100 hover:bg-green-200 border-green-200"
+              >
+                <FileCheck className="h-4 w-4" />
+                <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+                  Autograde
                 </span>
               </Button>
             </div>
