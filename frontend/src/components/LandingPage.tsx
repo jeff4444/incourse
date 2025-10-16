@@ -87,7 +87,7 @@ export default function LandingPage() {
     <div className="bg-[#f8f9fa] min-h-screen">
       {/* Navigation */}
       <nav className="fixed top-4 left-[15%] right-[15%] z-50 backdrop-blur-[15px] bg-white/40 rounded-2xl border border-white/20 shadow-lg">
-        <div className="px-6 sm:px-8 lg:px-10 py-5 flex items-center justify-between">
+        <div className="px-6 sm:px-8 lg:px-10 py-2 flex items-center justify-between">
           <div className="flex items-center">
             <img
               src="/logos/incourse_logov2_transparent.png"
@@ -136,7 +136,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-64 pb-20 px-4 sm:px-6 lg:px-10">
+      <section className="pt-40 pb-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto">
           <div className="text-center max-w-6xl mx-auto">
             <h1 className="text-4xl sm:text-6xl md:text-6xl lg:text-7xl leading-[0.9] font-playfair text-black tracking-[-2.5px] mb-10">
@@ -249,22 +249,47 @@ export default function LandingPage() {
         <div className="max-w-[1500px] mx-auto">
           <div className="flex flex-col lg:flex-row justify-between items-start gap-8 lg:gap-10">
             <div className="flex flex-col gap-3">
-              <div className="text-2xl lg:text-3xl font-medium text-black font-playfair">
-                InCourse
+              <div className="flex items-center">
+                <img
+                  src="/logos/incourse_logov2_transparent.png"
+                  alt="InCourse Logo"
+                  className="w-8 h-8 lg:w-9 lg:h-9 -ml-2"
+                />
+                <div className="text-2xl lg:text-3xl font-medium text-black font-playfair">
+                  InCourse
+                </div>
               </div>
               <div className="flex gap-6 lg:gap-8">
                 <button
-                  className="w-5 h-5 lg:w-6 lg:h-6 bg-gray-300 rounded"
-                  aria-label="Social media link 1"
-                ></button>
+                  className="w-5 h-5 lg:w-6 lg:h-6 hover:opacity-70 transition-opacity"
+                  aria-label="Instagram"
+                >
+                  <img
+                    src="/logos/instagram.svg"
+                    alt="Instagram"
+                    className="w-full h-full"
+                  />
+                </button>
                 <button
-                  className="w-5 h-5 lg:w-6 lg:h-6 bg-gray-300 rounded"
-                  aria-label="Social media link 2"
-                ></button>
+                  className="w-5 h-5 lg:w-6 lg:h-6 hover:opacity-70 transition-opacity"
+                  aria-label="LinkedIn"
+                >
+                  <img
+                    src="/logos/linkedin.svg"
+                    alt="LinkedIn"
+                    className="w-full h-full"
+                  />
+                </button>
                 <button
-                  className="w-5 h-5 lg:w-6 lg:h-6 bg-gray-300 rounded"
-                  aria-label="Social media link 3"
-                ></button>
+                  className="w-5 h-5 lg:w-6 lg:h-6 hover:opacity-70 transition-opacity"
+                  aria-label="Twitter"
+                >
+                  <img
+                    src="/logos/twitter.svg"
+                    alt="Twitter"
+                    className="w-full h-full"
+                  />
+                </button>
               </div>
             </div>
 
