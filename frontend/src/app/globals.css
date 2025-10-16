@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import url("https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;1,400&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@100..900&display=swap");
 
 @custom-variant dark (&:is(.dark *));
 
@@ -161,6 +162,19 @@ body {
   margin: 0;
   background-color: #525659;
   font-family: Segoe UI, Tahoma, sans-serif;
+}
+
+/* Custom font classes for the landing page */
+.font-crimson {
+  font-family: "Crimson Text", serif;
+}
+
+.font-dm-sans {
+  font-family: "DM Sans", sans-serif;
+}
+
+.font-inter {
+  font-family: "Inter", sans-serif;
 }
 
 .Example input,
