@@ -137,7 +137,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero Section */}
-      <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-10">
+      <section className="pt-64 pb-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto">
           <div className="text-center max-w-6xl mx-auto">
             <h1 className="text-4xl sm:text-6xl md:text-6xl lg:text-7xl leading-[0.9] font-playfair text-black tracking-[-6.8px] mb-10">
