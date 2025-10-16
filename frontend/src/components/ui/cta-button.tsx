@@ -18,7 +18,7 @@ export function CTAButton({
   showArrow = false,
 }: CTAButtonProps) {
   const baseClasses =
-    "px-6 py-3 rounded-full text-sm font-bold transition-colors";
+    "px-6 py-3 rounded-full text-sm font-bold transition-colors font-playfair";
 
   const variantClasses = {
     primary: "bg-[#ffc857] hover:bg-[#ffc857]/90 text-black",

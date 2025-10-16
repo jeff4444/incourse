@@ -1,25 +1,10 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import { CTAButton } from "@/components/ui/cta-button";
 import { FeatureSection } from "@/components/FeatureSection";
 import { PricingTable } from "@/components/PricingTable";
-import { ArrowRight } from "lucide-react";
-
-// Image assets (placeholder URLs - these would be replaced with actual assets)
-const imgArrowLeft = "/api/placeholder/40/40";
-const imgArrowRight = "/api/placeholder/40/40";
-const imgCheck = "/api/placeholder/12/12";
-const imgClose = "/api/placeholder/12/12";
-const imgArrow = "/api/placeholder/6/6";
-const imgSocialLink1 = "/api/placeholder/24/24";
-const imgSocialLink2 = "/api/placeholder/24/24";
-const imgSocialLink3 = "/api/placeholder/24/24";
 
 export default function LandingPage() {
-  const [currentFeature, setCurrentFeature] = useState(0);
-
   // Placeholder functions for button clicks
   const handleJoinWaitlist = () => {
     alert("Join waitlist functionality will be implemented soon!");
@@ -105,26 +90,26 @@ export default function LandingPage() {
       <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-[15px] bg-white/40">
         <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-10 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className="text-2xl sm:text-3xl font-medium text-black tracking-[-1.5px]">
+            <div className="text-2xl sm:text-3xl font-medium text-black tracking-[-1.5px] font-playfair">
               InCourse
             </div>
           </div>
 
           <div className="hidden md:flex items-center gap-6">
             <button
-              className="text-sm font-bold text-black hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Pricing")}
             >
               Pricing
             </button>
             <button
-              className="text-sm font-bold text-black hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Blog")}
             >
               Blog
             </button>
             <button
-              className="text-sm font-bold text-black hover:text-gray-600 transition-colors"
+              className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Features")}
             >
               Features
@@ -147,10 +132,10 @@ export default function LandingPage() {
       <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto">
           <div className="text-center max-w-6xl mx-auto">
-            <h1 className="text-4xl sm:text-6xl md:text-8xl lg:text-[160px] leading-[0.9] font-crimson text-black tracking-[-6.8px] mb-10">
+            <h1 className="text-4xl sm:text-6xl md:text-6xl lg:text-7xl leading-[0.9] font-playfair text-black tracking-[-6.8px] mb-10">
               AI Assistant that lives in your lectures.
             </h1>
-            <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-16 font-dm-sans px-4">
+            <p className="text-[#6f6f6f] md:text-md lg:text-lg sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-16 font-playfair px-4">
               Make learning feel easier with AI that understands you lectures
               and your learning style. <br className="hidden sm:block" />
               <span className="sm:hidden"> </span>No switching between apps.
@@ -159,7 +144,7 @@ export default function LandingPage() {
             {/* Hero Image Placeholder */}
             <div className="bg-teal-600 h-[200px] sm:h-[300px] lg:h-[362px] rounded-[30px] relative overflow-hidden mx-4 sm:mx-0">
               <div className="absolute inset-0 bg-black/10 rounded-[30px] flex items-center justify-center">
-                <div className="text-white text-lg sm:text-2xl font-bold px-4">
+                <div className="text-white text-lg sm:text-2xl font-bold px-4 font-playfair">
                   Hero Image Placeholder
                 </div>
               </div>
@@ -171,22 +156,22 @@ export default function LandingPage() {
       {/* Social Proof Section */}
       <section className="py-12 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto text-center">
-          <p className="text-[#6f6f6f] text-sm sm:text-[15px] mb-8 font-dm-sans">
+          <p className="text-[#6f6f6f] text-sm sm:text-[15px] mb-8 font-playfair">
             Loved by students at:
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 sm:gap-16">
             <div className="h-16 sm:h-20 w-32 sm:w-48 bg-gray-200 rounded flex items-center justify-center">
-              <span className="text-gray-500 text-xs sm:text-sm">
+              <span className="text-gray-500 text-xs sm:text-sm font-playfair">
                 University Logo 1
               </span>
             </div>
             <div className="h-20 sm:h-24 w-32 sm:w-44 bg-gray-200 rounded flex items-center justify-center">
-              <span className="text-gray-500 text-xs sm:text-sm">
+              <span className="text-gray-500 text-xs sm:text-sm font-playfair">
                 University Logo 2
               </span>
             </div>
             <div className="h-16 sm:h-20 w-28 sm:w-36 bg-gray-200 rounded flex items-center justify-center">
-              <span className="text-gray-500 text-xs sm:text-sm">
+              <span className="text-gray-500 text-xs sm:text-sm font-playfair">
                 University Logo 3
               </span>
             </div>
@@ -215,12 +200,13 @@ export default function LandingPage() {
       <section className="py-10 lg:py-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto">
           <div className="text-center mb-8 lg:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-crimson text-black tracking-[-1.8px] mb-6 lg:mb-10">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-playfair text-black tracking-[-1.8px] mb-6 lg:mb-10">
               Spend Less To Learn
             </h2>
-            <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-dm-sans px-4">
-              You don't have to pay for multiple AI tools, Chegg or Quizlet. All
-              the learning tools you will ever need together on one app.
+            <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-playfair px-4">
+              You don&apos;t have to pay for multiple AI tools, Chegg or
+              Quizlet. All the learning tools you will ever need together on one
+              app.
             </p>
             <CTAButton onClick={handleJoinWaitlist}>
               Join the waitlist :)
@@ -235,10 +221,10 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-10 lg:py-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-crimson text-black tracking-[-1.8px] mb-6 lg:mb-10">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-playfair text-black tracking-[-1.8px] mb-6 lg:mb-10">
             Join our closed beta and make your learning easier
           </h2>
-          <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-dm-sans px-4">
+          <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-playfair px-4">
             Student that sign up with an .edu email get 15% off all semester
             plans.
           </p>
@@ -253,7 +239,7 @@ export default function LandingPage() {
         <div className="max-w-[1500px] mx-auto">
           <div className="flex flex-col lg:flex-row justify-between items-start gap-8 lg:gap-10">
             <div className="flex flex-col gap-3">
-              <div className="text-2xl lg:text-3xl font-medium text-black">
+              <div className="text-2xl lg:text-3xl font-medium text-black font-playfair">
                 InCourse
               </div>
               <div className="flex gap-6 lg:gap-8">
@@ -274,45 +260,45 @@ export default function LandingPage() {
 
             <div className="flex flex-col sm:flex-row gap-6 lg:gap-10 w-full lg:w-auto">
               <div className="flex-1">
-                <h4 className="text-sm lg:text-base font-semibold text-black mb-3 lg:mb-4 font-inter">
+                <h4 className="text-sm lg:text-base font-semibold text-black mb-3 lg:mb-4 font-playfair">
                   Features
                 </h4>
                 <div className="space-y-2">
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     In the works
                   </p>
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     Leave a suggestion
                   </p>
                 </div>
               </div>
 
               <div className="flex-1">
-                <h4 className="text-sm lg:text-base font-semibold text-black mb-3 lg:mb-4 font-inter">
+                <h4 className="text-sm lg:text-base font-semibold text-black mb-3 lg:mb-4 font-playfair">
                   Learn more
                 </h4>
                 <div className="space-y-2">
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     Our Mission
                   </p>
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     Careers
                   </p>
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     Privacy Policy
                   </p>
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     Terms of Service
                   </p>
                 </div>
               </div>
 
               <div className="flex-1">
-                <h4 className="text-sm lg:text-base font-semibold text-black mb-3 lg:mb-4 font-inter">
+                <h4 className="text-sm lg:text-base font-semibold text-black mb-3 lg:mb-4 font-playfair">
                   Support
                 </h4>
                 <div className="space-y-2">
-                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-inter">
+                  <p className="text-[rgba(0,0,0,0.55)] text-sm lg:text-base font-playfair">
                     Contact Us
                   </p>
                 </div>

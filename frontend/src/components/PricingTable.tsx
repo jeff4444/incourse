@@ -32,7 +32,7 @@ export function PricingTable({ plans }: PricingTableProps) {
               <h3
                 className={`text-2xl font-medium ${
                   plan.featured ? "text-black" : "text-[#6f6f6f]"
-                } font-inter`}
+                } font-playfair`}
               >
                 {plan.name}
               </h3>
@@ -49,7 +49,7 @@ export function PricingTable({ plans }: PricingTableProps) {
                   ) : (
                     <X className="w-3 h-3 text-black flex-shrink-0" />
                   )}
-                  <span className="text-black text-xs font-mono">
+                  <span className="text-black text-xs font-playfair">
                     {feature.text}
                   </span>
                 </div>
