@@ -21,8 +21,13 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
     const headers = {
       ...options.headers,
       'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json',
     };
+
+    // Only set Content-Type to application/json if body is not FormData
+    // FormData needs to set its own Content-Type with boundary
+    if (!(options.body instanceof FormData)) {
+      (headers as Record<string, string>)['Content-Type'] = 'application/json';
+    }
 
     return fetch(url, {
       ...options,

@@ -8,7 +8,7 @@ import aiohttp
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Any
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
@@ -26,7 +26,7 @@ from agents.chat_agent.streaming_handler import stream_chat_agent
 # Import managers and tools
 from shared.managers import ChatSessionManager
 from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id
-from api.canvas import get_course_details, get_file_details_with_content
+from api.canvas import get_course_details, get_file_details_with_content, get_file_details_with_temp_file
 from shared.utils.supabase_utils import decrypt_api_key
 from api.supabase import (
     get_user_lms_info,
@@ -37,7 +37,8 @@ from api.supabase import (
     create_quiz,
     create_quiz_questions,
     get_quiz,
-    create_activity
+    create_activity,
+    create_autograder_feedback
 )
 
 
@@ -833,6 +834,131 @@ async def convert_pptx_to_pdf_legacy(request: ConvertOfficeRequest):
     """
     request.format = 'pptx'
     return await convert_office_to_pdf(request)
+
+
+# Autograder Endpoint
+class AutogradeResponse(BaseModel):
+    feedback: str
+    success: bool
+    message: str
+
+
+@app.post("/grade-assignment", response_model=AutogradeResponse)
+async def grade_assignment(
+    user_id: str = Form(...),
+    course_id: str = Form(...),
+    assignment_id: str = Form(...),
+    files: List[UploadFile] = File(...)
+):
+    """
+    Grade student assignment using AI assistant.
+    
+    Args:
+        user_id: User ID
+        course_id: Course ID
+        assignment_id: Canvas assignment file ID
+        files: List of solution files uploaded by student
+    
+    Returns:
+        AI-generated feedback on the assignment
+    """
+    temp_file_paths = []
+    openai_file_ids = []
+    assistant_id = None
+    
+    try:
+        # Import OpenAI functions
+        from api.openai import (
+            save_uploaded_files_to_temp,
+            upload_file_to_openai,
+            create_grading_assistant,
+            run_grading_assistant,
+            cleanup_openai_files,
+            cleanup_openai_assistant,
+            cleanup_temp_files
+        )
+        from prompts.autograder_prompt import AUTOGRADER_INSTRUCTIONS
+        
+        # Validate inputs
+        if not files:
+            raise HTTPException(status_code=400, detail="No files provided")
+        
+        # Save uploaded files to temporary directory
+        temp_file_paths = await save_uploaded_files_to_temp(files)
+        
+        # Get Canvas assignment file
+        lms_info = await get_user_lms_info(user_id)
+        course_info = await get_course(course_id)
+        
+        # Download assignment file to temporary location (preserves original format)
+        assignment_file_details, assignment_temp_path = await get_file_details_with_temp_file(
+            api_key=lms_info["api_key"],
+            api_base_url=lms_info["base_url"],
+            course_id=course_info["lms_id"],
+            file_id=assignment_id
+        )
+        temp_file_paths.append(assignment_temp_path)
+        
+        # Upload all files to OpenAI
+        for temp_path in temp_file_paths:
+            file_id = await upload_file_to_openai(temp_path)
+            openai_file_ids.append(file_id)
+        
+        # Create grading assistant
+        assistant_id = await create_grading_assistant(
+            name=f"Autograder for {assignment_file_details.get('filename', 'Assignment')}"
+        )
+        
+        # Run grading
+        feedback = await run_grading_assistant(
+            assistant_id=assistant_id,
+            file_ids=openai_file_ids,
+            message=f"""
+            Please analyze the attached assignment and student solution files.
+            
+            Assignment: {assignment_file_details.get('filename', 'Unknown')}
+            Student submitted {len(files)} file(s): {[f.filename for f in files]}
+            
+            Provide detailed feedback following the grading instructions.
+            """
+        )
+        
+        # Save feedback to database
+        solution_file_names = [f.filename for f in files]
+        await create_autograder_feedback(
+            user_id=user_id,
+            course_id=course_id,
+            assignment_id=assignment_id,
+            feedback_text=feedback,
+            solution_file_names=solution_file_names
+        )
+        
+        return AutogradeResponse(
+            feedback=feedback,
+            success=True,
+            message="Assignment graded successfully"
+        )
+        
+    except Exception as e:
+        import traceback
+        print("=" * 80)
+        print("ERROR IN /grade-assignment ENDPOINT:")
+        print(traceback.format_exc())
+        print("=" * 80)
+        raise HTTPException(status_code=500, detail=f"Error grading assignment: {str(e)}")
+    
+    finally:
+        # Clean up temporary files, OpenAI files, and assistant
+        try:
+            from api.openai import cleanup_temp_files, cleanup_openai_files, cleanup_openai_assistant
+            if temp_file_paths:
+                await cleanup_temp_files(temp_file_paths)
+            if openai_file_ids:
+                await cleanup_openai_files(openai_file_ids)
+            if assistant_id:
+                await cleanup_openai_assistant(assistant_id)
+        except Exception as cleanup_error:
+            print(f"Warning: Error during cleanup: {cleanup_error}")
 
 if __name__ == "__main__":
     import uvicorn

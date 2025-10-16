@@ -1428,3 +1428,124 @@ async def get_recent_activities(
     )
     
     return response.data
+
+
+# =====================================================
+# Autograder Functions
+# =====================================================
+
+async def create_autograder_feedback(
+    user_id: str,
+    course_id: str,
+    assignment_id: str,
+    feedback_text: str,
+    solution_file_names: List[str]
+) -> str:
+    """
+    Create a new autograder feedback record.
+    
+    Args:
+        user_id: User ID
+        course_id: Course ID
+        assignment_id: Canvas assignment file ID
+        feedback_text: AI-generated feedback
+        solution_file_names: Names of submitted solution files
+    
+    Returns:
+        Created feedback ID
+    """
+    print(f"calling create_autograder_feedback with user_id={user_id}, course_id={course_id}, assignment_id={assignment_id}")
+    
+    supabase = get_supabase_client()
+    
+    feedback_data = {
+        "user_id": user_id,
+        "course_id": course_id,
+        "assignment_id": assignment_id,
+        "feedback_text": feedback_text,
+        "solution_file_names": solution_file_names
+    }
+    
+    response = (
+        supabase.table("autograder_feedback")
+        .insert(feedback_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create autograder feedback")
+    
+    return response.data[0]["id"]
+
+
+async def get_autograder_feedback(
+    user_id: str,
+    assignment_id: str
+) -> Optional[Dict[str, Any]]:
+    """
+    Get the most recent autograder feedback for a user and assignment.
+    
+    Args:
+        user_id: User ID
+        assignment_id: Canvas assignment file ID
+    
+    Returns:
+        Feedback record or None if not found
+    """
+    print(f"calling get_autograder_feedback with user_id={user_id}, assignment_id={assignment_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("autograder_feedback")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("assignment_id", assignment_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    
+    if response.data:
+        return response.data[0]
+    
+    return None
+
+
+async def get_user_autograder_feedback_history(
+    user_id: str,
+    course_id: str = None,
+    limit: int = 10
+) -> List[Dict[str, Any]]:
+    """
+    Get autograder feedback history for a user.
+    
+    Args:
+        user_id: User ID
+        course_id: Optional course ID to filter by
+        limit: Number of records to fetch
+    
+    Returns:
+        List of feedback records
+    """
+    print(f"calling get_user_autograder_feedback_history with user_id={user_id}, course_id={course_id}")
+    
+    supabase = get_supabase_client()
+    
+    query = (
+        supabase.table("autograder_feedback")
+        .select("*, courses(name, lms_id)")
+        .eq("user_id", user_id)
+    )
+    
+    if course_id:
+        query = query.eq("course_id", course_id)
+    
+    response = (
+        query
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    
+    return response.data
