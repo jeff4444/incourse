@@ -168,20 +168,26 @@ export default function LandingPage() {
             Loved by students at:
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center gap-8 sm:gap-16">
-            <div className="h-16 sm:h-20 w-32 sm:w-48 bg-gray-200 rounded flex items-center justify-center">
-              <span className="text-gray-500 text-xs sm:text-sm font-playfair">
-                University Logo 1
-              </span>
+            <div className="h-16 sm:h-20 w-32 sm:w-48 flex items-center justify-center">
+              <img
+                src="/logos/University of Maryland Logo.png"
+                alt="University of Maryland"
+                className="h-full w-auto object-contain"
+              />
             </div>
-            <div className="h-20 sm:h-24 w-32 sm:w-44 bg-gray-200 rounded flex items-center justify-center">
-              <span className="text-gray-500 text-xs sm:text-sm font-playfair">
-                University Logo 2
-              </span>
+            <div className="h-20 sm:h-24 w-32 sm:w-44 flex items-center justify-center">
+              <img
+                src="/logos/hU_logo.png"
+                alt="Howard University"
+                className="h-full w-auto object-contain"
+              />
             </div>
-            <div className="h-16 sm:h-20 w-28 sm:w-36 bg-gray-200 rounded flex items-center justify-center">
-              <span className="text-gray-500 text-xs sm:text-sm font-playfair">
-                University Logo 3
-              </span>
+            <div className="h-16 sm:h-20 w-28 sm:w-36 flex items-center justify-center">
+              <img
+                src="/logos/University of Illinois Logo.png"
+                alt="University of Illinois Urbana-Champaign"
+                className="h-full w-auto object-contain"
+              />
             </div>
           </div>
         </div>
