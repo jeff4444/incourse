@@ -87,8 +87,8 @@ export default function LandingPage() {
   return (
     <div className="bg-[#f8f9fa] min-h-screen">
       {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 backdrop-blur-[15px] bg-white/40">
-        <div className="max-w-[1500px] mx-auto px-4 sm:px-6 lg:px-10 py-5 flex items-center justify-between">
+      <nav className="fixed top-4 left-[15%] right-[15%] z-50 backdrop-blur-[15px] bg-white/40 rounded-2xl border border-white/20 shadow-lg">
+        <div className="px-6 sm:px-8 lg:px-10 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="text-2xl sm:text-3xl font-medium text-black tracking-[-1.5px] font-playfair">
               InCourse
