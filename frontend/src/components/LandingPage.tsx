@@ -49,12 +49,11 @@ export default function LandingPage() {
     {
       name: "Free",
       features: [
-        { text: "Unlimited", included: true },
-        { text: "Basic AI recommendations", included: true },
-        { text: "Restricts customization", included: true },
-        { text: "Basic AI insights", included: false },
-        { text: "Fast browsing", included: true },
-        { text: "Potential display errors", included: false },
+        { text: "Limited chats", included: true },
+        { text: "Limited file uploads", included: true },
+        { text: "Limited image generations", included: true },
+        { text: "Limited quiz and flashcard generations", included: true },
+        { text: "All external knowledge integrations", included: true },
       ],
     },
     {
@@ -65,7 +64,7 @@ export default function LandingPage() {
         { text: "Unlimited quiz and flashcard generations", included: true },
         { text: "10 file uploads", included: true },
         { text: "7 image generations / day", included: true },
-        { text: "All external knowledge intergrations", included: true },
+        { text: "All external knowledge integrations", included: true },
         { text: "30 day version history", included: true },
         { text: "Mock practice exams", included: true },
       ],
@@ -102,19 +101,19 @@ export default function LandingPage() {
 
           <div className="hidden md:flex items-center justify-center gap-6 flex-1">
             <button
-              className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
+              className="text-[0.875rem] md:text-[1.225rem] font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Pricing")}
             >
               Pricing
             </button>
             <button
-              className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
+              className="text-[0.875rem] md:text-[1.225rem] font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Blog")}
             >
               Blog
             </button>
             <button
-              className="text-sm font-bold text-black hover:text-gray-600 transition-colors font-playfair"
+              className="text-[0.875rem] md:text-[1.225rem] font-bold text-black hover:text-gray-600 transition-colors font-playfair"
               onClick={() => handleNavigationClick("Features")}
             >
               Features
@@ -123,7 +122,7 @@ export default function LandingPage() {
 
           <div className="hidden md:flex">
             <CTAButton variant="teal" onClick={handleJoinWaitlist}>
-              Join the waitlist :)
+              Join the waitlist
             </CTAButton>
           </div>
 
@@ -140,10 +139,10 @@ export default function LandingPage() {
       <section className="pt-64 pb-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto">
           <div className="text-center max-w-6xl mx-auto">
-            <h1 className="text-4xl sm:text-6xl md:text-6xl lg:text-7xl leading-[0.9] font-playfair text-black tracking-[-6.8px] mb-10">
+            <h1 className="text-4xl sm:text-6xl md:text-6xl lg:text-7xl leading-[0.9] font-playfair text-black tracking-[-2.5px] mb-10">
               AI Assistant that lives in your lectures.
             </h1>
-            <p className="text-[#6f6f6f] md:text-md lg:text-lg sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-16 font-playfair px-4">
+            <p className="text-[#6f6f6f] text-base sm:text-[22.5px] leading-[1.4] tracking-[-0.075px] mb-16 font-playfair">
               Make learning feel easier with AI that understands you lectures
               and your learning style. <br className="hidden sm:block" />
               <span className="sm:hidden"> </span>No switching between apps.
@@ -194,7 +193,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features Section */}
-      <section className="py-10 lg:py-20 px-4 sm:px-6 lg:px-10">
+      <section className="py-6 lg:py-16 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto">
           {features.map((feature, index) => (
             <FeatureSection
@@ -217,14 +216,11 @@ export default function LandingPage() {
             <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-playfair text-black tracking-[-1.8px] mb-6 lg:mb-10">
               Spend Less To Learn
             </h2>
-            <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-playfair px-4">
+            <p className="text-[#6f6f6f] text-base sm:text-[22.5px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-playfair">
               You don&apos;t have to pay for multiple AI tools, Chegg or
               Quizlet. All the learning tools you will ever need together on one
               app.
             </p>
-            <CTAButton onClick={handleJoinWaitlist}>
-              Join the waitlist :)
-            </CTAButton>
           </div>
 
           {/* Pricing Table */}
@@ -235,15 +231,15 @@ export default function LandingPage() {
       {/* CTA Section */}
       <section className="py-10 lg:py-20 px-4 sm:px-6 lg:px-10">
         <div className="max-w-[1500px] mx-auto text-center">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-playfair text-black tracking-[-1.8px] mb-6 lg:mb-10">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-[60px] leading-[0.9] font-playfair text-black tracking-[-2.5px] mb-6 lg:mb-10">
             Join our closed beta and make your learning easier
           </h2>
-          <p className="text-[#6f6f6f] text-sm sm:text-[15px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-playfair px-4">
-            Student that sign up with an .edu email get 15% off all semester
+          <p className="text-[#6f6f6f] text-base sm:text-[22.5px] leading-[1.4] tracking-[-0.075px] mb-6 lg:mb-10 font-playfair">
+            Student that sign up with a .edu email get 15% off all semester
             plans.
           </p>
-          <CTAButton variant="teal" showArrow onClick={handleJoinWaitlist}>
-            Join the waitlist :)
+          <CTAButton variant="teal" onClick={handleJoinWaitlist}>
+            Join the waitlist
           </CTAButton>
         </div>
       </section>

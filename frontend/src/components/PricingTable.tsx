@@ -42,14 +42,14 @@ export function PricingTable({ plans }: PricingTableProps) {
               {plan.features.map((feature, featureIndex) => (
                 <div
                   key={featureIndex}
-                  className="border-b border-[#e9e9e9]/50 py-8 px-8 flex items-center gap-2"
+                  className="border-b border-[#e9e9e9]/50 py-4 px-8 flex items-center gap-2"
                 >
                   {feature.included ? (
-                    <Check className="w-3 h-3 text-black flex-shrink-0" />
+                    <Check className="w-4.5 h-4.5 text-black flex-shrink-0" />
                   ) : (
-                    <X className="w-3 h-3 text-black flex-shrink-0" />
+                    <X className="w-4.5 h-4.5 text-black flex-shrink-0" />
                   )}
-                  <span className="text-black text-xs font-playfair">
+                  <span className="text-black text-sm font-playfair">
                     {feature.text}
                   </span>
                 </div>
