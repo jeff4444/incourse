@@ -153,6 +153,19 @@ async def root():
 
 @app.get("/health")
 async def health_check():
+    # Check that the environment variables are set
+    if not os.getenv("AWS_DEFAULT_REGION"):
+        return {"status": "unhealthy", "message": "AWS_DEFAULT_REGION is not set"}
+    if not os.getenv("AWS_MODEL_ARN"):
+        return {"status": "unhealthy", "message": "AWS_MODEL_ARN is not set"}
+    if not os.getenv("AWS_ACCESS_KEY_ID"):
+        return {"status": "unhealthy", "message": "AWS_ACCESS_KEY_ID is not set"}
+    if not os.getenv("AWS_SECRET_ACCESS_KEY"):
+        return {"status": "unhealthy", "message": "AWS_SECRET_ACCESS_KEY is not set"}
+    if not os.getenv("PINECONE_API_KEY"):
+        return {"status": "unhealthy", "message": "PINECONE_API_KEY is not set"}
+    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return {"status": "unhealthy", "message": "AWS_LAMBDA_FUNCTION_NAME is not set"}
     return {"status": "healthy", "message": "All agents are ready"}
 
 # Flashcard Generation Endpoint

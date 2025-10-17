@@ -52,26 +52,63 @@ def get_bedrock_model():
     from pydantic_ai.models.bedrock import BedrockConverseModel
     from pydantic_ai.providers.bedrock import BedrockProvider
     
-    if not all([BEDROCK_ACCESS_KEY, BEDROCK_SECRET_KEY, BEDROCK_DEFAULT_LOCATION, BEDROCK_MODEL_ARN]):
-        missing = []
-        if not BEDROCK_ACCESS_KEY:
-            missing.append("AWS_ACCESS_KEY_ID")
-        if not BEDROCK_SECRET_KEY:
-            missing.append("AWS_SECRET_ACCESS_KEY")
-        if not BEDROCK_DEFAULT_LOCATION:
-            missing.append("AWS_DEFAULT_REGION")
-        if not BEDROCK_MODEL_ARN:
-            missing.append("AWS_MODEL_ARN")
-        raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
+    # Check for required environment variables
+    if not BEDROCK_MODEL_ARN:
+        raise ValueError("Missing required environment variable: AWS_MODEL_ARN")
     
-    return BedrockConverseModel(
-        BEDROCK_MODEL_ARN,
-        provider=BedrockProvider(
-            region_name=BEDROCK_DEFAULT_LOCATION,
-            aws_access_key_id=BEDROCK_ACCESS_KEY,
-            aws_secret_access_key=BEDROCK_SECRET_KEY,
-        ),
-    )
+    # Determine region - use environment variable or default to us-east-1
+    region = BEDROCK_DEFAULT_LOCATION or 'us-east-1'
+    
+    # Detect if we're running in Lambda vs local development
+    # In Lambda, AWS_LAMBDA_FUNCTION_NAME is automatically set
+    is_lambda = os.getenv('AWS_LAMBDA_FUNCTION_NAME') is not None
+    
+    if is_lambda:
+        # Lambda environment - use IAM role credentials (no explicit keys needed)
+        print(f"DEBUG: Using IAM role credentials (Lambda environment)")
+        print(f"DEBUG: Region: {region}")
+        print(f"DEBUG: Model ARN: {BEDROCK_MODEL_ARN}")
+        
+        # Try to get AWS credentials info for debugging
+        try:
+            import boto3
+            sts = boto3.client('sts', region_name=region)
+            identity = sts.get_caller_identity()
+            print(f"DEBUG: AWS Identity: {identity}")
+        except Exception as e:
+            print(f"DEBUG: Could not get AWS identity: {e}")
+        
+        return BedrockConverseModel(
+            BEDROCK_MODEL_ARN,
+            provider=BedrockProvider(
+                region_name=region,
+            ),
+        )
+    else:
+        # Local development - use explicit credentials if available
+        if BEDROCK_ACCESS_KEY and BEDROCK_SECRET_KEY:
+            print(f"DEBUG: Using explicit AWS credentials (local development)")
+            print(f"DEBUG: Region: {region}")
+            print(f"DEBUG: Model ARN: {BEDROCK_MODEL_ARN}")
+            return BedrockConverseModel(
+                BEDROCK_MODEL_ARN,
+                provider=BedrockProvider(
+                    region_name=region,
+                    aws_access_key_id=BEDROCK_ACCESS_KEY,
+                    aws_secret_access_key=BEDROCK_SECRET_KEY,
+                ),
+            )
+        else:
+            # Local development without explicit credentials - use default credential chain
+            print(f"DEBUG: Using default credential chain (local development)")
+            print(f"DEBUG: Region: {region}")
+            print(f"DEBUG: Model ARN: {BEDROCK_MODEL_ARN}")
+            return BedrockConverseModel(
+                BEDROCK_MODEL_ARN,
+                provider=BedrockProvider(
+                    region_name=region,
+                ),
+            )
 
 def get_anthropic_model():
     """
