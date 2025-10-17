@@ -13,8 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from Cryptodome.Cipher import AES
-
+from mangum import Mangum
 # Import agent types (but not the actual agents - lazy loading)
 from agents.flashcard_gen_agent.agent import Flashcard, Deps as FlashcardDeps
 from agents.quiz_gen_agent.agent import Quiz, Deps as QuizDeps
@@ -959,6 +958,9 @@ async def grade_assignment(
                 await cleanup_openai_assistant(assistant_id)
         except Exception as cleanup_error:
             print(f"Warning: Error during cleanup: {cleanup_error}")
+
+# Create Mangum handler for AWS Lambda
+handler = Mangum(app)
 
 if __name__ == "__main__":
     import uvicorn
