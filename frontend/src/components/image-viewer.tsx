@@ -10,7 +10,7 @@ import { useReadingTracker } from "@/lib/hooks/useActivities"
 
 const maxZoom = 5
 const minZoom = 0.1
-const zoomStep = 0.2
+const zoomStep = 0.1
 
 export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)

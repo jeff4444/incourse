@@ -164,7 +164,7 @@ async def health_check():
         return {"status": "unhealthy", "message": "AWS_SECRET_ACCESS_KEY is not set"}
     if not os.getenv("PINECONE_API_KEY"):
         return {"status": "unhealthy", "message": "PINECONE_API_KEY is not set"}
-    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    if not os.getenv("AWS_LAMBDA_FUNCTION_NAME") and not os.getenv("RUNNING_LOCALLY"):
         return {"status": "unhealthy", "message": "AWS_LAMBDA_FUNCTION_NAME is not set"}
     return {"status": "healthy", "message": "All agents are ready"}
 

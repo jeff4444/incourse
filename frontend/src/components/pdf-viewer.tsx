@@ -102,11 +102,11 @@ export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibili
   }
 
   const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.2, 3))
+    setZoom((prev) => Math.min(prev + 0.1, 3))
   }
 
   const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 0.2, 0.3))
+    setZoom((prev) => Math.max(prev - 0.1, 0.3))
   }
 
   const handleDownload = () => {

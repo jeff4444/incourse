@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { MessageSquare, Lightbulb, Send, X, Loader2 } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -57,6 +57,7 @@ export function ChatPanel({
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState("")
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([])
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const suggestions = [
     "Summarize this document for me",
@@ -72,6 +73,15 @@ export function ChatPanel({
   useEffect(() => {
     scrollToBottom()
   }, [messages])
+
+  // Auto-resize textarea
+  useEffect(() => {
+    if (textareaRef.current) {
+      const textarea = textareaRef.current
+      textarea.style.height = 'auto'
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px'
+    }
+  }, [inputValue])
 
   // Load chat history when sessionId is provided or auto-detect existing session
   useEffect(() => {
@@ -155,7 +165,14 @@ export function ChatPanel({
   }
 
 
-  const handleSendMessage = async (e: React.FormEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage(e)
+    }
+  }
+
+  const handleSendMessage = async (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || isLoading || isLoadingHistory || isStreaming) return
 
@@ -236,23 +253,8 @@ export function ChatPanel({
             const event = JSON.parse(jsonStr)
 
             if (event.type === 'text_delta') {
-              // Smart spacing: add space or newline based on previous character
-              let textToAdd = event.content
-              
-              if (fullResponse.length > 0) {
-                const lastChar = fullResponse[fullResponse.length - 1]
-                
-                if (lastChar === ':') {
-                  // After colon, go to next line
-                  textToAdd = '\n' + textToAdd
-                } else if (lastChar !== ' ' && lastChar !== '\n' && textToAdd[0] !== ' ' && textToAdd[0] !== '\n') {
-                  // Add space if neither end nor start has whitespace
-                  textToAdd = ' ' + textToAdd
-                }
-              }
-              
-              // Append text token
-              fullResponse += textToAdd
+              // Simply append the text content without any smart spacing logic
+              fullResponse += event.content
               setStreamingMessage(fullResponse)
             } else if (event.type === 'tool_call') {
               console.log('Tool call received:', event)
@@ -343,18 +345,18 @@ export function ChatPanel({
   }
 
   return (
-    <div className="w-[30vw] h-[85vh] bg-white border border-gray-200 flex flex-col m-10 rounded-xl overflow-hidden shadow-sm">
+    <div className="w-full max-w-[40vw] max-h-[90vh] h-full bg-white border border-gray-200 flex flex-col m-5 rounded-2xl overflow-hidden shadow-lg">
       <Tabs
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as "chat" | "suggestions")}
         className="flex-1 flex flex-col overflow-hidden"
       >
-        <TabsList className="grid w-full grid-cols-2 bg-gray-100 rounded-none border-b">
-          <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-white">
+        <TabsList className="grid w-full grid-cols-2 bg-gray-50 rounded-none border-b border-gray-200">
+          <TabsTrigger value="chat" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-none">
             <MessageSquare className="h-4 w-4" />
             Chat
           </TabsTrigger>
-          <TabsTrigger value="suggestions" className="flex items-center gap-2 data-[state=active]:bg-white">
+          <TabsTrigger value="suggestions" className="flex items-center gap-2 data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-none">
             <Lightbulb className="h-4 w-4" />
             Suggestions
           </TabsTrigger>
@@ -371,65 +373,75 @@ export function ChatPanel({
           )}
           
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 overflow-y-auto p-6">
             {messages.map((message, index) => (
-              <div key={index} className={`mb-4 ${message.role === "assistant" ? "pr-8" : "pl-8"}`}>
-                <div
-                  className={`p-3 rounded-lg ${
-                    message.role === "assistant"
-                      ? "bg-gray-100 rounded-tr-none"
-                      : "bg-blue-500 text-white rounded-tl-none ml-auto"
-                  }`}
-                >
-                  {message.contextPreview && (
-                    <div className={`${message.role === "assistant" ? "bg-blue-50 text-blue-700" : "bg-blue-400/40 text-white"} border border-blue-200 rounded px-2 py-1 text-xs mb-2`}>
-                      {message.contextPreview}
+              <div key={index} className={`mb-6 ${message.role === "user" ? "flex justify-end" : ""}`}>
+                {message.role === "user" ? (
+                  // User message - modern chat bubble
+                  <div className="max-w-[80%]">
+                    <div className="bg-blue-500 text-white px-4 py-3 rounded-2xl rounded-br-md shadow-sm">
+                      {message.contextPreview && (
+                        <div className="bg-blue-400/30 text-white border border-blue-300/50 rounded-lg px-3 py-2 text-xs mb-3">
+                          {message.contextPreview}
+                        </div>
+                      )}
+                      <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                        {message.content}
+                      </div>
                     </div>
-                  )}
-                  {message.role === "assistant" ? (
-                    <div className="prose prose-sm max-w-none">
+                    <div className="text-xs text-gray-500 mt-2 text-right">
+                      {formatTime(message.timestamp)}
+                    </div>
+                  </div>
+                ) : (
+                  // AI message - background/widget style (like Notion)
+                  <div className="max-w-full">
+                    {message.contextPreview && (
+                      <div className="bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-3 py-2 text-xs mb-3">
+                        {message.contextPreview}
+                      </div>
+                    )}
+                    <div className="prose prose-sm max-w-none text-gray-800">
                       <ReactMarkdown
                         components={{
-                          p: ({ children }: any) => <p className="mb-2 last:mb-0">{children}</p>,
-                          ul: ({ children }: any) => <ul className="mb-2 list-disc list-inside space-y-1">{children}</ul>,
-                          ol: ({ children }: any) => <ol className="mb-2 list-decimal list-inside space-y-1">{children}</ol>,
-                          li: ({ children }: any) => <li className="text-sm">{children}</li>,
-                          h1: ({ children }: any) => <h1 className="text-lg font-bold mb-2 text-gray-900">{children}</h1>,
-                          h2: ({ children }: any) => <h2 className="text-base font-semibold mb-2 text-gray-900">{children}</h2>,
-                          h3: ({ children }: any) => <h3 className="text-sm font-medium mb-1 text-gray-900">{children}</h3>,
-                          code: ({ children }: any) => <code className="bg-blue-50 text-blue-600 px-1 py-0.5 rounded text-xs">{children}</code>,
-                          pre: ({ children }: any) => <pre className="bg-gray-100 p-2 rounded text-xs overflow-x-auto mb-2">{children}</pre>,
-                          blockquote: ({ children }: any) => <blockquote className="border-l-4 border-blue-400 bg-blue-50 pl-4 py-2 mb-2 italic">{children}</blockquote>,
+                          p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+                          ul: ({ children }: any) => <ul className="mb-3 list-disc list-inside space-y-1.5 pl-2">{children}</ul>,
+                          ol: ({ children }: any) => <ol className="mb-3 list-decimal list-inside space-y-1.5 pl-2">{children}</ol>,
+                          li: ({ children }: any) => <li className="text-sm leading-relaxed">{children}</li>,
+                          h1: ({ children }: any) => <h1 className="text-lg font-semibold mb-3 text-gray-900 leading-tight">{children}</h1>,
+                          h2: ({ children }: any) => <h2 className="text-base font-semibold mb-2 text-gray-900 leading-tight">{children}</h2>,
+                          h3: ({ children }: any) => <h3 className="text-sm font-medium mb-2 text-gray-900 leading-tight">{children}</h3>,
+                          code: ({ children }: any) => <code className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>,
+                          pre: ({ children }: any) => <pre className="bg-gray-50 border border-gray-200 p-3 rounded-lg text-xs overflow-x-auto mb-3 font-mono">{children}</pre>,
+                          blockquote: ({ children }: any) => <blockquote className="border-l-4 border-blue-300 bg-blue-50 pl-4 py-2 mb-3 italic text-gray-700">{children}</blockquote>,
                           strong: ({ children }: any) => <strong className="font-semibold text-gray-900">{children}</strong>,
-                          em: ({ children }: any) => <em className="italic">{children}</em>,
+                          em: ({ children }: any) => <em className="italic text-gray-700">{children}</em>,
                         }}
                       >
                         {message.content}
                       </ReactMarkdown>
                     </div>
-                  ) : (
-                    message.content
-                  )}
-                </div>
-                <div className={`text-xs text-gray-500 mt-1 ${message.role === "assistant" ? "" : "text-right"}`}>
-                  {formatTime(message.timestamp)}
-                </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      {formatTime(message.timestamp)}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
             
             {/* Streaming message */}
             {isStreaming && (
-              <div className="mb-4 pr-8">
+              <div className="mb-6">
                 {/* Tool call indicators */}
                 {activeToolCalls.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
+                  <div className="flex flex-wrap gap-2 mb-3">
                     {activeToolCalls.map((tool, idx) => (
                       <div
                         key={idx}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
                           tool.status === 'executing'
-                            ? 'bg-blue-100 text-blue-700'
-                            : 'bg-green-100 text-green-700'
+                            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+                            : 'bg-green-100 text-green-700 border border-green-200'
                         }`}
                       >
                         {tool.status === 'executing' ? (
@@ -443,29 +455,25 @@ export function ChatPanel({
                   </div>
                 )}
                 
-                {/* Streaming text */}
-                <div className="p-3 rounded-lg bg-gray-100 rounded-tr-none">
-                  <div className="prose prose-sm max-w-none">
-                    {streamingMessage ? (
-                      <div className="whitespace-pre-wrap text-sm text-gray-800">
-                        {streamingMessage}
-                      </div>
-                    ) : null}
-                    {/* Blinking cursor - always visible when streaming */}
-                    <span className="inline-block w-2 h-4 bg-blue-500 ml-0.5 animate-pulse" />
-                  </div>
+                {/* Streaming text - background/widget style */}
+                <div className="prose prose-sm max-w-none text-gray-800">
+                  {streamingMessage ? (
+                    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                      {streamingMessage}
+                    </div>
+                  ) : null}
+                  {/* Blinking cursor - always visible when streaming */}
+                  <span className="inline-block w-2 h-4 bg-blue-500 ml-0.5 animate-pulse" />
                 </div>
               </div>
             )}
             
             {/* Thinking indicator (for non-streaming) */}
             {isLoading && !isStreaming && (
-              <div className="mb-4 pr-8">
-                <div className="p-3 rounded-lg bg-gray-100 rounded-tr-none">
-                  <div className="flex items-center gap-2 text-gray-500">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm">Thinking...</span>
-                  </div>
+              <div className="mb-6">
+                <div className="flex items-center gap-3 text-gray-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="text-sm font-medium">Thinking...</span>
                 </div>
               </div>
             )}
@@ -474,14 +482,14 @@ export function ChatPanel({
 
           {/* Context item display */}
           {selectedContextItem && (
-            <div className="px-4 pt-2">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 pr-8 relative">
-                <div className="text-xs text-blue-600 font-medium mb-1">From page {selectedContextItem.pageNumber}</div>
-                <p className="text-sm text-gray-700 line-clamp-2">{selectedContextItem.text}</p>
+            <div className="px-6 pt-2">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 pr-10 relative">
+                <div className="text-xs text-blue-600 font-medium mb-2">From page {selectedContextItem.pageNumber}</div>
+                <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">{selectedContextItem.text}</p>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 absolute top-1 right-1"
+                  className="h-6 w-6 p-0 absolute top-2 right-2 hover:bg-blue-100"
                   onClick={() => onRemoveContextItem(selectedContextItem.id)}
                 >
                   <X className="h-3 w-3" />
@@ -491,16 +499,24 @@ export function ChatPanel({
           )}
 
           {/* Input */}
-          <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
-            <div className="flex items-center gap-2">
-              <Input
+          <form onSubmit={handleSendMessage} className="p-6 border-t border-gray-200 bg-gray-50/50">
+            <div className="flex items-start gap-3">
+              <Textarea
+                ref={textareaRef}
                 placeholder="Ask a question..."
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="flex-1"
+                onKeyDown={handleKeyDown}
+                className="flex-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500 rounded-xl resize-none min-h-[44px] max-h-[120px] overflow-y-auto"
                 disabled={isLoading || isStreaming}
+                rows={1}
               />
-              <Button type="submit" size="icon" disabled={!inputValue.trim() || isLoading || isStreaming}>
+              <Button 
+                type="submit" 
+                size="icon" 
+                disabled={!inputValue.trim() || isLoading || isStreaming}
+                className="rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 mt-1"
+              >
                 {isLoading || isStreaming ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -511,17 +527,17 @@ export function ChatPanel({
           </form>
         </TabsContent>
 
-        <TabsContent value="suggestions" className="flex-1 p-4 m-0 overflow-y-auto">
-          <h3 className="text-sm font-medium text-gray-500 mb-3">Try asking about:</h3>
-          <div className="grid gap-2">
+        <TabsContent value="suggestions" className="flex-1 p-6 m-0 overflow-y-auto">
+          <h3 className="text-sm font-medium text-gray-600 mb-4">Try asking about:</h3>
+          <div className="grid gap-3">
             {suggestions.map((suggestion, index) => (
               <Button
                 key={index}
                 variant="outline"
-                className="justify-start h-auto py-3 px-4 text-left"
+                className="justify-start h-auto py-4 px-4 text-left border-gray-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl transition-colors"
                 onClick={() => handleSuggestionClick(suggestion)}
               >
-                {suggestion}
+                <span className="text-sm leading-relaxed">{suggestion}</span>
               </Button>
             ))}
           </div>
