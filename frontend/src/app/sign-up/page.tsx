@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/select";
 import { SUPPORTED_SCHOOLS, validateEmailForSchool } from "@/constants/supported_schools";
 import { isSuperUser } from "@/constants/super_users";
+import { isAllowedUser } from "@/constants/allowed_users";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -49,6 +50,13 @@ export default function SignUpPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    
+    // Check if user is in allowed users list
+    if (!isAllowedUser(email)) {
+      setError("Access is currently limited to invited users only.");
+      setLoading(false);
+      return;
+    }
     
     // Validate school selection
     if (!selectedSchool) {
@@ -102,6 +110,12 @@ export default function SignUpPage() {
     e.preventDefault();
 
     if (!magicLinkSent) {
+      // Check if user is in allowed users list
+      if (!isAllowedUser(email)) {
+        setError("Access is currently limited to invited users only.");
+        return;
+      }
+      
       // Validate school selection
       if (!selectedSchool) {
         setError("Please select your school");
