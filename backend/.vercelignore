@@ -43,3 +43,18 @@ scripts/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Environment files
+*.env
+.env*
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Additional patterns from vercel.json
+automations/
+logdir/
+prisma/migrations/
+pytests.ini
