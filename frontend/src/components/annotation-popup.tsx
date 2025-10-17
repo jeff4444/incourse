@@ -10,9 +10,10 @@ interface AnnotationPopupProps {
   onAddNote: () => void
   onAddToContext: () => void
   onClose: () => void
+  showContextOptions?: boolean
 }
 
-export function AnnotationPopup({ rect, onHighlight, onAddNote, onAddToContext, onClose }: AnnotationPopupProps) {
+export function AnnotationPopup({ rect, onHighlight, onAddNote, onAddToContext, onClose, showContextOptions = true }: AnnotationPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
 
   // Position the popup near the selection
@@ -107,17 +108,21 @@ export function AnnotationPopup({ rect, onHighlight, onAddNote, onAddToContext, 
         <Pencil className="h-4 w-4 text-orange-500" />
       </Button>
 
-      <div className="w-px h-6 bg-gray-200 mx-1"></div>
+      {showContextOptions && (
+        <>
+          <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0 hover:bg-purple-100"
-        onClick={onAddToContext}
-        title="Ask AI about this"
-      >
-        <MessageCircle className="h-4 w-4 text-purple-600" />
-      </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-purple-100"
+            onClick={onAddToContext}
+            title="Ask AI about this"
+          >
+            <MessageCircle className="h-4 w-4 text-purple-600" />
+          </Button>
+        </>
+      )}
 
       <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100" onClick={onClose} title="Close">
         <X className="h-4 w-4" />

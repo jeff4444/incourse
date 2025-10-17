@@ -5,7 +5,6 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ZoomIn, ZoomOut, Download, Image as ImageIcon, Loader2, Maximize2, Minimize2, RotateCw, Move, MessageSquare, Play, Square, Clock } from "lucide-react"
-import { ChatPanel } from "./ai-chat-panel"
 import { FileDetails } from "@/lib/types/course"
 import { useReadingTracker } from "@/lib/hooks/useActivities"
 
@@ -13,7 +12,7 @@ const maxZoom = 5
 const minZoom = 0.1
 const zoomStep = 0.2
 
-export default function ImageViewer({ fileDetails, courseId, showChat = true }: { fileDetails: FileDetails, courseId?: string, showChat?: boolean }) {
+export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -24,11 +23,6 @@ export default function ImageViewer({ fileDetails, courseId, showChat = true }: 
   const [rotation, setRotation] = useState(0)
   const [zenMode, setZenMode] = useState(false)
   const [isPanning, setIsPanning] = useState(false)
-  const [showChatState, setShowChat] = useState(showChat)
-  const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat")
-  type ContextItem = { id: string; text: string; source: string; pageNumber: number }
-  const [contextItems, setContextItems] = useState<ContextItem[]>([])
-  const [selectedContextItem, setSelectedContextItem] = useState<ContextItem | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const imageRef = useRef<HTMLImageElement>(null)
 
@@ -68,19 +62,17 @@ export default function ImageViewer({ fileDetails, courseId, showChat = true }: 
   }
 
   const toggleZenMode = () => {
-    setZenMode(!zenMode)
-  }
-
-  const toggleChat = () => {
-    setShowChat(!showChatState)
-  }
-
-  const removeContextItem = (id: string) => {
-    setContextItems(contextItems.filter((item) => item.id !== id))
-    if (selectedContextItem?.id === id) {
-      setSelectedContextItem(null)
+    if (!zenMode) {
+      // Entering zen mode - hide panel
+      setZenMode(true)
+      onTogglePanelVisibility?.()
+    } else {
+      // Exiting zen mode - let page decide whether to show panel
+      setZenMode(false)
     }
   }
+
+
 
   const rotateImage = () => {
     setRotation((prev) => (prev + 90) % 360)
@@ -292,16 +284,6 @@ export default function ImageViewer({ fileDetails, courseId, showChat = true }: 
                   )}
                 </div>
 
-                {!zenMode && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleChat}
-                    className={`h-8 w-8 p-0 ${showChatState ? "bg-blue-100 text-blue-600" : ""}`}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
-                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -370,18 +352,6 @@ export default function ImageViewer({ fileDetails, courseId, showChat = true }: 
           </Card>
         </div>
 
-        {!zenMode && showChatState && (
-          <ChatPanel
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            contextItems={contextItems}
-            selectedContextItem={selectedContextItem}
-            onRemoveContextItem={removeContextItem}
-            courseId=""
-            fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
-            initialSessionId={undefined}
-          />
-        )}
       </div>
 
       {/* Instructions overlay */}

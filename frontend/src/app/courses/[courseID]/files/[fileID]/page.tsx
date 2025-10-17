@@ -6,19 +6,21 @@ import PPTXViewer from "@/components/pptx-viewer";
 import XLSXViewer from "@/components/xlsx-viewer";
 import DOCXViewer from "@/components/docx-viewer";
 import ImageViewer from "@/components/image-viewer";
+import { ChatPanel } from "@/components/ai-chat-panel";
 import { Button } from "@/components/ui/button";
 import { FileDetails } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useReadingTracker } from "@/lib/hooks/useActivities";
-import { Play, Square, Clock, FileCheck } from "lucide-react";
+import { Play, Square, Clock, FileCheck, MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { nanoid } from "@/lib/utils";
 
-function getViewer(fileDetails: FileDetails, courseID?: string) {
+function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean) {
   // PDF files
   if (fileDetails.type === "application/pdf" || fileDetails.contentType === "application/pdf") {
-    return <PDFViewer fileDetails={fileDetails} courseId={courseID} />;
+    return <PDFViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // PowerPoint files
@@ -26,7 +28,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       fileDetails.type === "application/vnd.ms-powerpoint" ||
       fileDetails.contentType === "application/vnd.ms-powerpoint") {
-    return <PPTXViewer fileDetails={fileDetails} courseId={courseID} />;
+    return <PPTXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Excel files
@@ -34,7 +36,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
       fileDetails.type === "application/vnd.ms-excel" ||
       fileDetails.contentType === "application/vnd.ms-excel") {
-    return <XLSXViewer fileDetails={fileDetails} courseId={courseID} />;
+    return <XLSXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Word files
@@ -42,12 +44,12 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       fileDetails.type === "application/msword" ||
       fileDetails.contentType === "application/msword") {
-    return <DOCXViewer fileDetails={fileDetails} courseId={courseID} />;
+    return <DOCXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Image files
   if (fileDetails.type.startsWith("image/") || fileDetails.contentType?.startsWith("image/")) {
-    return <ImageViewer fileDetails={fileDetails} courseId={courseID} />;
+    return <ImageViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Unsupported file type
@@ -88,6 +90,10 @@ function FileViewPage({
   const [fileDetails, setFileDetails] = useState<FileDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showChatPanel, setShowChatPanel] = useState(true);
+  const [contextItems, setContextItems] = useState<{ id: string; text: string; source: string; pageNumber: number }[]>([]);
+  const [selectedContextItem, setSelectedContextItem] = useState<{ id: string; text: string; source: string; pageNumber: number } | null>(null);
+  const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat");
   const router = useRouter();
 
   // Check if filename contains "homework" or "assignment" (case insensitive)
@@ -97,6 +103,38 @@ function FileViewPage({
      fileDetails.name.toLowerCase().includes('quiz') ||
      fileDetails.name.toLowerCase().includes('test') ||
      fileDetails.name.toLowerCase().includes('exam'));
+
+  // Handle panel visibility toggle
+  const handleTogglePanelVisibility = () => {
+    setShowChatPanel(!showChatPanel);
+  };
+
+  // Handle showing panel (for context addition)
+  const handleShowPanel = () => {
+    setShowChatPanel(true);
+  };
+
+  // Handle adding text to context
+  const handleAddToContext = (text: string, pageNumber: number) => {
+    const newContextItem = {
+      id: nanoid(),
+      text,
+      source: fileDetails?.name || 'document',
+      pageNumber
+    };
+    setContextItems([...contextItems, newContextItem]);
+    setSelectedContextItem(newContextItem);
+    setShowChatPanel(true);
+    setActiveTab('chat');
+  };
+
+  // Handle removing context item
+  const handleRemoveContextItem = (id: string) => {
+    setContextItems(contextItems.filter(item => item.id !== id));
+    if (selectedContextItem?.id === id) {
+      setSelectedContextItem(null);
+    }
+  };
 
   // Reading tracker - only enable when we have file details
   const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
@@ -213,6 +251,21 @@ function FileViewPage({
             </div>
           )}
           
+          {/* Chat Panel Toggle */}
+          <div className="relative group">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleTogglePanelVisibility}
+              className={`flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-32 ${showChatPanel ? "bg-blue-100 hover:bg-blue-200 border-blue-200" : ""}`}
+            >
+              <MessageSquare className="h-4 w-4" />
+              <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+                {showChatPanel ? "Hide Chat" : "Show Chat"}
+              </span>
+            </Button>
+          </div>
+          
           {/* Autograde Button - only show for homework/assignment files */}
           {shouldShowAutogradeButton && (
             <div className="relative group">
@@ -239,7 +292,23 @@ function FileViewPage({
           )}
         </div>
       </div>
-      {getViewer(fileDetails, courseID)}
+      <div className="flex">
+        <div className="flex-1">
+          {getViewer(fileDetails, courseID, handleTogglePanelVisibility, handleShowPanel, handleAddToContext, true)}
+        </div>
+        {showChatPanel && (
+          <ChatPanel
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            contextItems={contextItems}
+            selectedContextItem={selectedContextItem}
+            onRemoveContextItem={handleRemoveContextItem}
+            courseId={courseID}
+            fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
+            initialSessionId={undefined}
+          />
+        )}
+      </div>
     </div>
   );
 }

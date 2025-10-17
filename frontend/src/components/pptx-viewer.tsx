@@ -10,7 +10,7 @@ import PDFViewer from "./pdf-viewer"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
-export default function PPTXViewer({ fileDetails, courseId, showChat = true }: { fileDetails: FileDetails, courseId?: string, showChat?: boolean }) {
+export default function PPTXViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [isConverting, setIsConverting] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null)
@@ -87,7 +87,7 @@ export default function PPTXViewer({ fileDetails, courseId, showChat = true }: {
 
   // If PDF is ready, render the PDF viewer directly
   if (pdfFileDetails && !isConverting && !error) {
-    return <PDFViewer fileDetails={pdfFileDetails} courseId={courseId} showChat={showChat} />
+    return <PDFViewer fileDetails={pdfFileDetails} courseId={courseId} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />
   }
 
   // Otherwise render the conversion UI (loading or error)
