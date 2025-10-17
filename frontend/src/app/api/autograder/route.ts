@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Call the Python backend
-    const backendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+    const backendUrl = process.env.NEXT_PUBLIC_AGENTS_BACKEND_URL || 'http://localhost:8000';
     const response = await fetch(`${backendUrl}/grade-assignment`, {
       method: 'POST',
       body: backendFormData,

@@ -3,12 +3,14 @@ import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
+  let courseId, fileIds;
+  
   try {
     const body = await request.json();
-    const { courseId, fileIds } = body as {
+    ({ courseId, fileIds } = body as {
       courseId: string;
       fileIds: string[];
-    };
+    });
 
     // Get user id from request
     const userData = await getUserFromRequest(request);
@@ -42,7 +44,20 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (moduleItemError) {
-      console.error('Error finding module item:', moduleItemError);
+      // Enhanced error logging with request context
+      const errorDetails = {
+        endpoint: '/api/agents/chat/session',
+        operation: 'find_module_item',
+        error: moduleItemError,
+        requestBody: {
+          courseId,
+          fileIds,
+          lmsContentId,
+        },
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('Error finding module item:', errorDetails);
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
@@ -57,7 +72,21 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 is "not found" error
-      console.error('Supabase error:', error);
+      // Enhanced error logging with request context
+      const errorDetails = {
+        endpoint: '/api/agents/chat/session',
+        operation: 'check_existing_session',
+        error,
+        requestBody: {
+          courseId,
+          fileIds,
+          userId: userData.userId,
+          documentId,
+        },
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('Supabase error:', errorDetails);
       return NextResponse.json({ error: "Failed to check for existing session" }, { status: 500 });
     }
 
@@ -66,7 +95,20 @@ export async function POST(request: NextRequest) {
       success: true 
     });
   } catch (error) {
-    console.error('Error in chat session API:', error);
+    // Enhanced error logging with request context
+    const errorDetails = {
+      endpoint: '/api/agents/chat/session',
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      requestBody: {
+        courseId,
+        fileIds,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.error('Error in chat session API:', errorDetails);
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

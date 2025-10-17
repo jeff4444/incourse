@@ -49,7 +49,46 @@ export async function authenticatedFetchJson<T>(url: string, options: RequestIni
   const response = await authenticatedFetch(url, options);
   
   if (!response.ok) {
-    throw new Error(`API call failed: ${response.status} ${response.statusText} ${response.body} ${url}`);
+    // Try to get the error text from the response body
+    let errorText = '';
+    let errorJson: any = null;
+    
+    try {
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        errorJson = await response.json();
+        errorText = errorJson.error || errorJson.message || JSON.stringify(errorJson);
+      } else {
+        errorText = await response.text();
+      }
+    } catch (e) {
+      errorText = 'Unable to read error response';
+      console.error('Failed to parse error response:', e);
+    }
+    
+    // Enhanced error logging with more context
+    const errorDetails = {
+      url,
+      status: response.status,
+      statusText: response.statusText,
+      errorText,
+      errorJson,
+      method: options.method || 'GET',
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.error('API call failed:', errorDetails);
+    
+    // Create a more informative error message
+    const errorMessage = `API call failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''} - ${url}`;
+    const error = new Error(errorMessage);
+    
+    // Attach additional context to the error object
+    (error as any).status = response.status;
+    (error as any).url = url;
+    (error as any).response = errorJson;
+    
+    throw error;
   }
   
   return response.json();

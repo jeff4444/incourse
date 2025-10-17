@@ -2,15 +2,17 @@ import { NextRequest } from "next/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function POST(request: NextRequest) {
+  let courseId, fileIds, message, context, sessionId;
+  
   try {
     const body = await request.json();
-    const { courseId, fileIds, message, context, sessionId } = body as {
+    ({ courseId, fileIds, message, context, sessionId } = body as {
       courseId: string;
       fileIds: string[];
       message: string;
       context?: string;
       sessionId?: string;
-    };
+    });
 
     // Get user id from request
     const userData = await getUserFromRequest(request);
@@ -43,9 +45,47 @@ export async function POST(request: NextRequest) {
     });
 
     if (!resp.ok) {
-      const err = await resp.text();
+      let errorText = '';
+      let errorJson: any = null;
+      
+      try {
+        const contentType = resp.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          errorJson = await resp.json();
+          errorText = errorJson.error || errorJson.message || JSON.stringify(errorJson);
+        } else {
+          errorText = await resp.text();
+        }
+      } catch (e) {
+        errorText = 'Unable to read error response';
+        console.error('Failed to parse backend error response:', e);
+      }
+      
+      // Enhanced error logging with request context
+      const errorDetails = {
+        endpoint: '/chat/stream',
+        backendUrl,
+        requestBody: {
+          user_id: userData.userId,
+          course_id: courseId,
+          file_ids: (fileIds || []).map((id: string) => String(id)),
+          message,
+          ...(prompt ? { prompt } : {}),
+          ...(sessionId ? { session_id: sessionId } : {}),
+        },
+        response: {
+          status: resp.status,
+          statusText: resp.statusText,
+          errorText,
+          errorJson,
+        },
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error("Backend error in chat stream:", errorDetails);
+      
       return new Response(
-        JSON.stringify({ error: err }),
+        JSON.stringify({ error: errorText }),
         { status: resp.status, headers: { "Content-Type": "application/json" } }
       );
     }
@@ -59,7 +99,23 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Error in chat stream API:', error);
+    // Enhanced error logging with request context
+    const errorDetails = {
+      endpoint: '/api/agents/chat/stream',
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      requestBody: {
+        courseId,
+        fileIds,
+        message,
+        context,
+        sessionId,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.error('Error in chat stream API:', errorDetails);
+    
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { "Content-Type": "application/json" } }

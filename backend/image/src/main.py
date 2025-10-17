@@ -11,7 +11,7 @@ from typing import List, Dict, Optional, Any
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, validator
 from dotenv import load_dotenv
 from mangum import Mangum
 # Import agent types (but not the actual agents - lazy loading)
@@ -84,7 +84,7 @@ class FlashcardRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str]
+    file_ids: List[str] = Field(..., min_items=1, description="At least one file ID must be provided")
     num_flashcards: int = 10
     card_type: str = "term-definition"
     extra_context: Optional[str] = None
@@ -93,7 +93,7 @@ class QuizRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str]
+    file_ids: List[str] = Field(..., min_items=1, description="At least one file ID must be provided")
     num_questions: int = 5
     difficulty: str = "medium"
     extra_context: Optional[str] = None
@@ -135,7 +135,7 @@ class TakeActionResponse(BaseModel):
 class ChatRequest(BaseModel):
     user_id: str
     course_id: str
-    file_ids: List[str]
+    file_ids: List[str] = Field(..., min_items=1, description="At least one file ID must be provided")
     message: str
     prompt: Optional[str] = None
     session_id: Optional[str] = None
@@ -661,16 +661,17 @@ async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
                 elif event.type.value == "done" and event.content:
                     full_response = event.content
             
-            # Schedule session management as background task (doesn't block response)
-            background_tasks.add_task(
-                save_chat_session_background,
-                user_id=request.user_id,
-                course_id=request.course_id,
-                file_id=request.file_ids[0],
-                user_message=request.message,
-                assistant_response=full_response,
-                deps=deps
-            )
+            if full_response:
+                # Schedule session management as background task (doesn't block response)
+                background_tasks.add_task(
+                    save_chat_session_background,
+                    user_id=request.user_id,
+                    course_id=request.course_id,
+                    file_id=request.file_ids[0],
+                    user_message=request.message,
+                    assistant_response=full_response,
+                    deps=deps
+                )
         
         except Exception as e:
             import traceback

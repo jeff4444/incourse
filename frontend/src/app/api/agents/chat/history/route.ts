@@ -36,7 +36,19 @@ export async function GET(request: NextRequest) {
       .limit(100);
 
     if (error) {
-      console.error('Supabase error:', error);
+      // Enhanced error logging with request context
+      const errorDetails = {
+        endpoint: '/api/agents/chat/history',
+        operation: 'fetch_chat_history',
+        error,
+        requestBody: {
+          sessionId,
+          userId: userData.userId,
+        },
+        timestamp: new Date().toISOString(),
+      };
+      
+      console.error('Supabase error:', errorDetails);
       return NextResponse.json({ error: "Failed to fetch chat history" }, { status: 500 });
     }
 
@@ -45,7 +57,19 @@ export async function GET(request: NextRequest) {
       success: true 
     });
   } catch (error) {
-    console.error('Error in chat history API:', error);
+    // Enhanced error logging with request context
+    const errorDetails = {
+      endpoint: '/api/agents/chat/history',
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      requestBody: {
+        sessionId,
+      },
+      timestamp: new Date().toISOString(),
+    };
+    
+    console.error('Error in chat history API:', errorDetails);
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

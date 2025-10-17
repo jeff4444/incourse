@@ -92,6 +92,9 @@ async def get_user_lms_info(user_id: str) -> str:
     Get the LMS API key for the user.
     """
     api_keys = await get_user_api_keys(user_id=user_id)
+    if not api_keys:
+        raise Exception(f"No API keys found for user: {user_id}. Please configure your LMS credentials.")
+    
     api_key = api_keys[0]
     encrypted_api_key = api_key["encrypted_api_key"]
     api_base_url =f"{api_key["api_base_url"]}/api/v1"
