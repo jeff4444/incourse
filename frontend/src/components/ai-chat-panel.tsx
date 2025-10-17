@@ -6,7 +6,7 @@ import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MessageSquare, Lightbulb, Send, X, Loader2 } from "lucide-react"
+import { MessageSquare, Lightbulb, Send, X, Loader2, MessageCircle } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import type { ContextItem } from "./pdf-viewer"
 import { authenticatedFetchJson, authenticatedFetch } from "@/lib/utils/apiClient"
@@ -17,9 +17,12 @@ interface ChatPanelProps {
   contextItems: ContextItem[]
   selectedContextItem: ContextItem | null
   onRemoveContextItem: (id: string) => void
+  onAddContextItem?: (contextItem: ContextItem) => void
   courseId: string
   fileIdList: string[]
   initialSessionId?: string
+  messages?: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]
+  onUpdateMessages?: (messages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]) => void
 }
 
 interface ToolCall {
@@ -35,17 +38,22 @@ export function ChatPanel({
   contextItems,
   selectedContextItem,
   onRemoveContextItem,
+  onAddContextItem,
   courseId,
   fileIdList,
   initialSessionId,
+  messages: externalMessages,
+  onUpdateMessages,
 }: ChatPanelProps) {
-  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]>([
-    {
-      role: "assistant",
-      content: "Hi there! I'm your AI learning assistant. How can I help you with this document?",
-      timestamp: new Date(),
-    },
-  ])
+  const [messages, setMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]>(
+    externalMessages || [
+      {
+        role: "assistant",
+        content: "Hi there! I'm your AI learning assistant. How can I help you with this document?",
+        timestamp: new Date(),
+      },
+    ]
+  )
   const [inputValue, setInputValue] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null)
@@ -58,6 +66,15 @@ export function ChatPanel({
   const [streamingMessage, setStreamingMessage] = useState("")
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Text selection state for messages
+  const [messageSelection, setMessageSelection] = useState<{
+    range: Range | null
+    rect: DOMRect | null
+    text: string | null
+    messageIndex: number | null
+  }>({ range: null, rect: null, text: null, messageIndex: null })
+  const [showMessageSelectionPopup, setShowMessageSelectionPopup] = useState(false)
 
   const suggestions = [
     "Summarize this document for me",
@@ -74,6 +91,13 @@ export function ChatPanel({
     scrollToBottom()
   }, [messages])
 
+  // Sync external messages when they change
+  useEffect(() => {
+    if (externalMessages) {
+      setMessages(externalMessages)
+    }
+  }, [externalMessages])
+
   // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
@@ -83,51 +107,19 @@ export function ChatPanel({
     }
   }, [inputValue])
 
-  // Load chat history when sessionId is provided or auto-detect existing session
+  // Load chat history when sessionId is provided
   useEffect(() => {
-    // Prevent multiple load attempts
-    if (hasAttemptedLoad) return
-    
-    if (initialSessionId && !sessionId) {
+    // Only load if we have an initialSessionId and haven't attempted to load yet
+    if (initialSessionId && !sessionId && !hasAttemptedLoad) {
       setHasAttemptedLoad(true)
       loadChatHistory(initialSessionId)
-    } else if (!initialSessionId && !sessionId && courseId && fileIdList.length > 0) {
-      setHasAttemptedLoad(true)
-      // Auto-detect existing session for this user-document pair
-      detectAndLoadExistingSession()
     }
-  }, [initialSessionId, sessionId, courseId, fileIdList, hasAttemptedLoad])
+  }, [initialSessionId, sessionId, hasAttemptedLoad])
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }
 
-  const detectAndLoadExistingSession = async () => {
-    setIsLoadingHistory(true)
-    try {
-      // Check if there's an existing session for this user-document pair
-      const data = await authenticatedFetchJson<{ sessionId?: string }>(
-        '/api/agents/chat/session',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            courseId,
-            fileIds: fileIdList,
-          }),
-        }
-      )
-      
-      if (data?.sessionId) {
-        // We found an existing session, load its history
-        await loadChatHistory(data.sessionId)
-      }
-    } catch (error) {
-      console.error("Error detecting existing session:", error)
-    } finally {
-      setIsLoadingHistory(false)
-    }
-  }
 
   const loadChatHistory = async (sessionId: string) => {
     setIsLoadingHistory(true)
@@ -151,6 +143,7 @@ export function ChatPanel({
         
         // Replace the default welcome message with actual history
         setMessages(historyMessages)
+        onUpdateMessages?.(historyMessages)
       }
       
       setSessionId(sessionId)
@@ -196,6 +189,7 @@ export function ChatPanel({
     ]
 
     setMessages(newMessages)
+    onUpdateMessages?.(newMessages)
     setInputValue("")
     setIsStreaming(true)
     setStreamingMessage("")
@@ -306,28 +300,32 @@ export function ChatPanel({
       }
 
       // Add final message to history
-      setMessages([
+      const finalMessages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[] = [
         ...newMessages,
         {
-          role: "assistant",
+          role: "assistant" as const,
           content: fullResponse || 'Sorry, I could not get a response.',
           timestamp: new Date(),
         },
-      ])
+      ]
+      setMessages(finalMessages)
+      onUpdateMessages?.(finalMessages)
 
       // Clear streaming state
       setStreamingMessage("")
       setActiveToolCalls([])
     } catch (err) {
       console.error('Streaming error:', err)
-      setMessages([
+      const errorMessages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[] = [
         ...newMessages,
         {
-          role: "assistant",
+          role: "assistant" as const,
           content: 'There was an error contacting the assistant.',
           timestamp: new Date(),
         },
-      ])
+      ]
+      setMessages(errorMessages)
+      onUpdateMessages?.(errorMessages)
       setStreamingMessage("")
       setActiveToolCalls([])
     } finally {
@@ -340,12 +338,93 @@ export function ChatPanel({
     setActiveTab("chat")
   }
 
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  // Handle text selection in messages
+  const handleMessageTextSelection = (e: React.MouseEvent, messageIndex: number) => {
+    const selection = window.getSelection()
+    if (!selection || selection.toString().trim() === '') {
+      setShowMessageSelectionPopup(false)
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    const rect = range.getBoundingClientRect()
+    const text = selection.toString().trim()
+
+    if (text) {
+      setMessageSelection({
+        range,
+        rect,
+        text,
+        messageIndex
+      })
+      setShowMessageSelectionPopup(true)
+    }
+  }
+
+  // Handle adding selected text to context
+  const handleAddMessageTextToContext = () => {
+    if (messageSelection.text && messageSelection.messageIndex !== null) {
+      const message = messages[messageSelection.messageIndex]
+      const contextItem: ContextItem = {
+        id: `message-${messageSelection.messageIndex}-${Date.now()}`,
+        text: messageSelection.text,
+        source: `Message from ${message.role === 'user' ? 'You' : 'AI'}`,
+        pageNumber: 0 // Messages don't have page numbers
+      }
+      
+      // Add to context by calling the parent's onAddContextItem function
+      if (onAddContextItem) {
+        onAddContextItem(contextItem)
+      }
+      
+      // Clear selection
+      window.getSelection()?.removeAllRanges()
+      setShowMessageSelectionPopup(false)
+      setMessageSelection({ range: null, rect: null, text: null, messageIndex: null })
+    }
+  }
+
+  // Message selection popup component
+  const MessageSelectionPopup = () => {
+    if (!showMessageSelectionPopup || !messageSelection.rect) return null
+
+    return (
+      <div
+        className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-2 flex items-center gap-2"
+        style={{
+          position: "absolute",
+          top: messageSelection.rect.top - 50,
+          left: messageSelection.rect.left + messageSelection.rect.width / 2 - 100,
+        }}
+      >
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 hover:bg-purple-100"
+          onClick={handleAddMessageTextToContext}
+          title="Add to context"
+        >
+          <MessageCircle className="h-4 w-4 text-purple-600" />
+        </Button>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 w-8 p-0 hover:bg-gray-100" 
+          onClick={() => {
+            setShowMessageSelectionPopup(false)
+            window.getSelection()?.removeAllRanges()
+          }}
+          title="Close"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+    )
   }
 
   return (
-    <div className="w-full max-w-[40vw] max-h-[90vh] h-full bg-white border border-gray-200 flex flex-col m-5 rounded-2xl overflow-hidden shadow-lg">
+    <div className="w-full max-w-[40vw] h-[90vh] bg-white border border-gray-200 flex flex-col m-5 rounded-2xl overflow-hidden shadow-lg">
       <Tabs
         value={activeTab}
         onValueChange={(v) => setActiveTab(v as "chat" | "suggestions")}
@@ -385,12 +464,12 @@ export function ChatPanel({
                           {message.contextPreview}
                         </div>
                       )}
-                      <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                      <div 
+                        className="text-sm leading-relaxed whitespace-pre-wrap select-text"
+                        onMouseUp={(e) => handleMessageTextSelection(e, index)}
+                      >
                         {message.content}
                       </div>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2 text-right">
-                      {formatTime(message.timestamp)}
                     </div>
                   </div>
                 ) : (
@@ -401,7 +480,10 @@ export function ChatPanel({
                         {message.contextPreview}
                       </div>
                     )}
-                    <div className="prose prose-sm max-w-none text-gray-800">
+                    <div 
+                      className="prose prose-sm max-w-none text-gray-800 select-text"
+                      onMouseUp={(e) => handleMessageTextSelection(e, index)}
+                    >
                       <ReactMarkdown
                         components={{
                           p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
@@ -420,9 +502,6 @@ export function ChatPanel({
                       >
                         {message.content}
                       </ReactMarkdown>
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      {formatTime(message.timestamp)}
                     </div>
                   </div>
                 )}
@@ -484,7 +563,9 @@ export function ChatPanel({
           {selectedContextItem && (
             <div className="px-6 pt-2">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 pr-10 relative">
-                <div className="text-xs text-blue-600 font-medium mb-2">From page {selectedContextItem.pageNumber}</div>
+                <div className="text-xs text-blue-600 font-medium mb-2">
+                  {selectedContextItem.pageNumber === 0 ? 'From previous message' : `From page ${selectedContextItem.pageNumber}`}
+                </div>
                 <p className="text-sm text-gray-700 line-clamp-2 leading-relaxed">{selectedContextItem.text}</p>
                 <Button
                   variant="ghost"
@@ -543,6 +624,9 @@ export function ChatPanel({
           </div>
         </TabsContent>
       </Tabs>
+      
+      {/* Message selection popup */}
+      <MessageSelectionPopup />
     </div>
   )
 }

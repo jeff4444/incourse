@@ -94,6 +94,15 @@ function FileViewPage({
   const [contextItems, setContextItems] = useState<{ id: string; text: string; source: string; pageNumber: number }[]>([]);
   const [selectedContextItem, setSelectedContextItem] = useState<{ id: string; text: string; source: string; pageNumber: number } | null>(null);
   const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat");
+  const [chatSessionId, setChatSessionId] = useState<string | null>(null);
+  const [hasLoadedChatHistory, setHasLoadedChatHistory] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]>([
+    {
+      role: "assistant",
+      content: "Hi there! I'm your AI learning assistant. How can I help you with this document?",
+      timestamp: new Date(),
+    },
+  ]);
   const router = useRouter();
 
   // Check if filename contains "homework" or "assignment" (case insensitive)
@@ -135,6 +144,78 @@ function FileViewPage({
       setSelectedContextItem(null);
     }
   };
+
+  // Handle adding context item from chat messages
+  const handleAddContextItem = (contextItem: { id: string; text: string; source: string; pageNumber: number }) => {
+    setContextItems([...contextItems, contextItem]);
+    setSelectedContextItem(contextItem);
+  };
+
+  // Load chat history from backend
+  const loadChatHistory = async (sessionId: string) => {
+    try {
+      const data = await authenticatedFetchJson<{ messages: any[] }>(
+        `/api/agents/chat/history?sessionId=${sessionId}`,
+        {
+          method: 'GET',
+        }
+      );
+      
+      if (data?.messages && data.messages.length > 0) {
+        // Convert backend messages to frontend format
+        const historyMessages = data.messages.map((msg: any) => ({
+          role: msg.sender as "user" | "assistant",
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          contextPreview: undefined
+        }));
+        
+        // Replace the default welcome message with actual history
+        setChatMessages(historyMessages);
+      }
+    } catch (error) {
+      console.error("Error loading chat history:", error);
+    }
+  };
+
+  // Handle updating chat messages
+  const handleUpdateChatMessages = (messages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[]) => {
+    setChatMessages(messages);
+  };
+
+  // Load chat session when file details are available
+  useEffect(() => {
+    if (fileDetails && courseID && !hasLoadedChatHistory) {
+      setHasLoadedChatHistory(true);
+      
+      // Auto-detect existing session for this user-document pair
+      const detectAndLoadExistingSession = async () => {
+        try {
+          const data = await authenticatedFetchJson<{ sessionId?: string }>(
+            '/api/agents/chat/session',
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                courseId: courseID,
+                fileIds: [fileDetails.canvasId || fileDetails.id || ''],
+              }),
+            }
+          );
+          
+          if (data?.sessionId) {
+            setChatSessionId(data.sessionId);
+            // Load chat history for this session
+            loadChatHistory(data.sessionId);
+          }
+        } catch (error) {
+          console.error("Error detecting existing session:", error);
+        }
+      };
+      
+      detectAndLoadExistingSession();
+    }
+  }, [fileDetails, courseID, hasLoadedChatHistory]);
 
   // Reading tracker - only enable when we have file details
   const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
@@ -303,9 +384,12 @@ function FileViewPage({
             contextItems={contextItems}
             selectedContextItem={selectedContextItem}
             onRemoveContextItem={handleRemoveContextItem}
+            onAddContextItem={handleAddContextItem}
             courseId={courseID}
             fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
-            initialSessionId={undefined}
+            initialSessionId={chatSessionId || undefined}
+            messages={chatMessages}
+            onUpdateMessages={handleUpdateChatMessages}
           />
         )}
       </div>
