@@ -3,9 +3,11 @@ import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: NextRequest) {
+  let sessionId: string | null = null;
+  
   try {
     const { searchParams } = new URL(request.url);
-    const sessionId = searchParams.get("sessionId");
+    sessionId = searchParams.get("sessionId");
 
     if (!sessionId) {
       return NextResponse.json({ error: "Session ID is required" }, { status: 400 });
