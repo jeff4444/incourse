@@ -48,6 +48,9 @@ export class BackendStack extends cdk.Stack {
       environment: {
         // Add your Bedrock model ARN here - you'll need to set this
         AWS_MODEL_ARN: 'arn:aws:bedrock:us-east-1:412385203988:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+        // Lambda Web Adapter configuration
+        AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
+        PORT: '8080',
         // Add other environment variables as needed
         // Note: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are not needed when using IAM roles
       },
@@ -60,6 +63,7 @@ export class BackendStack extends cdk.Stack {
         allowedMethods: [lambda.HttpMethod.ALL],
         allowedHeaders: ['*'],
       },
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM, // Enable streaming
     });
 
     new cdk.CfnOutput(this, 'FuncUrlValue', {

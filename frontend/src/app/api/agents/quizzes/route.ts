@@ -97,6 +97,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log("Response:", resp);
+
     const data = await resp.json();
     return NextResponse.json(data);
 
