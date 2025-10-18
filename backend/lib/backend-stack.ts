@@ -2,6 +2,10 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 export class BackendStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -47,12 +51,21 @@ export class BackendStack extends cdk.Stack {
       role: lambdaRole,
       environment: {
         // Add your Bedrock model ARN here - you'll need to set this
-        AWS_MODEL_ARN: 'arn:aws:bedrock:us-east-1:412385203988:inference-profile/us.anthropic.claude-sonnet-4-5-20250929-v1:0',
+        AWS_MODEL_ARN: process.env.AWS_MODEL_ARN || '',
         // Lambda Web Adapter configuration
         AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
         PORT: '8080',
-        // Add other environment variables as needed
-        // Note: AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY are not needed when using IAM roles
+        AWS_LWA_INVOKE_MODE: 'RESPONSE_STREAM',
+        DEBUG: 'false',
+        GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+        CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || '',
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY || '',
+        PINECONE_API_KEY: process.env.PINECONE_API_KEY || '',
+        NEXT_PUBLIC_ENCRYPTION_KEY: process.env.NEXT_PUBLIC_ENCRYPTION_KEY || '',
+        NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL || '',
+        NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
       },
     });
   

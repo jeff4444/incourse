@@ -8,7 +8,7 @@ import aiohttp
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Any
-from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, validator
@@ -531,109 +531,9 @@ async def chat(request: ChatRequest):
         print("=" * 80)
         raise HTTPException(status_code=500, detail=f"Error chatting: {str(e)}")
 
-async def save_chat_session_background(
-    user_id: str,
-    course_id: str,
-    file_id: str,
-    user_message: str,
-    assistant_response: str,
-    deps: ChatDeps
-):
-    """
-    Background task to save chat session after streaming completes.
-    This runs asynchronously so the user doesn't have to wait.
-    """
-    try:
-        # 1. Ensure we have a chat_id
-        if not deps.chat_id:
-            from tools.supabase_tools import get_or_create_chat_session
-            
-            # Need document_id for chat session
-            if not deps.file_info:
-                try:
-                    file_info = await get_module_items_by_course_id(
-                        course_id=course_id,
-                        lms_id=file_id
-                    )
-                    document_id = file_info["id"]
-                    deps.file_info = file_info
-                    deps.is_file_from_lms = False
-                except Exception:
-                    document_id = file_id
-                    deps.is_file_from_lms = True
-            else:
-                document_id = deps.file_info["id"] if not deps.is_file_from_lms else file_id
-            
-            chat_session = await get_or_create_chat_session(
-                user_id=user_id,
-                document_id=document_id
-            )
-            deps.chat_id = chat_session["id"]
-        
-        # 2. Ensure we have minimal info for session manager
-        if not deps.course_info:
-            deps.course_info = await get_course(course_id=course_id)
-        
-        if not deps.file_info:
-            try:
-                deps.file_info = await get_module_items_by_course_id(
-                    course_id=deps.course_info["id"],
-                    lms_id=file_id
-                )
-                deps.is_file_from_lms = False
-            except Exception:
-                if not deps.lms_api_key:
-                    lms_info = await get_user_lms_info(user_id)
-                    deps.lms_api_key = lms_info["api_key"]
-                    deps.lms_base_url = lms_info["base_url"]
-                
-                deps.file_info = await get_file_details_with_content(
-                    api_key=deps.lms_api_key,
-                    api_base_url=deps.lms_base_url,
-                    course_id=deps.course_info["lms_id"],
-                    file_id=file_id
-                )
-                deps.is_file_from_lms = True
-        
-        # 3. Initialize session manager and save messages
-        session_manager = ChatSessionManager(
-            course_info=deps.course_info,
-            file_info=deps.file_info
-        )
-        
-        await session_manager.add_message_to_buffer(
-            chat_id=deps.chat_id,
-            sender="user",
-            content=user_message
-        )
-        
-        await session_manager.add_message_to_buffer(
-            chat_id=deps.chat_id,
-            sender="assistant",
-            content=assistant_response
-        )
-        
-        # 4. Check if we should create a summary
-        await session_manager.check_and_create_summary(
-            chat_id=deps.chat_id,
-            user_message=user_message,
-            assistant_response=assistant_response,
-            existing_chat_history=deps.chat_history,
-            existing_context_summary=deps.context_summary
-        )
-        
-        # 5. Flush any remaining messages in buffer
-        await session_manager.flush_buffer(chat_id=deps.chat_id)
-        
-    except Exception as session_error:
-        print(f"Error in background session management: {session_error}")
-        import traceback
-        traceback.print_exc()
-
-
 # Chat Agent Streaming Endpoint
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
+async def chat_stream(request: ChatRequest):
     """
     Stream chat responses with token-by-token generation and real-time tool call visibility.
     Uses pydantic-ai's native streaming capabilities with agent.iter() and node.stream().
@@ -665,6 +565,7 @@ async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
             
             async for event in stream_chat_agent(agent, user_prompt, deps):
                 # Send event to client
+                print("Sending event to client: ", event.to_sse())
                 yield event.to_sse()
                 
                 # Buffer text content for session management
@@ -674,16 +575,93 @@ async def chat_stream(request: ChatRequest, background_tasks: BackgroundTasks):
                     full_response = event.content
             
             if full_response:
-                # Schedule session management as background task (doesn't block response)
-                background_tasks.add_task(
-                    save_chat_session_background,
-                    user_id=request.user_id,
-                    course_id=request.course_id,
-                    file_id=request.file_ids[0],
-                    user_message=request.message,
-                    assistant_response=full_response,
-                    deps=deps
-                )
+                # Save chat session directly in the main flow
+                try:
+                    # 1. Ensure we have a chat_id
+                    if not deps.chat_id:
+                        from tools.supabase_tools import get_or_create_chat_session
+                        
+                        # Need document_id for chat session
+                        if not deps.file_info:
+                            try:
+                                file_info = await get_module_items_by_course_id(
+                                    course_id=request.course_id,
+                                    lms_id=request.file_ids[0]
+                                )
+                                document_id = file_info["id"]
+                                deps.file_info = file_info
+                                deps.is_file_from_lms = False
+                            except Exception:
+                                document_id = request.file_ids[0]
+                                deps.is_file_from_lms = True
+                        else:
+                            document_id = deps.file_info["id"] if not deps.is_file_from_lms else request.file_ids[0]
+                        
+                        chat_session = await get_or_create_chat_session(
+                            user_id=request.user_id,
+                            document_id=document_id
+                        )
+                        deps.chat_id = chat_session["id"]
+                    
+                    # 2. Ensure we have minimal info for session manager
+                    if not deps.course_info:
+                        deps.course_info = await get_course(course_id=request.course_id)
+                    
+                    if not deps.file_info:
+                        try:
+                            deps.file_info = await get_module_items_by_course_id(
+                                course_id=deps.course_info["id"],
+                                lms_id=request.file_ids[0]
+                            )
+                            deps.is_file_from_lms = False
+                        except Exception:
+                            if not deps.lms_api_key:
+                                lms_info = await get_user_lms_info(request.user_id)
+                                deps.lms_api_key = lms_info["api_key"]
+                                deps.lms_base_url = lms_info["base_url"]
+                            
+                            deps.file_info = await get_file_details_with_content(
+                                api_key=deps.lms_api_key,
+                                api_base_url=deps.lms_base_url,
+                                course_id=deps.course_info["lms_id"],
+                                file_id=request.file_ids[0]
+                            )
+                            deps.is_file_from_lms = True
+                    
+                    # 3. Initialize session manager and save messages
+                    session_manager = ChatSessionManager(
+                        course_info=deps.course_info,
+                        file_info=deps.file_info
+                    )
+                    
+                    await session_manager.add_message_to_buffer(
+                        chat_id=deps.chat_id,
+                        sender="user",
+                        content=request.message
+                    )
+                    
+                    await session_manager.add_message_to_buffer(
+                        chat_id=deps.chat_id,
+                        sender="assistant",
+                        content=full_response
+                    )
+                    
+                    # 4. Check if we should create a summary
+                    await session_manager.check_and_create_summary(
+                        chat_id=deps.chat_id,
+                        user_message=request.message,
+                        assistant_response=full_response,
+                        existing_chat_history=deps.chat_history,
+                        existing_context_summary=deps.context_summary
+                    )
+                    
+                    # 5. Flush any remaining messages in buffer
+                    await session_manager.flush_buffer(chat_id=deps.chat_id)
+                    
+                except Exception as session_error:
+                    print(f"Error in session management: {session_error}")
+                    import traceback
+                    print(traceback.format_exc())
         
         except Exception as e:
             import traceback
