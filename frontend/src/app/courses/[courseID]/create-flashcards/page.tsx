@@ -53,7 +53,7 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
       )
 
       if (!response.deck_id) {
-        console.error('Failed to generate flashcards: ' + response)
+        console.error('Failed to generate flashcards: ' + JSON.stringify(response))
         alert('Failed to generate flashcards. Please try again.')
         setIsGenerating(false)
         return
