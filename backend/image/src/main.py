@@ -83,7 +83,7 @@ class FlashcardRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str] = Field(..., min_items=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
     num_flashcards: int = 10
     card_type: str = "term-definition"
     extra_context: Optional[str] = None
@@ -92,7 +92,7 @@ class QuizRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str] = Field(..., min_items=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
     num_questions: int = 5
     difficulty: str = "medium"
     extra_context: Optional[str] = None
@@ -134,7 +134,7 @@ class TakeActionResponse(BaseModel):
 class ChatRequest(BaseModel):
     user_id: str
     course_id: str
-    file_ids: List[str] = Field(..., min_items=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
     message: str
     prompt: Optional[str] = None
     session_id: Optional[str] = None
@@ -956,7 +956,7 @@ if __name__ == "__main__":
     
     # Get port from environment or default to 8000
     port = int(os.getenv("PORT", 8000))
-    host = os.getenv("HOST", "0.0.0.0")
+    host = os.getenv("HOST", "127.0.0.1")
     
     print(f"Starting InCourse AI Agents API on {host}:{port}")
     

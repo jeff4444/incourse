@@ -53,9 +53,9 @@ export class BackendStack extends cdk.Stack {
         // Add your Bedrock model ARN here - you'll need to set this
         AWS_MODEL_ARN: process.env.AWS_MODEL_ARN || '',
         // Lambda Web Adapter configuration
+        PORT: '8000',
+        AWS_LWA_INVOKE_MODE: 'response_stream',
         AWS_LAMBDA_EXEC_WRAPPER: '/opt/bootstrap',
-        PORT: '8080',
-        AWS_LWA_INVOKE_MODE: 'RESPONSE_STREAM',
         DEBUG: 'false',
         GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
         CLAUDE_API_KEY: process.env.CLAUDE_API_KEY || '',
