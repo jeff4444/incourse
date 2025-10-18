@@ -16,7 +16,6 @@ import { ZoomIn, ZoomOut, Download, FileText, Loader2, Maximize2, Minimize2, Mes
 import { AnnotationPopup } from "./annotation-popup"
 import { AnnotationDisplay } from "./annotation-display"
 import { nanoid } from "@/lib/utils"
-import { ChatPanel } from "./ai-chat-panel"
 import { FileDetails } from "@/lib/types/course"
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()
@@ -53,7 +52,7 @@ export type ContextItem = {
   pageNumber: number
 }
 
-export default function PDFViewer({ fileDetails, courseId, showChat = true }: { fileDetails: FileDetails, courseId?: string, showChat?: boolean }) {
+export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions = true }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [file, setFile] = useState<PDFFile>(null)
   const [numPages, setNumPages] = useState<number>()
   const [containerRef, setContainerRef] = useState<HTMLElement | null>(null)
@@ -67,8 +66,6 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
   const pageRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
   const textLayerRefs = useRef<{ [key: number]: HTMLDivElement | null }>({})
   const [zenMode, setZenMode] = useState(false)
-  const [showChatState, setShowChat] = useState(showChat)
-  const [activeTab, setActiveTab] = useState<"chat" | "suggestions">("chat")
 
   // Annotation states
   const [annotations, setAnnotations] = useState<Annotation[]>([])
@@ -105,11 +102,11 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
   }
 
   const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.2, 3))
+    setZoom((prev) => Math.min(prev + 0.1, 3))
   }
 
   const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 0.2, 0.3))
+    setZoom((prev) => Math.max(prev - 0.1, 0.3))
   }
 
   const handleDownload = () => {
@@ -126,13 +123,16 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
   }
 
   const toggleZenMode = () => {
-    setZenMode(!zenMode)
-    setShowChat(false)
+    if (!zenMode) {
+      // Entering zen mode - hide panel
+      setZenMode(true)
+      onTogglePanelVisibility?.()
+    } else {
+      // Exiting zen mode - let page decide whether to show panel
+      setZenMode(false)
+    }
   }
 
-  const toggleChat = () => {
-    setShowChat(!showChatState)
-  }
 
   const handlePageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value
@@ -211,7 +211,7 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && zenMode) {
         setZenMode(false)
-        setShowChat(true)
+        // Don't call onTogglePanelVisibility here - let page decide whether to show panel
       }
     }
 
@@ -299,7 +299,10 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
     setContextItems([...contextItems, newContextItem])
     setSelectedContextItem(newContextItem)
     setShowAnnotationPopup(false)
-    setShowChat(true)
+    // Show chat panel when adding context
+    onShowPanel?.()
+    // Send text to chat panel
+    onAddToContext?.(selection.text, selection.pageNumber)
     window.getSelection()?.removeAllRanges()
   }
 
@@ -472,16 +475,6 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
 
               {/* Right side controls */}
               <div className="flex items-center gap-2">
-                {!zenMode && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleChat}
-                    className={`h-8 w-8 p-0 ${showChatState ? "bg-blue-100 text-blue-600" : ""}`}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
-                )}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -593,19 +586,6 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
           </Card>
         </div>
 
-        {/* Chat Panel */}
-        {!zenMode && showChatState && (
-          <ChatPanel
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-            contextItems={contextItems}
-            selectedContextItem={selectedContextItem}
-            onRemoveContextItem={removeContextItem}
-            courseId={courseId || ''}
-            fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
-            initialSessionId={undefined}
-          />
-        )}
       </div>
 
       {/* Annotation Popup */}
@@ -616,6 +596,7 @@ export default function PDFViewer({ fileDetails, courseId, showChat = true }: { 
           onAddNote={handleAddNote}
           onAddToContext={handleAddToContext}
           onClose={() => setShowAnnotationPopup(false)}
+          showContextOptions={showContextOptions}
         />
       )}
     </div>

@@ -7,17 +7,17 @@ import XLSXViewer from "@/components/xlsx-viewer";
 import DOCXViewer from "@/components/docx-viewer";
 import ImageViewer from "@/components/image-viewer";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, FileCheck } from "lucide-react";
 import { FileDetails } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { AutograderPanel } from "@/components/autograder-panel";
 
-function getViewer(fileDetails: FileDetails, courseID?: string) {
+function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean) {
   // PDF files
   if (fileDetails.type === "application/pdf" || fileDetails.contentType === "application/pdf") {
-    return <PDFViewer fileDetails={fileDetails} courseId={courseID} showChat={false} />;
+    return <PDFViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // PowerPoint files
@@ -25,7 +25,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       fileDetails.type === "application/vnd.ms-powerpoint" ||
       fileDetails.contentType === "application/vnd.ms-powerpoint") {
-    return <PPTXViewer fileDetails={fileDetails} courseId={courseID} showChat={false} />;
+    return <PPTXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Excel files
@@ -33,7 +33,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
       fileDetails.type === "application/vnd.ms-excel" ||
       fileDetails.contentType === "application/vnd.ms-excel") {
-    return <XLSXViewer fileDetails={fileDetails} courseId={courseID} showChat={false} />;
+    return <XLSXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Word files
@@ -41,12 +41,12 @@ function getViewer(fileDetails: FileDetails, courseID?: string) {
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       fileDetails.type === "application/msword" ||
       fileDetails.contentType === "application/msword") {
-    return <DOCXViewer fileDetails={fileDetails} courseId={courseID} showChat={false} />;
+    return <DOCXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Image files
   if (fileDetails.type.startsWith("image/") || fileDetails.contentType?.startsWith("image/")) {
-    return <ImageViewer fileDetails={fileDetails} courseId={courseID} showChat={false} />;
+    return <ImageViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Unsupported file type
@@ -86,6 +86,7 @@ function AutograderPage({
   const [fileDetails, setFileDetails] = useState<FileDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showFeedbackPanel, setShowFeedbackPanel] = useState(true);
 
   useEffect(() => {
     const getParams = async () => {
@@ -149,23 +150,42 @@ function AutograderPage({
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-      <div className="flex items-center gap-2 px-5 pt-5 mb-2">
-        <BackButtonClient />
-        <h1 className="text-xl font-semibold">{fileDetails.name} - Autograder</h1>
+      <div className="flex items-center justify-between px-5 pt-5 mb-2">
+        <div className="flex items-center gap-2">
+          <BackButtonClient />
+          <h1 className="text-xl font-semibold">{fileDetails.name} - Autograder</h1>
+        </div>
+        
+        {/* Feedback Panel Toggle */}
+        <div className="relative group">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowFeedbackPanel(!showFeedbackPanel)}
+            className={`flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-32 ${showFeedbackPanel ? "bg-green-100 hover:bg-green-200 border-green-200" : ""}`}
+          >
+            <FileCheck className="h-4 w-4" />
+            <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
+              {showFeedbackPanel ? "Hide Feedback" : "Show Feedback"}
+            </span>
+          </Button>
+        </div>
       </div>
       
       <div className="flex">
         {/* File Viewer - Left Side */}
         <div className="flex-1 px-5">
-          {getViewer(fileDetails, courseID)}
+          {getViewer(fileDetails, courseID, () => setShowFeedbackPanel(!showFeedbackPanel), () => setShowFeedbackPanel(true), undefined, false)}
         </div>
         
         {/* Autograder Panel - Right Side */}
-        <AutograderPanel 
-          courseId={courseID}
-          fileId={fileID}
-          assignmentName={fileDetails.name}
-        />
+        {showFeedbackPanel && (
+          <AutograderPanel 
+            courseId={courseID}
+            fileId={fileID}
+            assignmentName={fileDetails.name}
+          />
+        )}
       </div>
     </div>
   );

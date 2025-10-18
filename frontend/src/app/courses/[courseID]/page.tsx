@@ -102,14 +102,14 @@ function CoursePage({
 
         {/* Course Content */}
         <div className="grid grid-cols-1 gap-6">
-          <Tabs defaultValue="notes" className="w-full">
+          <Tabs defaultValue="modules" className="w-full">
             <TabsList className="mb-6">
-              <TabsTrigger value="notes">Notes</TabsTrigger>
+              <TabsTrigger value="modules">Modules</TabsTrigger>
               <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
               <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
               <TabsTrigger value="assignments">Assignments</TabsTrigger>
             </TabsList>
-            <TabsContent value="notes">
+            <TabsContent value="modules">
               <div className="grid grid-cols-1 gap-6">
                 {/* <Card className="pb-0 justify-between">
                   <CardContent>

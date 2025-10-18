@@ -8,6 +8,9 @@ import sys
 import uvicorn
 from dotenv import load_dotenv
 
+# add the project root to path so we can find the .env file
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+
 load_dotenv()
 
 def main():
