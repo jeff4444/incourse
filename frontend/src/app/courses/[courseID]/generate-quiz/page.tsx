@@ -52,6 +52,10 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
         }
       )
 
+      if (!response.quiz_id) {
+        throw new Error('Failed to generate quiz: ' + response)
+      }
+
       // Navigate to the newly created quiz
       router.push(`/courses/${courseID}/quiz/${response.quiz_id}`)
     } catch (error) {

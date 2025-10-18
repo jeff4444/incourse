@@ -52,6 +52,13 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
         }
       )
 
+      if (!response.deck_id) {
+        console.error('Failed to generate flashcards: ' + response)
+        alert('Failed to generate flashcards. Please try again.')
+        setIsGenerating(false)
+        return
+      }
+
       // Navigate to the newly created flashcard deck
       router.push(`/courses/${courseID}/flashcards/${response.deck_id}`)
     } catch (error) {
