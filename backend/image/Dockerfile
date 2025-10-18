@@ -3,6 +3,8 @@ FROM public.ecr.aws/docker/library/python:3.12.0-slim-bullseye
 # Install the Lambda Web Adapter extension
 COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:0.9.1 /lambda-adapter /opt/extensions/lambda-adapter
 ENV PORT=8000
+ENV AWS_LWA_INVOKE_MODE=response_stream
+ENV AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap
 COPY requirements.txt ${LAMBDA_TASK_ROOT}
 
 RUN pip install -r requirements.txt

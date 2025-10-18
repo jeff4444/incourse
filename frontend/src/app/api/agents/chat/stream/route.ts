@@ -90,27 +90,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Handle Lambda response format for streaming
-    const responseText = await resp.text();
-    
-    // Check if this is a Lambda response format
-    let streamBody;
-    try {
-      const lambdaResponse = JSON.parse(responseText);
-      if (lambdaResponse.body) {
-        // Lambda response format: extract the body content
-        streamBody = lambdaResponse.body;
-      } else {
-        // Direct response format
-        streamBody = responseText;
-      }
-    } catch (e) {
-      // Not JSON, treat as direct response
-      streamBody = responseText;
-    }
-    
-    // Stream the response directly to the client
-    return new Response(streamBody, {
+    // Stream the response directly to the client without buffering
+    return new Response(resp.body, {
       headers: {
         'Content-Type': 'text/event-stream',
         'Cache-Control': 'no-cache',
