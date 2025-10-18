@@ -12,4 +12,3 @@ pinecone
 supabase
 pycryptodomex
 openai
-mangum
