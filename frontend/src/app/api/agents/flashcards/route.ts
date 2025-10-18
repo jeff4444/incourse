@@ -98,7 +98,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const data = await resp.json();
+    const lambdaResponse = await resp.json();
+    
+    // Extract the body from Lambda response format
+    let data;
+    if (lambdaResponse.body) {
+      // Lambda response format: extract and parse the body
+      data = JSON.parse(lambdaResponse.body);
+    } else {
+      // Direct response format (for local development)
+      data = lambdaResponse;
+    }
+    
     return NextResponse.json(data);
 
   } catch (error) {

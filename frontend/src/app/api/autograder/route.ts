@@ -57,13 +57,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await response.json();
+    const lambdaResponse = await response.json();
+    
+    // Extract the body from Lambda response format
+    let result;
+    if (lambdaResponse.body) {
+      // Lambda response format: extract and parse the body
+      result = JSON.parse(lambdaResponse.body);
+    } else {
+      // Direct response format (for local development)
+      result = lambdaResponse;
+    }
+    
     return NextResponse.json(result);
 
   } catch (error) {
     console.error('Error in autograder API route:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error" + JSON.stringify(error) },
       { status: 500 }
     );
   }
