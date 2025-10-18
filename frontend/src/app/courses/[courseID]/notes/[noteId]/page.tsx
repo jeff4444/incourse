@@ -118,13 +118,13 @@ function NoteEditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
       <Navbar />
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex h-[calc(100vh-4rem)] p-4 gap-4">
         {/* Sidebar */}
         <div 
           className={cn(
-            "sidebar bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex-shrink-0",
+            "sidebar bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm transition-all duration-300 ease-in-out flex-shrink-0",
             sidebarOpen ? "" : "w-0 overflow-hidden"
           )}
           style={{ 
@@ -135,12 +135,13 @@ function NoteEditorPage() {
         >
           <div className="h-full flex flex-col">
             {/* Sidebar Header */}
-            <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">Notes</h2>
+            <div className="p-4 border-b border-slate-200/60 flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-slate-800">Notes</h2>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSidebarOpen(false)}
+                className="hover:bg-slate-200/50"
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -161,23 +162,25 @@ function NoteEditorPage() {
         {/* Draggable Resize Handle */}
         {sidebarOpen && (
           <div
-            className="w-1 bg-gray-200 hover:bg-gray-300 cursor-col-resize flex-shrink-0 transition-colors"
+            className="w-1 bg-slate-300/50 hover:bg-slate-400/70 cursor-col-resize flex-shrink-0 transition-colors rounded-full"
             onMouseDown={() => setIsResizing(true)}
           />
         )}
 
         {/* Main Editor Area */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Editor */}
+          {/* Floating Editor Container */}
           <div className="flex-1 overflow-hidden">
-            <NoteEditor 
-              note={note} 
-              onSave={() => {
-                // Optional: show success message or redirect
-              }}
-              sidebarOpen={sidebarOpen}
-              onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-            />
+            <div className="h-full bg-white/90 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-lg shadow-slate-200/50 transition-all duration-300 ease-in-out hover:shadow-xl hover:shadow-slate-200/60">
+              <NoteEditor 
+                note={note} 
+                onSave={() => {
+                  // Optional: show success message or redirect
+                }}
+                sidebarOpen={sidebarOpen}
+                onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+              />
+            </div>
           </div>
         </div>
       </div>

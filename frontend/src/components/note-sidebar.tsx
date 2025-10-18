@@ -128,31 +128,35 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
   const totalFolders = folders.length;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-transparent">
       {/* Search Bar */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="p-4 border-b border-slate-200/60">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
           <Input
             type="text"
             placeholder="Search notes and folders..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-9 bg-white/80 border-slate-200/60 focus:border-slate-300/80 transition-colors"
           />
         </div>
       </div>
 
       {/* Action Buttons */}
-      <div className="p-4 border-b border-gray-200 flex gap-2">
-        <Button onClick={handleNewNoteClick} className="flex items-center gap-2" size="sm">
+      <div className="p-4 border-b border-slate-200/60 flex gap-2">
+        <Button 
+          onClick={handleNewNoteClick} 
+          className="flex items-center gap-2 bg-slate-600 hover:bg-slate-700 transition-colors" 
+          size="sm"
+        >
           <Plus className="h-4 w-4" />
           New Note
         </Button>
         <Button 
           variant="outline" 
           onClick={() => setShowCreateFolder(true)}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 border-slate-200 hover:bg-slate-50 transition-colors"
           size="sm"
         >
           <Folder className="h-4 w-4" />
@@ -193,20 +197,20 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
           const isExpanded = expandedFolders.has(folder.id);
           
           return (
-            <div key={folder.id} className="border-b border-gray-100">
+            <div key={folder.id} className="border-b border-slate-200/40">
               <div
                 onClick={() => toggleFolder(folder.id)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-100/60 transition-colors cursor-pointer group"
               >
                 <div className="flex items-center gap-2">
                   {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 text-gray-500 transition-transform duration-200" />
+                    <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                   ) : (
-                    <ChevronRight className="h-4 w-4 text-gray-500 transition-transform duration-200" />
+                    <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                   )}
-                  <Folder className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-900">{folder.name}</span>
-                  <span className="text-xs text-gray-500 ml-1">
+                  <Folder className="h-4 w-4 text-slate-500" />
+                  <span className="text-sm font-medium text-slate-800">{folder.name}</span>
+                  <span className="text-xs text-slate-500 ml-1">
                     ({folderNotes.length})
                   </span>
                 </div>
@@ -270,18 +274,18 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
               >
                 <div className="pl-6 space-y-1 max-h-[380px] overflow-y-auto">
                   {folderNotes.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500">
+                    <div className="px-4 py-3 text-sm text-slate-500">
                       No notes in this folder yet.
                     </div>
                   ) : (
                     folderNotes.map((note) => (
                       <div
                         key={note.id}
-                        className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer group"
+                        className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100/60 cursor-pointer group transition-colors"
                         onClick={() => window.location.href = `/courses/${courseID}/notes/${note.id}`}
                       >
-                        <FileText className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm text-gray-700 truncate">{note.title}</span>
+                        <FileText className="h-4 w-4 text-slate-400" />
+                        <span className="text-sm text-slate-700 truncate">{note.title}</span>
                       </div>
                     ))
                   )}
@@ -293,20 +297,20 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
 
         {/* Notes without folder */}
         {notesWithoutFolder.length > 0 && (
-          <div className="border-b border-gray-100">
+          <div className="border-b border-slate-200/40">
             <div
               onClick={toggleAllNotes}
-              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-100/60 transition-colors cursor-pointer group"
             >
               <div className="flex items-center gap-2">
                 {expandedAllNotes ? (
-                  <ChevronDown className="h-4 w-4 text-gray-500 transition-transform duration-200" />
+                  <ChevronDown className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                 ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-500 transition-transform duration-200" />
+                  <ChevronRight className="h-4 w-4 text-slate-500 transition-transform duration-200" />
                 )}
-                <FileText className="h-4 w-4 text-gray-500" />
-                <span className="text-sm font-medium text-gray-900">All Notes</span>
-                <span className="text-xs text-gray-500 ml-1">
+                <FileText className="h-4 w-4 text-slate-500" />
+                <span className="text-sm font-medium text-slate-800">All Notes</span>
+                <span className="text-xs text-slate-500 ml-1">
                   ({notesWithoutFolder.length})
                 </span>
               </div>
@@ -336,11 +340,11 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
                 {notesWithoutFolder.map((note) => (
                   <div
                     key={note.id}
-                    className="flex items-center gap-2 px-4 py-2 hover:bg-gray-50 cursor-pointer group"
+                    className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100/60 cursor-pointer group transition-colors"
                     onClick={() => window.location.href = `/courses/${courseID}/notes/${note.id}`}
                   >
-                    <FileText className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-700 truncate">{note.title}</span>
+                    <FileText className="h-4 w-4 text-slate-400" />
+                    <span className="text-sm text-slate-700 truncate">{note.title}</span>
                   </div>
                 ))}
               </div>

@@ -147,7 +147,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     },
     editorProps: {
       attributes: {
-        class: "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none h-full p-6 font-math",
+        class: "prose prose-base sm:prose-lg lg:prose-xl xl:prose-2xl mx-auto focus:outline-none h-full p-8 font-math text-black",
         style: "font-family: 'Computer Modern', 'Latin Modern Math', 'STIX Two Math', 'Asana Math', 'Cambria Math', 'Times New Roman', serif;",
       },
     },
@@ -365,16 +365,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   }
 
   return (
-    <div className="h-full bg-white flex flex-col relative">
+    <div className="h-full bg-white/95 backdrop-blur-sm flex flex-col relative rounded-2xl overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-white">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm">
         {/* Left side - Back button and sidebar toggle */}
         <div className="flex items-center gap-2">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.back()}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 hover:bg-slate-100/80 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
             Back
@@ -384,6 +384,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               variant="ghost"
               size="sm"
               onClick={onToggleSidebar}
+              className="hover:bg-slate-100/80 transition-colors"
             >
               <Menu className="h-4 w-4" />
             </Button>
@@ -396,20 +397,20 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Note title..."
-            className="text-3xl font-bold border-none shadow-none focus-visible:ring-0 p-0 min-w-0 text-center max-w-md"
+            className="text-3xl font-bold border-none shadow-none focus-visible:ring-0 p-0 min-w-0 text-center max-w-md bg-transparent placeholder:text-slate-400"
           />
         </div>
         
         {/* Right side - Save status and action buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {isSaving && (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" />
               Saving...
             </div>
           )}
           {lastSaved && !isSaving && (
-            <div className="text-sm text-muted-foreground">
+            <div className="text-sm text-slate-500">
               Saved {lastSaved.toLocaleTimeString()}
             </div>
           )}
@@ -418,7 +419,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             size="sm"
             onClick={handleManualSave}
             disabled={isSaving || !hasUnsavedChanges}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-slate-200 hover:bg-slate-50 transition-colors"
           >
             <Save className="h-4 w-4" />
             {hasUnsavedChanges ? "Save" : "Saved"}
@@ -427,7 +428,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             variant="outline"
             size="sm"
             onClick={exportNote}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-slate-200 hover:bg-slate-50 transition-colors"
           >
             <Download className="h-4 w-4" />
             Export
@@ -436,7 +437,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       </div>
       
       {/* Editor */}
-      <div className="flex-1 overflow-hidden relative" ref={editorRef}>
+      <div className="flex-1 overflow-hidden relative bg-slate-50/30" ref={editorRef}>
         <EditorContent 
           editor={editor} 
           className="h-full"
@@ -445,7 +446,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         {/* Floating Toolbar */}
         {showFloatingToolbar && editor && (
           <div
-            className="absolute z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-1 flex items-center gap-1 transform -translate-x-1/2 max-w-[90vw] overflow-x-auto"
+            className="absolute z-50 bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg shadow-slate-200/50 p-2 flex items-center gap-1 transform -translate-x-1/2 max-w-[90vw] overflow-x-auto"
             style={{
               left: `${toolbarPosition.x}px`,
               top: `${toolbarPosition.y}px`,
@@ -456,7 +457,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               variant={editor.isActive('bold') ? 'default' : 'ghost'}
               size="sm"
               onClick={() => editor.chain().focus().toggleBold().run()}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
               title="Bold (Ctrl+B)"
             >
               <Bold className="h-4 w-4" />
@@ -465,7 +466,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               variant={editor.isActive('italic') ? 'default' : 'ghost'}
               size="sm"
               onClick={() => editor.chain().focus().toggleItalic().run()}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
               title="Italic (Ctrl+I)"
             >
               <Italic className="h-4 w-4" />
@@ -474,14 +475,14 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               variant={editor.isActive('underline') ? 'default' : 'ghost'}
               size="sm"
               onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className="h-8 w-8 p-0"
+              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
               title="Underline (Ctrl+U)"
             >
               <UnderlineIcon className="h-4 w-4" />
             </Button>
             
             {/* Separator */}
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
             {/* Headings */}
             <Button
@@ -513,7 +514,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             </Button>
             
             {/* Separator */}
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
             {/* Lists */}
             <Button
@@ -536,7 +537,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             </Button>
             
             {/* Separator */}
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
             {/* Code and Quote */}
             <Button
@@ -559,7 +560,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             </Button>
             
             {/* Separator */}
-            <div className="w-px h-6 bg-gray-300 mx-1" />
+            <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
             {/* Link */}
             <Button
