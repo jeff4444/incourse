@@ -4,9 +4,10 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Loader2, FileText, AlertCircle, Download } from "lucide-react"
+import { Loader2, FileText, AlertCircle, Download, Maximize2, Minimize2 } from "lucide-react"
 import { FileDetails } from "@/lib/types/course"
 import PDFViewer from "./pdf-viewer"
+import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
@@ -15,11 +16,17 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
   const [error, setError] = useState<string | null>(null)
   const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null)
   const [pdfFileDetails, setPdfFileDetails] = useState<FileDetails | null>(null)
+  const [showFallback, setShowFallback] = useState(false)
+  const [zenMode, setZenMode] = useState(false)
 
   // Convert DOCX to PDF on mount
   useEffect(() => {
+    let isMounted = true
+    let currentPdfUrl: string | null = null
+    
     const convertDOCX = async () => {
       try {
+        if (!isMounted) return
         setIsConverting(true)
         setError(null)
 
@@ -49,6 +56,13 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
         
         // Create a URL for the PDF blob
         const pdfUrl = URL.createObjectURL(pdfBlob)
+        currentPdfUrl = pdfUrl
+        
+        if (!isMounted) {
+          URL.revokeObjectURL(pdfUrl)
+          return
+        }
+        
         setConvertedPdfUrl(pdfUrl)
 
         // Create FileDetails for the PDF viewer
@@ -61,21 +75,30 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
         setPdfFileDetails(pdfDetails)
 
       } catch (err) {
+        if (!isMounted) return
         console.error('Error converting Word document:', err)
         setError(
           err instanceof Error 
             ? err.message 
             : 'Failed to convert Word document. Please ensure LibreOffice is installed on the server.'
         )
+        // Show fallback viewer when conversion fails
+        setShowFallback(true)
       } finally {
-        setIsConverting(false)
+        if (isMounted) {
+          setIsConverting(false)
+        }
       }
     }
 
     convertDOCX()
 
-    // Cleanup: revoke object URL when component unmounts
+    // Cleanup: revoke object URL when component unmounts or dependencies change
     return () => {
+      isMounted = false
+      if (currentPdfUrl) {
+        URL.revokeObjectURL(currentPdfUrl)
+      }
       if (convertedPdfUrl) {
         URL.revokeObjectURL(convertedPdfUrl)
       }
@@ -89,9 +112,102 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
     link.click()
   }
 
+  const toggleZenMode = () => {
+    if (!zenMode) {
+      // Entering zen mode - hide panel
+      onTogglePanelVisibility?.()
+    } else {
+      // Exiting zen mode - let page decide whether to show panel
+      onTogglePanelVisibility?.()
+    }
+    setZenMode(!zenMode)
+  }
+
   // If PDF is ready, render the PDF viewer directly
   if (pdfFileDetails && !isConverting && !error) {
     return <PDFViewer fileDetails={pdfFileDetails} courseId={courseId} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />
+  }
+
+  // If conversion failed, show fallback viewer
+  if (showFallback && !isConverting) {
+    return (
+      <div className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
+        <div className={`flex ${zenMode ? "h-screen" : ""}`}>
+          <div className={`transition-all duration-300 ${zenMode ? "w-full h-full" : "max-w-6xl mx-auto flex-1"}`}>
+            <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} flex-shrink-0 py-1`}>
+              <CardContent className="flex items-center justify-between py-0">
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm ${zenMode ? "text-gray-300" : "text-gray-600"}`}>Word Document (Fallback Viewer)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleDownload}
+                    className={`flex items-center gap-2 ${zenMode ? "border-gray-600 text-gray-300 hover:bg-gray-700" : ""}`}
+                  >
+                    <Download className="h-4 w-4" />
+                    Download
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleZenMode}
+                    className={`h-8 w-8 p-0 ${zenMode ? "text-gray-300 hover:bg-gray-700" : ""}`}
+                  >
+                    {zenMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className={`flex-1 overflow-hidden py-0 ${zenMode ? "bg-gray-800 border-gray-700 h-[calc(100vh-64px)]" : ""}`}>
+              <CardContent className="p-0 h-[85vh]">
+                <div className={`h-full ${zenMode ? "bg-gray-900" : ""}`}>
+                  <style jsx>{`
+                    :global(#msdoc-renderer) {
+                      height: 100% !important;
+                    }
+                    :global(#proxy-renderer) {
+                      height: 100% !important;
+                    }
+                    :global(.doc-viewer-container) {
+                      height: 100% !important;
+                    }
+                  `}</style>
+                  <DocViewer
+                    key={`docx-fallback-${fileDetails.url}`}
+                    documents={[{
+                      uri: fileDetails.url,
+                      fileName: fileDetails.name,
+                      fileType: fileDetails.name.split('.').pop()?.toLowerCase() || 'docx'
+                    }]}
+                    pluginRenderers={DocViewerRenderers}
+                    config={{
+                      header: {
+                        disableHeader: false,
+                        disableFileName: false,
+                        retainURLParams: false
+                      },
+                      loadingRenderer: {
+                        overrideComponent: () => null
+                      },
+                      noRenderer: {
+                        overrideComponent: () => null
+                      }
+                    }}
+                    style={{ 
+                      height: `${window.innerHeight * 0.85}px`,
+                      width: '100%'
+                    }}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Otherwise render the conversion UI (loading or error)
@@ -131,7 +247,7 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
               </div>
             )}
 
-            {error && (
+            {error && !showFallback && (
               <div className="flex flex-col items-center gap-4 py-12 max-w-md mx-auto px-4">
                 <AlertCircle className="h-16 w-16 text-red-400" />
                 <div className="text-center">
@@ -147,8 +263,21 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
                     Download Original File
                   </Button>
                   <Button 
-                    onClick={() => window.location.reload()} 
+                    onClick={() => setShowFallback(true)} 
                     variant="default"
+                    size="sm"
+                  >
+                    Use Fallback Viewer
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      setError(null)
+                      setIsConverting(true)
+                      setShowFallback(false)
+                      // Trigger re-conversion by updating a dependency
+                      window.location.reload()
+                    }} 
+                    variant="outline"
                     size="sm"
                   >
                     Try Again
@@ -156,7 +285,7 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
                 </div>
                 <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                   <p className="text-xs text-blue-800">
-                    <strong>Note:</strong> This feature requires LibreOffice to be installed on the server.
+                    <strong>Note:</strong> This feature requires LibreOffice to be installed on the server. You can use the fallback viewer to view the document directly.
                   </p>
                 </div>
               </div>
