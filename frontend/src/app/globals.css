@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Mathematical Fonts */
+@import url('https://fonts.googleapis.com/css2?family=STIX+Two+Math:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Asana+Math:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cambria+Math:wght@400;500;600;700&display=swap');
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
@@ -213,4 +218,37 @@ body {
 .Example__container__document .react-pdf__message {
   padding: 20px;
   color: white;
+}
+
+/* Mathematical Font Styles */
+.font-math {
+  font-family: 'STIX Two Math', 'Asana Math', 'Cambria Math', 'Computer Modern', 'Latin Modern Math', 'Times New Roman', serif;
+  font-feature-settings: 'kern' 1, 'liga' 1, 'calt' 1;
+  font-variant-numeric: lining-nums;
+  letter-spacing: 0.01em;
+}
+
+/* Enhanced mathematical typography */
+.prose .font-math {
+  font-family: 'STIX Two Math', 'Asana Math', 'Cambria Math', 'Computer Modern', 'Latin Modern Math', 'Times New Roman', serif;
+  line-height: 1.6;
+  font-weight: 400;
+}
+
+/* Mathematical symbols and equations */
+.prose .font-math sup,
+.prose .font-math sub {
+  font-family: 'STIX Two Math', 'Asana Math', 'Cambria Math', 'Computer Modern', 'Latin Modern Math', 'Times New Roman', serif;
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.prose .font-math sup {
+  top: -0.5em;
+}
+
+.prose .font-math sub {
+  bottom: -0.25em;
 }
