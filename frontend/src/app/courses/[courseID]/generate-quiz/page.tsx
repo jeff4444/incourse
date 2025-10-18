@@ -53,7 +53,10 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
       )
 
       if (!response.quiz_id) {
-        throw new Error('Failed to generate quiz: ' + response)
+        console.error('Failed to generate quiz: ' + JSON.stringify(response))
+        alert('Failed to generate quiz. Please try again.')
+        setIsGenerating(false)
+        return
       }
 
       // Navigate to the newly created quiz
