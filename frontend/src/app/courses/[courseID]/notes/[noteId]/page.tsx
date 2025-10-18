@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { NoteEditor } from "@/components/note-editor";
 import { NoteSidebar } from "@/components/note-sidebar";
 import { Navbar } from "@/components/navbar";
-import { CourseSkeleton } from "@/components/course-skeleton";
+import { NoteSkeleton } from "@/components/note-skeleton";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { useNote, useNotes, useNoteFolders } from "@/lib/hooks/useNotes";
 import { createClient } from "@/lib/utils/supabase/client";
@@ -97,7 +97,7 @@ function NoteEditorPage() {
   const { data: folders = [] } = useNoteFolders(courseID, userId);
 
   if (isLoading) {
-    return <CourseSkeleton />;
+    return <NoteSkeleton />;
   }
 
   if (error || !note) {

@@ -109,47 +109,13 @@ function CoursePage({
           <Tabs defaultValue="modules" className="w-full">
             <TabsList className="mb-6">
               <TabsTrigger value="modules">Modules</TabsTrigger>
+              <TabsTrigger value="notes">Notes</TabsTrigger>
               <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
               <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
               <TabsTrigger value="assignments">Assignments</TabsTrigger>
-              <TabsTrigger value="notes">Notes</TabsTrigger>
             </TabsList>
             <TabsContent value="modules">
               <div className="grid grid-cols-1 gap-6">
-                {/* <Card className="pb-0 justify-between">
-                  <CardContent>
-                    <SummaryViewer
-                      title="Course Overview"
-                      content={`This course covers the fundamental principles and concepts of ${course.name}. Throughout the semester, we will explore theoretical foundations and practical applications, with a focus on developing a strong understanding of core concepts.
-
-The course is structured around four main modules:
-1. Introduction and Basic Principles
-2. Theoretical Frameworks
-3. Practical Applications
-4. Advanced Topics and Future Directions
-
-By the end of this course, you will have developed a comprehensive understanding of the subject matter and be able to apply these concepts to real-world scenarios.`}
-                    />
-                  </CardContent>
-                  <CardFooter className="border-t bg-muted/50 p-3 [.border-t]:pt-3">
-                    <div className="flex justify-between items-center w-full text-sm">
-                      <div className="flex items-center">
-                        <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
-                        <span className="text-muted-foreground">Generated 2 days ago</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="ghost" size="sm">
-                          <Download className="mr-2 h-4 w-4" />
-                          Download
-                        </Button>
-                        <Button variant="ghost" size="sm">
-                          <ThumbsUp className="mr-2 h-4 w-4" />
-                          Helpful
-                        </Button>
-                      </div>
-                    </div>
-                  </CardFooter>
-                </Card> */}
                 <Card>
                   <CardHeader>
                     <CardTitle>Course Materials</CardTitle>
@@ -158,12 +124,31 @@ By the end of this course, you will have developed a comprehensive understanding
                   <CardContent>
                     <ModuleList modules={modules} courseID={courseID} />
                   </CardContent>
-                  {/* <CardFooter className="border-t">
-                    <Button className="w-full">
-                      <Plus className="mr-2 h-4 w-4" />
-                      Add New Material
-                    </Button>
-                  </CardFooter> */}
+                </Card>
+              </div>
+            </TabsContent>
+            <TabsContent value="notes">
+              <div className="grid gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <StickyNote className="h-5 w-5" />
+                      Course Notes
+                    </CardTitle>
+                    <CardDescription>Take and organize your personal notes for this course</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {notesLoading || noteFoldersLoading ? (
+                      <div className="text-center py-8 text-muted-foreground">Loading notes...</div>
+                    ) : (
+                      <NoteList 
+                        notes={notes} 
+                        folders={noteFolders} 
+                        courseID={courseID} 
+                        userId={userId} 
+                      />
+                    )}
+                  </CardContent>
                 </Card>
               </div>
             </TabsContent>
@@ -306,32 +291,6 @@ By the end of this course, you will have developed a comprehensive understanding
                       <div className="text-center py-8 text-muted-foreground">Loading assignments...</div>
                     ) : (
                       <AssignmentList assignments={assignments} courseID={courseID} />
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="notes">
-              <div className="grid gap-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <StickyNote className="h-5 w-5" />
-                      Course Notes
-                    </CardTitle>
-                    <CardDescription>Take and organize your personal notes for this course</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {notesLoading || noteFoldersLoading ? (
-                      <div className="text-center py-8 text-muted-foreground">Loading notes...</div>
-                    ) : (
-                      <NoteList 
-                        notes={notes} 
-                        folders={noteFolders} 
-                        courseID={courseID} 
-                        userId={userId} 
-                      />
                     )}
                   </CardContent>
                 </Card>
