@@ -6,6 +6,7 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import { InlineMath } from "@/lib/tiptap/inline-math";
 import { BlockMath } from "@/lib/tiptap/block-math";
 import { MathInputRules, MathPasteRules } from "@/lib/tiptap/math-input-rule";
@@ -46,7 +47,8 @@ import {
   Search,
   X,
   HelpCircle,
-  Brain
+  Brain,
+  ImageIcon
 } from "lucide-react";
 import { useUpdateNote } from "@/lib/hooks/useNotes";
 import { useRouter } from "next/navigation";
@@ -93,6 +95,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   const router = useRouter();
   const updateNote = useUpdateNote();
   const editorRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const { data: modules = [] } = useModules(note.course_id);
   
   // Get user ID for quizzes and flashcards
@@ -166,6 +169,14 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         HTMLAttributes: {
           class: "text-blue-600 underline cursor-pointer hover:text-blue-700",
           target: "_self",
+        },
+      }),
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'note-image rounded-lg my-4',
+          style: 'max-width: 800px; width: 400px; height: auto;',
         },
       }),
       InlineMath,
@@ -474,6 +485,40 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     };
   }, [handleManualSave, editor]);
 
+  // Handle paste events for images
+  useEffect(() => {
+    if (!editor) return;
+    
+    const handlePaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+      
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          event.preventDefault();
+          const file = item.getAsFile();
+          if (!file) continue;
+          
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            const base64 = e.target?.result as string;
+            editor.chain().focus().setImage({ src: base64 }).run();
+          };
+          reader.readAsDataURL(file);
+          break;
+        }
+      }
+    };
+    
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener('paste', handlePaste);
+    
+    return () => {
+      editorElement.removeEventListener('paste', handlePaste);
+    };
+  }, [editor]);
+
   // Update title when it changes
   useEffect(() => {
     if (title !== note.title) {
@@ -564,6 +609,13 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           attrs: { latex }
         }).run();
       }},
+      { 
+        id: 'image', 
+        label: 'Image', 
+        icon: ImageIcon, 
+        action: handleImageButtonClick,
+        subtitle: 'Insert an image'
+      },
     ];
 
     // Add attachment options
@@ -681,6 +733,42 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     setFlashcardSearchQuery("");
     setTimeout(() => editor?.commands.focus(), 0);
   };
+
+  // Handle image file selection
+  const handleImageUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    
+    const file = files[0];
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB');
+      return;
+    }
+    
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      editor?.chain().focus().setImage({ src: base64 }).run();
+    };
+    reader.readAsDataURL(file);
+    
+    // Reset input
+    event.target.value = '';
+  }, [editor]);
+
+  // Handle image button click
+  const handleImageButtonClick = useCallback(() => {
+    imageInputRef.current?.click();
+  }, []);
 
   // Get filtered quizzes
   const getFilteredQuizzes = () => {
@@ -1047,6 +1135,17 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               <LinkIcon className="h-4 w-4" />
             </Button>
             
+            {/* Image */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleImageButtonClick}
+              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+              title="Insert Image"
+            >
+              <ImageIcon className="h-4 w-4" />
+            </Button>
+            
             {/* Separator */}
             <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
@@ -1333,6 +1432,15 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* Hidden file input for image upload */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleImageUpload}
+        className="hidden"
+      />
     </div>
   );
 }
