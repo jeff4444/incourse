@@ -11,7 +11,6 @@ import { BlockMath } from "@/lib/tiptap/block-math";
 import { MathInputRules, MathPasteRules } from "@/lib/tiptap/math-input-rule";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -56,6 +55,7 @@ import { useModules } from "@/lib/hooks/useModules";
 import { useQuizzes } from "@/lib/hooks/useQuizzes";
 import { useFlashcardDecks } from "@/lib/hooks/useFlashcards";
 import { Module, ModuleItem } from "@/lib/types/course";
+import { authenticatedFetch } from "@/lib/utils/apiClient";
 
 interface NoteEditorProps {
   note: {
@@ -489,9 +489,35 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     }
   }, [title, note.title, debouncedSave]);
 
-  const exportNote = () => {
-    const exportUrl = `/api/courses/${note.course_id}/notes/${note.id}/export`;
-    window.open(exportUrl, '_blank');
+  const exportNote = async () => {
+    try {
+      const exportUrl = `/api/courses/${note.course_id}/notes/${note.id}/export`;
+      const response = await authenticatedFetch(exportUrl);
+      
+      if (!response.ok) {
+        throw new Error('Failed to export note');
+      }
+      
+      // Get the filename from the Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      const filename = contentDisposition 
+        ? contentDisposition.split('filename=')[1]?.replace(/"/g, '')
+        : `note_${note.id}.md`;
+      
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error exporting note:', error);
+      // You could add a toast notification here to show the error to the user
+    }
   };
 
   // Get all available module items for reference
@@ -762,11 +788,6 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <Loader2 className="h-4 w-4 animate-spin" />
               Saving...
-            </div>
-          )}
-          {lastSaved && !isSaving && (
-            <div className="text-sm text-slate-500">
-              Saved {lastSaved.toLocaleTimeString()}
             </div>
           )}
           <Button
