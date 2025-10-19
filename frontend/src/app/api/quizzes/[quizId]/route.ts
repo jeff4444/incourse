@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/utils/supabase/server";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ quizId: string }> }
 ) {
+  // Get user id from request
+  const userData = await getUserFromRequest(request);
+  if (!userData) {
+    return NextResponse.json({ error: "Unauthorized - No valid user token" }, { status: 401 });
+  }
+
   try {
     const { quizId } = await params;
     const supabase = await createClient();

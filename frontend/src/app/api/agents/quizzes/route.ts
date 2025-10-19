@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserCredentials } from "@/lib/utils/userCredentials";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function POST(request: NextRequest) {
   let courseId, name, fileIds, numQuestions, difficulty, extraContext;
@@ -8,26 +8,10 @@ export async function POST(request: NextRequest) {
     const requestBody = await request.json();
     ({ courseId, name, fileIds, numQuestions, difficulty, extraContext } = requestBody);
 
-    // Get the user ID from the session
-    const token = request.headers.get('Authorization')?.split(' ')[1];
-    if (!token) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
-    // Decode the JWT to get user ID
-    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-    const userId = payload.sub;
-
-    // Get user credentials
-    const userCreds = await getUserCredentials(userId, token);
-    if (!userCreds) {
-      return NextResponse.json(
-        { error: "User credentials not found" },
-        { status: 404 }
-      );
+    // Get user id from request
+    const userData = await getUserFromRequest(request);
+    if (!userData) {
+      return NextResponse.json({ error: "Unauthorized - No valid user token" }, { status: 401 });
     }
 
     // Python backend URL
@@ -40,7 +24,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        user_id: userId,
+        user_id: userData.userId,
         course_id: courseId,
         name,
         file_ids: fileIds,
@@ -72,7 +56,7 @@ export async function POST(request: NextRequest) {
         endpoint: '/generate-quiz',
         backendUrl,
         requestBody: {
-          user_id: userId,
+          user_id: userData.userId,
           course_id: courseId,
           name,
           file_ids: fileIds,

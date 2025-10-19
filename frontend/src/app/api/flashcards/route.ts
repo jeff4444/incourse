@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/utils/supabase/server";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function GET(request: NextRequest) {
   try {
+    // Get user id from request
+    const userData = await getUserFromRequest(request);
+    if (!userData) {
+      return NextResponse.json({ error: "Unauthorized - No valid user token" }, { status: 401 });
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const courseId = searchParams.get('courseId');
     const userId = searchParams.get('userId');
