@@ -6,9 +6,18 @@ import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
+import { InlineMath } from "@/lib/tiptap/inline-math";
+import { BlockMath } from "@/lib/tiptap/block-math";
+import { MathInputRules, MathPasteRules } from "@/lib/tiptap/math-input-rule";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Bold, 
   Italic, 
@@ -25,7 +34,9 @@ import {
   Download,
   ArrowLeft,
   Loader2,
-  Menu
+  Menu,
+  Sigma,
+  ChevronDown
 } from "lucide-react";
 import { useUpdateNote } from "@/lib/hooks/useNotes";
 import { useRouter } from "next/navigation";
@@ -58,7 +69,44 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
 
   const editor = useEditor({
     extensions: [
-      StarterKit,
+      StarterKit.configure({
+        heading: {
+          levels: [1, 2, 3],
+          HTMLAttributes: {
+            class: 'heading',
+          },
+        },
+        bulletList: {
+          HTMLAttributes: {
+            class: 'bullet-list',
+          },
+        },
+        orderedList: {
+          HTMLAttributes: {
+            class: 'ordered-list',
+          },
+        },
+        listItem: {
+          HTMLAttributes: {
+            class: 'list-item',
+          },
+        },
+        blockquote: {
+          HTMLAttributes: {
+            class: 'blockquote',
+          },
+        },
+        codeBlock: {
+          HTMLAttributes: {
+            class: 'code-block',
+          },
+        },
+        code: {
+          HTMLAttributes: {
+            class: 'inline-code',
+          },
+        },
+      }),
       Placeholder.configure({
         placeholder: "Start writing your note...",
       }),
@@ -66,12 +114,17 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
-          class: "text-blue-600 underline cursor-pointer",
+          class: "text-blue-600 underline cursor-pointer hover:text-blue-700",
         },
       }),
+      InlineMath,
+      BlockMath,
+      MathInputRules,
+      MathPasteRules,
     ],
     content: note.content,
     immediatelyRender: false,
+    autofocus: false,
     onUpdate: ({ editor }) => {
       // Mark that there are unsaved changes
       setHasUnsavedChanges(true);
@@ -147,8 +200,15 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     },
     editorProps: {
       attributes: {
-        class: "prose prose-base sm:prose-lg lg:prose-xl xl:prose-2xl mx-auto focus:outline-none h-full p-8 font-math text-black",
-        style: "font-family: 'Computer Modern', 'Latin Modern Math', 'STIX Two Math', 'Asana Math', 'Cambria Math', 'Times New Roman', serif;",
+        class: "note-editor-prose prose prose-base sm:prose-lg lg:prose-xl xl:prose-2xl mx-auto focus:outline-none h-full p-8 font-math text-black",
+        style: "font-family: 'Source Serif Pro', 'STIX Two Math', 'Asana Math', 'Cambria Math', 'Computer Modern', 'Latin Modern Math', Georgia, serif;",
+        spellcheck: "true",
+      },
+      handleDOMEvents: {
+        keydown: (view, event) => {
+          // Let TipTap handle its own shortcuts
+          return false;
+        },
       },
     },
   });
@@ -257,83 +317,28 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
 
   // Keyboard shortcuts
   useEffect(() => {
+    if (!editor) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!editor) return;
-      
-      // Save shortcut (Ctrl+S / Cmd+S)
+      // Save shortcut (Ctrl+S / Cmd+S) - works globally
       if ((event.ctrlKey || event.metaKey) && event.key === 's') {
         event.preventDefault();
         handleManualSave();
         return;
       }
-      
-      // Bold shortcut (Ctrl+B / Cmd+B)
-      if ((event.ctrlKey || event.metaKey) && event.key === 'b') {
-        event.preventDefault();
-        editor.chain().focus().toggleBold().run();
-        return;
-      }
-      
-      // Italic shortcut (Ctrl+I / Cmd+I)
-      if ((event.ctrlKey || event.metaKey) && event.key === 'i') {
-        event.preventDefault();
-        editor.chain().focus().toggleItalic().run();
-        return;
-      }
-      
-      // Underline shortcut (Ctrl+U / Cmd+U)
-      if ((event.ctrlKey || event.metaKey) && event.key === 'u') {
-        event.preventDefault();
-        editor.chain().focus().toggleUnderline().run();
-        return;
-      }
-      
-      // Heading shortcuts (Ctrl+1/2/3 / Cmd+1/2/3)
-      if ((event.ctrlKey || event.metaKey) && event.key === '1') {
-        event.preventDefault();
-        editor.chain().focus().toggleHeading({ level: 1 }).run();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key === '2') {
-        event.preventDefault();
-        editor.chain().focus().toggleHeading({ level: 2 }).run();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.key === '3') {
-        event.preventDefault();
-        editor.chain().focus().toggleHeading({ level: 3 }).run();
-        return;
-      }
-      
-      // List shortcuts (Ctrl+Shift+8 for bullet, Ctrl+Shift+7 for numbered)
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === '8') {
-        event.preventDefault();
-        editor.chain().focus().toggleBulletList().run();
-        return;
-      }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === '7') {
-        event.preventDefault();
-        editor.chain().focus().toggleOrderedList().run();
-        return;
-      }
-      
-      // Code shortcut (Ctrl+` / Cmd+`)
-      if ((event.ctrlKey || event.metaKey) && event.key === '`') {
-        event.preventDefault();
-        editor.chain().focus().toggleCode().run();
-        return;
-      }
-      
-      // Quote shortcut (Ctrl+Shift+> / Cmd+Shift+>)
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === '>') {
-        event.preventDefault();
-        editor.chain().focus().toggleBlockquote().run();
-        return;
-      }
     };
 
+    // Add listener to editor element instead of document
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener('keydown', handleKeyDown);
+    
+    // Also add to document for save shortcut
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      editorElement.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [handleManualSave, editor]);
 
   // Update title when it changes
@@ -437,10 +442,14 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       </div>
       
       {/* Editor */}
-      <div className="flex-1 overflow-hidden relative bg-slate-50/30" ref={editorRef}>
+      <div 
+        className="flex-1 overflow-y-auto relative bg-slate-50/30" 
+        ref={editorRef}
+        onClick={() => editor?.commands.focus()}
+      >
         <EditorContent 
           editor={editor} 
-          className="h-full"
+          className="min-h-full cursor-text"
         />
         
         {/* Floating Toolbar */}
@@ -456,8 +465,17 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('bold') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleBold().run()}
-              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+              onClick={() => {
+                editor.chain().focus().toggleBold().run();
+                // Ensure focus remains on editor after button click
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('bold') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Bold (Ctrl+B)"
             >
               <Bold className="h-4 w-4" />
@@ -465,8 +483,17 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('italic') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleItalic().run()}
-              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+              onClick={() => {
+                editor.chain().focus().toggleItalic().run();
+                // Ensure focus remains on editor after button click
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('italic') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Italic (Ctrl+I)"
             >
               <Italic className="h-4 w-4" />
@@ -474,8 +501,17 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('underline') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleUnderline().run()}
-              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+              onClick={() => {
+                editor.chain().focus().toggleUnderline().run();
+                // Ensure focus remains on editor after button click
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('underline') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Underline (Ctrl+U)"
             >
               <UnderlineIcon className="h-4 w-4" />
@@ -488,8 +524,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('heading', { level: 1 }) ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleHeading({ level: 1 }).run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('heading', { level: 1 }) 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Heading 1 (Ctrl+1)"
             >
               <Heading1 className="h-4 w-4" />
@@ -497,8 +541,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('heading', { level: 2 }) ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleHeading({ level: 2 }).run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('heading', { level: 2 }) 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Heading 2 (Ctrl+2)"
             >
               <Heading2 className="h-4 w-4" />
@@ -506,8 +558,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('heading', { level: 3 }) ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleHeading({ level: 3 }).run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('heading', { level: 3 }) 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Heading 3 (Ctrl+3)"
             >
               <Heading3 className="h-4 w-4" />
@@ -520,8 +580,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('bulletList') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleBulletList().run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleBulletList().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('bulletList') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Bullet List (Ctrl+Shift+8)"
             >
               <List className="h-4 w-4" />
@@ -529,8 +597,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('orderedList') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleOrderedList().run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleOrderedList().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('orderedList') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Numbered List (Ctrl+Shift+7)"
             >
               <ListOrdered className="h-4 w-4" />
@@ -543,8 +619,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('code') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleCode().run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleCode().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('code') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Inline Code (Ctrl+`)"
             >
               <Code className="h-4 w-4" />
@@ -552,8 +636,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Button
               variant={editor.isActive('blockquote') ? 'default' : 'ghost'}
               size="sm"
-              onClick={() => editor.chain().focus().toggleBlockquote().run()}
-              className="h-8 w-8 p-0"
+              onClick={() => {
+                editor.chain().focus().toggleBlockquote().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('blockquote') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Quote (Ctrl+Shift+>)"
             >
               <Quote className="h-4 w-4" />
@@ -570,13 +662,73 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                 const url = window.prompt('Enter URL:');
                 if (url) {
                   editor.chain().focus().setLink({ href: url }).run();
+                  setTimeout(() => editor.commands.focus(), 0);
                 }
               }}
-              className="h-8 w-8 p-0"
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('link') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
               title="Add Link"
             >
               <LinkIcon className="h-4 w-4" />
             </Button>
+            
+            {/* Separator */}
+            <div className="w-px h-6 bg-slate-300/60 mx-1" />
+            
+            {/* Math */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-1 hover:bg-slate-100/80 transition-colors"
+                  title="Insert Math"
+                >
+                  <Sigma className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3 ml-0.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={() => {
+                    const selectedText = editor.state.doc.textBetween(
+                      editor.state.selection.from,
+                      editor.state.selection.to
+                    );
+                    const latex = selectedText || 'x^2';
+                    editor.chain().focus().insertContent({
+                      type: 'inlineMath',
+                      attrs: { latex }
+                    }).run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                >
+                  <span className="mr-2">$</span>
+                  Inline Math
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    const selectedText = editor.state.doc.textBetween(
+                      editor.state.selection.from,
+                      editor.state.selection.to
+                    );
+                    const latex = selectedText || '\\frac{a}{b}';
+                    editor.chain().focus().insertContent({
+                      type: 'blockMath',
+                      attrs: { latex }
+                    }).run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                >
+                  <span className="mr-2">$$</span>
+                  Block Math
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>
