@@ -85,6 +85,10 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   const [slashCommandPosition, setSlashCommandPosition] = useState({ x: 0, y: 0 });
   const [slashCommandQuery, setSlashCommandQuery] = useState("");
   const [selectedSlashCommandIndex, setSelectedSlashCommandIndex] = useState(0);
+  const [showAtCommand, setShowAtCommand] = useState(false);
+  const [atCommandPosition, setAtCommandPosition] = useState({ x: 0, y: 0 });
+  const [atCommandQuery, setAtCommandQuery] = useState("");
+  const [selectedAtCommandIndex, setSelectedAtCommandIndex] = useState(0);
   const [showModuleSelector, setShowModuleSelector] = useState(false);
   const [moduleSearchQuery, setModuleSearchQuery] = useState("");
   const [showQuizSelector, setShowQuizSelector] = useState(false);
@@ -159,9 +163,9 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       Placeholder.configure({
         placeholder: ({ node }) => {
           if (node.type.name === 'doc') {
-            return "Start writing your note... Type / for formatting options and to attach modules, quizzes, or flashcard decks";
+            return "Start writing your note... Type / for formatting options and @ for modules, quizzes, or flashcard decks";
           }
-          return "Type / for formatting options and to attach modules, quizzes, or flashcard decks";
+          return "Type / for formatting options and @ for modules, quizzes, or flashcard decks";
         },
       }),
       Underline,
@@ -388,6 +392,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           setShowSlashCommand(true);
           setSlashCommandQuery(afterSlash);
           setSelectedSlashCommandIndex(0);
+          setShowAtCommand(false); // Hide @ command menu
           
           // Position the menu
           const editorRect = editorRef.current?.getBoundingClientRect();
@@ -405,11 +410,43 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         setShowSlashCommand(false);
       }
       
+      // Check for @ command
+      const atIndex = currentText.lastIndexOf('@');
+      if (atIndex !== -1) {
+        const beforeAt = currentText.substring(0, atIndex);
+        const afterAt = currentText.substring(atIndex + 1);
+        
+        // Check if @ is at start of line or after whitespace/newline
+        const isAtLineStart = beforeAt === '' || beforeAt.endsWith('\n') || beforeAt.endsWith(' ');
+        
+        if (isAtLineStart && !afterAt.includes(' ')) {
+          // Show @ command menu
+          setShowAtCommand(true);
+          setAtCommandQuery(afterAt);
+          setSelectedAtCommandIndex(0);
+          setShowSlashCommand(false); // Hide slash command menu
+          
+          // Position the menu
+          const editorRect = editorRef.current?.getBoundingClientRect();
+          if (editorRect) {
+            const coords = editor.view.coordsAtPos($from.pos);
+            setAtCommandPosition({
+              x: coords.left - editorRect.left,
+              y: coords.top - editorRect.top
+            });
+          }
+        } else {
+          setShowAtCommand(false);
+        }
+      } else {
+        setShowAtCommand(false);
+      }
+      
       // Check if we're at the start of a new line (for line placeholder)
       const isAtLineStart = $from.parentOffset === 0;
       const isEmptyLine = $from.parent.textContent === '';
       
-      if (isAtLineStart && isEmptyLine && !showSlashCommand) {
+      if (isAtLineStart && isEmptyLine && !showSlashCommand && !showAtCommand) {
         // Show line placeholder
         setShowLinePlaceholder(true);
         
@@ -642,6 +679,25 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           setShowSlashCommand(false);
         }
       }
+      
+      // Handle @ command navigation
+      if (showAtCommand) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setSelectedAtCommandIndex(prev => 
+            Math.min(prev + 1, getAtCommandOptions().length - 1)
+          );
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          setSelectedAtCommandIndex(prev => Math.max(prev - 1, 0));
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          executeAtCommand();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          setShowAtCommand(false);
+        }
+      }
     };
 
     // Add listener to editor element instead of document
@@ -790,46 +846,62 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       },
     ];
 
-    // Add attachment options
-    const attachmentOptions = [];
-    
+    return formattingOptions;
+  };
+
+  // Get @ command options
+  const getAtCommandOptions = () => {
+    const contentOptions: Array<{
+      id: string;
+      label: string;
+      icon: any;
+      action: () => void;
+      subtitle?: string;
+    }> = [];
+
+    // Add module options
     if (modules.length > 0) {
-      attachmentOptions.push({
+      contentOptions.push({
         id: 'attach-module',
         label: 'Attach Module Item',
         icon: FileText,
         action: () => {
           setShowModuleSelector(true);
-          setShowSlashCommand(false);
-        }
+          setShowAtCommand(false);
+        },
+        subtitle: 'Link to course modules'
       });
     }
     
+    // Add quiz options
     if (quizzes.length > 0) {
-      attachmentOptions.push({
+      contentOptions.push({
         id: 'attach-quiz',
         label: 'Attach Quiz',
         icon: HelpCircle,
         action: () => {
           setShowQuizSelector(true);
-          setShowSlashCommand(false);
-        }
+          setShowAtCommand(false);
+        },
+        subtitle: 'Link to quizzes'
       });
     }
     
+    // Add flashcard options
     if (flashcardDecks.length > 0) {
-      attachmentOptions.push({
+      contentOptions.push({
         id: 'attach-flashcard',
         label: 'Attach Flashcard Deck',
         icon: Brain,
         action: () => {
           setShowFlashcardSelector(true);
-          setShowSlashCommand(false);
-        }
+          setShowAtCommand(false);
+        },
+        subtitle: 'Link to flashcard decks'
       });
     }
 
-    return [...formattingOptions, ...attachmentOptions];
+    return contentOptions;
   };
 
   // Get href for module item
@@ -992,6 +1064,40 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       // Execute the selected action
       selectedOption.action();
       setShowSlashCommand(false);
+      setTimeout(() => editor?.commands.focus(), 0);
+    }
+  };
+
+  // Execute selected @ command
+  const executeAtCommand = () => {
+    const options = getAtCommandOptions();
+    const selectedOption = options[selectedAtCommandIndex];
+    if (selectedOption) {
+      // Remove the @ and any text after it
+      const { state } = editor!;
+      const { selection } = state;
+      const { $from } = selection;
+      
+      // Find the position of the @
+      const textBefore = $from.nodeBefore?.textContent || '';
+      const textAfter = $from.nodeAfter?.textContent || '';
+      const currentText = textBefore + textAfter;
+      const atIndex = currentText.lastIndexOf('@');
+      
+      if (atIndex !== -1) {
+        // Calculate the position to delete from (the @ position)
+        const deleteFrom = $from.pos - (textAfter.length + 1); // +1 for the @ itself
+        
+        // Delete the @ and everything after it
+        editor?.chain()
+          .focus()
+          .deleteRange({ from: deleteFrom, to: $from.pos })
+          .run();
+      }
+      
+      // Execute the selected action
+      selectedOption.action();
+      setShowAtCommand(false);
       setTimeout(() => editor?.commands.focus(), 0);
     }
   };
@@ -1442,6 +1548,74 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           </div>
         )}
         
+        {/* @ Command Dropdown */}
+        {showAtCommand && (
+          <div
+            className="absolute z-50 bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg shadow-slate-200/50 p-2 max-w-sm w-full max-h-80 overflow-y-auto"
+            style={{
+              left: `${atCommandPosition.x}px`,
+              top: `${atCommandPosition.y + 20}px`,
+            }}
+          >
+            <div className="space-y-1">
+              {getAtCommandOptions().map((option, index) => {
+                const IconComponent = option.icon;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => {
+                      // Remove the @ and any text after it
+                      const { state } = editor!;
+                      const { selection } = state;
+                      const { $from } = selection;
+                      
+                      // Find the position of the @
+                      const textBefore = $from.nodeBefore?.textContent || '';
+                      const textAfter = $from.nodeAfter?.textContent || '';
+                      const currentText = textBefore + textAfter;
+                      const atIndex = currentText.lastIndexOf('@');
+                      
+                      if (atIndex !== -1) {
+                        // Calculate the position to delete from (the @ position)
+                        const deleteFrom = $from.pos - (textAfter.length + 1); // +1 for the @ itself
+                        
+                        // Delete the @ and everything after it
+                        editor?.chain()
+                          .focus()
+                          .deleteRange({ from: deleteFrom, to: $from.pos })
+                          .run();
+                      }
+                      
+                      // Execute the selected action
+                      option.action();
+                      setShowAtCommand(false);
+                      setTimeout(() => editor?.commands.focus(), 0);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors",
+                      index === selectedAtCommandIndex
+                        ? "bg-blue-100 text-blue-900"
+                        : "hover:bg-slate-100/80"
+                    )}
+                  >
+                    <IconComponent className="h-4 w-4 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">
+                        {option.label}
+                      </div>
+                      {'subtitle' in option && option.subtitle && (
+                        <div className="text-xs text-slate-500 truncate">
+                          {option.subtitle}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
         {/* Line Placeholder */}
         {showLinePlaceholder && (
           <div
@@ -1452,7 +1626,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             }}
           >
             <div className="text-slate-400 text-sm italic">
-              Type / for formatting options and to attach modules, quizzes, or flashcard decks
+              Type / for formatting options and @ for modules, quizzes, or flashcard decks
             </div>
           </div>
         )}
