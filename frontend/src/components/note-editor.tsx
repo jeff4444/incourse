@@ -163,14 +163,15 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           const toolbarWidth = 400; // Approximate toolbar width for all buttons
           const toolbarHeight = 40; // Approximate toolbar height
           
-          // Handle horizontal boundaries
-          const clampedX = Math.max(
-            toolbarWidth / 2, // Half toolbar width from left edge
-            Math.min(
-              relativeX,
-              editorRect.width - toolbarWidth / 2 // Half toolbar width from right edge
-            )
-          );
+           // Handle horizontal boundaries with padding
+           const padding = 70; // Extra padding from edges
+           const clampedX = Math.max(
+             toolbarWidth / 2 + padding, // Half toolbar width + padding from left edge
+             Math.min(
+               relativeX,
+               editorRect.width - toolbarWidth / 2 - padding // Half toolbar width + padding from right edge
+             )
+           );
           
           // Handle vertical positioning - prefer above, but below if too close to top
           const spaceAbove = relativeY;
