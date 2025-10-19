@@ -59,6 +59,7 @@ import { useFlashcardDecks } from "@/lib/hooks/useFlashcards";
 import { Module, ModuleItem } from "@/lib/types/course";
 import { authenticatedFetch } from "@/lib/utils/apiClient";
 
+
 interface NoteEditorProps {
   note: {
     id: string;
@@ -175,8 +176,178 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         inline: false,
         allowBase64: true,
         HTMLAttributes: {
-          class: 'note-image rounded-lg my-4',
-          style: 'max-width: 800px; width: 400px; height: auto;',
+          width: 600,
+          height: 'auto',
+        },
+      }).extend({
+        addNodeView() {
+          return ({ node, updateAttributes, getPos, editor }: any) => {
+            const container = document.createElement('div');
+            container.className = 'relative inline-block my-4';
+            
+            const img = document.createElement('img');
+            img.src = node.attrs.src;
+            img.alt = node.attrs.alt || '';
+            img.className = 'note-image rounded-xl border-2 border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200 block';
+            img.style.width = `${node.attrs.width || 600}px`;
+            img.style.height = node.attrs.height === 'auto' ? 'auto' : `${node.attrs.height}px`;
+            img.style.maxWidth = '800px';
+            img.style.marginLeft = 'auto';
+            img.style.marginRight = 'auto';
+            
+            container.appendChild(img);
+            
+            // Add resize handles when selected
+            const updateSelection = () => {
+              const { from, to } = editor.state.selection;
+              const pos = getPos();
+              const isSelected = pos !== undefined && from <= pos && pos <= to;
+              
+              // Remove existing handles
+              const existingHandles = container.querySelectorAll('.resize-handle');
+              existingHandles.forEach(handle => handle.remove());
+              
+              if (isSelected) {
+                const resizeHandles = [
+                  { id: 'top-left', className: 'top-0 left-0 cursor-nw-resize' },
+                  { id: 'top-right', className: 'top-0 right-0 cursor-ne-resize' },
+                  { id: 'bottom-left', className: 'bottom-0 left-0 cursor-sw-resize' },
+                  { id: 'bottom-right', className: 'bottom-0 right-0 cursor-se-resize' },
+                  { id: 'top', className: 'top-0 left-1/2 transform -translate-x-1/2 cursor-n-resize' },
+                  { id: 'bottom', className: 'bottom-0 left-1/2 transform -translate-x-1/2 cursor-s-resize' },
+                  { id: 'left', className: 'left-0 top-1/2 transform -translate-y-1/2 cursor-w-resize' },
+                  { id: 'right', className: 'right-0 top-1/2 transform -translate-y-1/2 cursor-e-resize' },
+                ];
+                
+                resizeHandles.forEach((handle) => {
+                  const handleEl = document.createElement('div');
+                  handleEl.className = `absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-lg resize-handle ${handle.className}`;
+                  handleEl.style.pointerEvents = 'auto';
+                  handleEl.style.zIndex = '10';
+                  
+                  let isResizing = false;
+                  let startPos = { x: 0, y: 0 };
+                  let startSize = { width: 0, height: 0 };
+                  
+                  const handleMouseDown = (e: MouseEvent) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    isResizing = true;
+                    startPos = { x: e.clientX, y: e.clientY };
+                    
+                    // Get the actual rendered size of the image
+                    const imgRect = img.getBoundingClientRect();
+                    startSize = { 
+                      width: imgRect.width, 
+                      height: node.attrs.height === 'auto' ? imgRect.height : (node.attrs.height || imgRect.height)
+                    };
+                    
+                    const handleMouseMove = (e: MouseEvent) => {
+                      if (!isResizing) return;
+                      
+                      const deltaX = e.clientX - startPos.x;
+                      const deltaY = e.clientY - startPos.y;
+                      
+                      let newWidth = startSize.width;
+                      let newHeight = startSize.height;
+                      
+                      if (handle.id.includes('right')) {
+                        newWidth = Math.max(100, startSize.width + deltaX);
+                      }
+                      if (handle.id.includes('left')) {
+                        newWidth = Math.max(100, startSize.width - deltaX);
+                      }
+                      if (handle.id.includes('bottom')) {
+                        newHeight = Math.max(50, startSize.height + deltaY);
+                      }
+                      if (handle.id.includes('top')) {
+                        newHeight = Math.max(50, startSize.height - deltaY);
+                      }
+                      
+                      // Update attributes using transaction
+                      const pos = getPos();
+                      if (pos !== undefined) {
+                        // Create a transaction to update the node attributes
+                        const newAttrs = {
+                          ...node.attrs,
+                          width: newWidth,
+                          height: newHeight
+                        };
+                        
+                        const tr = editor.state.tr.setNodeMarkup(pos, null, newAttrs);
+                        editor.view.dispatch(tr);
+                      }
+                      img.style.width = `${newWidth}px`;
+                      img.style.height = typeof newHeight === 'string' ? newHeight : `${newHeight}px`;
+                    };
+                    
+                    const handleMouseUp = () => {
+                      isResizing = false;
+                      document.removeEventListener('mousemove', handleMouseMove);
+                      document.removeEventListener('mouseup', handleMouseUp);
+                    };
+                    
+                    document.addEventListener('mousemove', handleMouseMove);
+                    document.addEventListener('mouseup', handleMouseUp);
+                  };
+                  
+                  handleEl.addEventListener('mousedown', handleMouseDown);
+                  container.appendChild(handleEl);
+                });
+              }
+            };
+            
+            // Listen for selection changes
+            editor.on('selectionUpdate', updateSelection);
+            updateSelection(); // Initial check
+            
+            return {
+              dom: container,
+              contentDOM: null,
+              update: (updatedNode) => {
+                if (updatedNode.type.name !== 'image') return false;
+                img.src = updatedNode.attrs.src;
+                img.alt = updatedNode.attrs.alt || '';
+                img.style.width = `${updatedNode.attrs.width || 600}px`;
+                img.style.height = updatedNode.attrs.height === 'auto' ? 'auto' : `${updatedNode.attrs.height}px`;
+                updateSelection();
+                return true;
+              },
+              destroy() {
+                editor.off('selectionUpdate', updateSelection);
+              },
+            };
+          };
+        },
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            width: {
+              default: 600,
+              parseHTML: element => {
+                const width = element.getAttribute('width');
+                return width ? parseInt(width, 10) : 600;
+              },
+              renderHTML: attributes => {
+                return {
+                  width: attributes.width,
+                };
+              },
+            },
+            height: {
+              default: 'auto',
+              parseHTML: element => {
+                const height = element.getAttribute('height');
+                return height === 'auto' ? 'auto' : (height ? parseInt(height, 10) : 'auto');
+              },
+              renderHTML: attributes => {
+                return {
+                  height: attributes.height,
+                };
+              },
+            },
+          };
         },
       }),
       InlineMath,
@@ -376,6 +547,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     if (!editor) return;
     
     const currentContent = editor.getJSON();
+    
     if (!hasContentChanged(currentContent) && title.trim() === note.title) {
       // No changes to save
       return;
