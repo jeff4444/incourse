@@ -18,10 +18,69 @@ import { Youtube } from "@tiptap/extension-youtube";
 import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
 import { Dropcursor } from "@tiptap/extension-dropcursor";
 import { createLowlight } from "lowlight";
+import languages from "highlight.js/lib/languages/*";
+import javascript from "highlight.js/lib/languages/javascript";
+import typescript from "highlight.js/lib/languages/typescript";
+import python from "highlight.js/lib/languages/python";
+import java from "highlight.js/lib/languages/java";
+import cpp from "highlight.js/lib/languages/cpp";
+import c from "highlight.js/lib/languages/c";
+import csharp from "highlight.js/lib/languages/csharp";
+import php from "highlight.js/lib/languages/php";
+import ruby from "highlight.js/lib/languages/ruby";
+import go from "highlight.js/lib/languages/go";
+import rust from "highlight.js/lib/languages/rust";
+import swift from "highlight.js/lib/languages/swift";
+import kotlin from "highlight.js/lib/languages/kotlin";
+import scala from "highlight.js/lib/languages/scala";
+import r from "highlight.js/lib/languages/r";
+import sql from "highlight.js/lib/languages/sql";
+import html from "highlight.js/lib/languages/xml";
+import css from "highlight.js/lib/languages/css";
+import scss from "highlight.js/lib/languages/scss";
+import json from "highlight.js/lib/languages/json";
+import yaml from "highlight.js/lib/languages/yaml";
+import markdown from "highlight.js/lib/languages/markdown";
+import bash from "highlight.js/lib/languages/bash";
+import dockerfile from "highlight.js/lib/languages/dockerfile";
+import nginx from "highlight.js/lib/languages/nginx";
+import apache from "highlight.js/lib/languages/apache";
+import diff from "highlight.js/lib/languages/diff";
 import { InlineMath } from "@/lib/tiptap/inline-math";
 
-// Create lowlight instance
+// Create lowlight instance and register languages
 const lowlight = createLowlight();
+
+// Register all the languages we support
+lowlight.register('javascript', javascript);
+lowlight.register('typescript', typescript);
+lowlight.register('python', python);
+lowlight.register('java', java);
+lowlight.register('cpp', cpp);
+lowlight.register('c', c);
+lowlight.register('csharp', csharp);
+lowlight.register('php', php);
+lowlight.register('ruby', ruby);
+lowlight.register('go', go);
+lowlight.register('rust', rust);
+lowlight.register('swift', swift);
+lowlight.register('kotlin', kotlin);
+lowlight.register('scala', scala);
+lowlight.register('r', r);
+lowlight.register('sql', sql);
+lowlight.register('html', html);
+lowlight.register('css', css);
+lowlight.register('scss', scss);
+lowlight.register('json', json);
+lowlight.register('yaml', yaml);
+lowlight.register('markdown', markdown);
+lowlight.register('bash', bash);
+lowlight.register('shell', bash); // Use bash for shell
+lowlight.register('powershell', bash); // Use bash for powershell
+lowlight.register('dockerfile', dockerfile);
+lowlight.register('nginx', nginx);
+lowlight.register('apache', apache);
+lowlight.register('diff', diff);
 
 // Common programming languages for code blocks
 const PROGRAMMING_LANGUAGES = [
@@ -168,7 +227,9 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
-  const [languageSelectorPosition, setLanguageSelectorPosition] = useState({ x: 0, y: 0 });
+  const [languageSearchQuery, setLanguageSearchQuery] = useState("");
+  const [showTableToolbar, setShowTableToolbar] = useState(false);
+  const [tableToolbarPosition, setTableToolbarPosition] = useState({ x: 0, y: 0 });
   const router = useRouter();
   const updateNote = useUpdateNote();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -605,6 +666,42 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       const { from, to } = editor.state.selection;
       const hasSelection = from !== to;
       
+      // Check if cursor is in a table
+      const isInTable = editor.isActive('table');
+      
+      if (isInTable) {
+        // Show table toolbar when in table
+        setShowTableToolbar(true);
+        
+        // Position table toolbar - defer DOM measurements to avoid flushSync issues
+        startTransition(() => {
+          setTimeout(() => {
+            const { view } = editor;
+            const { state } = view;
+            const { selection } = state;
+            const { $from } = selection;
+            
+            // Get the DOM coordinates of the cursor
+            const coords = view.coordsAtPos($from.pos);
+            const editorRect = editorRef.current?.getBoundingClientRect();
+            
+            if (editorRect) {
+              // Convert to relative coordinates within the editor
+              const relativeX = coords.left - editorRect.left;
+              const relativeY = coords.top - editorRect.top;
+              
+              // Position table toolbar above the cursor
+              setTableToolbarPosition({
+                x: Math.max(200, Math.min(relativeX, editorRect.width - 200)), // Center horizontally with bounds
+                y: Math.max(10, relativeY - 50) // Position above cursor
+              });
+            }
+          }, 0);
+        });
+      } else {
+        setShowTableToolbar(false);
+      }
+      
       if (hasSelection) {
         // Mark that we're in the process of selecting
         setIsSelecting(true);
@@ -950,22 +1047,6 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     }
   }, [editor, extractHeadings]);
 
-  // Close language selector when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showLanguageSelector) {
-        const target = event.target as HTMLElement;
-        if (!target.closest('[data-language-selector]')) {
-          setShowLanguageSelector(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showLanguageSelector]);
 
   // Track scroll position to highlight active heading in TOC
   useEffect(() => {
@@ -1296,6 +1377,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   // Handle language selection for code blocks
   const handleLanguageSelection = useCallback((language: string) => {
     setShowLanguageSelector(false);
+    setLanguageSearchQuery("");
     // Use startTransition and setTimeout to avoid flushSync issues by deferring the editor operations
     startTransition(() => {
       setTimeout(() => {
@@ -1305,25 +1387,8 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   }, [editor]);
 
   // Show language selector popup
-  const showLanguageSelectorPopup = useCallback((event?: React.MouseEvent) => {
-    if (event) {
-      // Use startTransition and setTimeout to avoid flushSync issues by deferring DOM operations
-      startTransition(() => {
-        setTimeout(() => {
-          const rect = event.currentTarget.getBoundingClientRect();
-          const editorRect = editorRef.current?.getBoundingClientRect();
-          if (editorRect) {
-            setLanguageSelectorPosition({
-              x: rect.left - editorRect.left,
-              y: rect.bottom - editorRect.top + 5
-            });
-          }
-          setShowLanguageSelector(true);
-        }, 0);
-      });
-    } else {
-      setShowLanguageSelector(true);
-    }
+  const showLanguageSelectorPopup = useCallback(() => {
+    setShowLanguageSelector(true);
   }, []);
 
   // Get filtered quizzes
@@ -1343,6 +1408,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     return flashcardDecks.filter(deck => 
       deck.name.toLowerCase().includes(query) ||
       (deck.description && deck.description.toLowerCase().includes(query))
+    );
+  };
+
+  // Get filtered programming languages
+  const getFilteredLanguages = () => {
+    if (!languageSearchQuery.trim()) return PROGRAMMING_LANGUAGES;
+    const query = languageSearchQuery.toLowerCase();
+    return PROGRAMMING_LANGUAGES.filter(lang => 
+      lang.label.toLowerCase().includes(query) ||
+      lang.value.toLowerCase().includes(query)
     );
   };
 
@@ -1802,8 +1877,8 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                   Quote
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={(e) => {
-                    showLanguageSelectorPopup(e);
+                  onClick={() => {
+                    showLanguageSelectorPopup();
                     setTimeout(() => editor.commands.focus(), 0);
                   }}
                   className={cn(
@@ -1942,92 +2017,232 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                 <div className="w-px h-6 bg-slate-300/60 mx-1" />
                 
                 {/* Table Controls */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().addColumnBefore().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Add Column Before"
-                >
-                  <Columns className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().addColumnAfter().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Add Column After"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().addRowBefore().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Add Row Before"
-                >
-                  <Rows className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().addRowAfter().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Add Row After"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().deleteColumn().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Delete Column"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().deleteRow().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Delete Row"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    editor.chain().focus().deleteTable().run();
-                    setTimeout(() => editor.commands.focus(), 0);
-                  }}
-                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-                  title="Delete Table"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-slate-600 mr-1">Table:</span>
+                  
+                  {/* Add Column Before */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().addColumnBefore().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                    title="Add Column Before"
+                  >
+                    <Columns className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Add Column After */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().addColumnAfter().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                    title="Add Column After"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Add Row Before */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().addRowBefore().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                    title="Add Row Before"
+                  >
+                    <Rows className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Add Row After */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().addRowAfter().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                    title="Add Row After"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Delete Column */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().deleteColumn().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+                    title="Delete Column"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Delete Row */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().deleteRow().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+                    title="Delete Row"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                  
+                  {/* Delete Table */}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      editor.chain().focus().deleteTable().run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                    className="h-8 w-8 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+                    title="Delete Table"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               </>
             )}
+          </div>
+        )}
+        
+        {/* Table Toolbar - Show when cursor is in table */}
+        {showTableToolbar && editor && (
+          <div
+            className="absolute z-50 bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg shadow-slate-200/50 p-2 flex items-center gap-1 transform -translate-x-1/2"
+            style={{
+              left: `${tableToolbarPosition.x}px`,
+              top: `${tableToolbarPosition.y}px`,
+            }}
+          >
+            <div className="flex items-center gap-1 text-xs font-medium text-slate-600 mr-2">
+              <TableIcon className="h-3 w-3" />
+              Table
+            </div>
+            
+            {/* Separator */}
+            <div className="w-px h-4 bg-slate-300/60 mx-1" />
+            
+            {/* Add Column Before */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().addColumnBefore().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+              title="Add Column Before"
+            >
+              <Columns className="h-3 w-3" />
+            </Button>
+            
+            {/* Add Column After */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().addColumnAfter().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+              title="Add Column After"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            
+            {/* Separator */}
+            <div className="w-px h-4 bg-slate-300/60 mx-1" />
+            
+            {/* Add Row Before */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().addRowBefore().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+              title="Add Row Before"
+            >
+              <Rows className="h-3 w-3" />
+            </Button>
+            
+            {/* Add Row After */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().addRowAfter().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+              title="Add Row After"
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+            
+            {/* Separator */}
+            <div className="w-px h-4 bg-slate-300/60 mx-1" />
+            
+            {/* Delete Column */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().deleteColumn().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+              title="Delete Column"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+            
+            {/* Delete Row */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().deleteRow().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+              title="Delete Row"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+            
+            {/* Delete Table */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().deleteTable().run();
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+              title="Delete Table"
+            >
+              <X className="h-3 w-3" />
+            </Button>
           </div>
         )}
         
@@ -2379,27 +2594,35 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         </DialogContent>
       </Dialog>
       
-      {/* Language Selector Popup */}
-      {showLanguageSelector && (
-        <div
-          data-language-selector
-          className="absolute z-50 bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg shadow-slate-200/50 p-2 max-w-sm w-full max-h-80 overflow-y-auto"
-          style={{
-            left: `${languageSelectorPosition.x}px`,
-            top: `${languageSelectorPosition.y}px`,
-          }}
-        >
-          <div className="space-y-1">
-            <div className="px-3 py-2 text-sm font-medium text-slate-700 border-b border-slate-200/60 mb-2">
-              Select Programming Language
-            </div>
-            {PROGRAMMING_LANGUAGES.map((lang) => (
+      {/* Language Selector Dialog */}
+      <Dialog open={showLanguageSelector} onOpenChange={setShowLanguageSelector}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Programming Language</DialogTitle>
+          </DialogHeader>
+          
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search programming languages..."
+              value={languageSearchQuery}
+              onChange={(e) => setLanguageSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* Languages List */}
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {getFilteredLanguages().map((lang) => (
               <button
                 key={lang.value}
                 onClick={() => handleLanguageSelection(lang.value)}
-                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100/80"
+                className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 transition-colors text-left"
               >
-                <Code className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <div className="flex-shrink-0">
+                  <Code className="h-5 w-5 text-slate-500" />
+                </div>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-sm truncate">
                     {lang.label}
@@ -2410,9 +2633,15 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                 </div>
               </button>
             ))}
+            
+            {getFilteredLanguages().length === 0 && (
+              <div className="text-center py-8 text-slate-500">
+                {languageSearchQuery ? 'No programming languages found matching your search.' : 'No programming languages available.'}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
       
       {/* Hidden file input for image upload */}
       <input
