@@ -187,7 +187,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         addNodeView() {
           return ({ node, updateAttributes, getPos, editor }: any) => {
             const container = document.createElement('div');
-            container.className = 'relative inline-block my-4';
+            container.className = 'relative inline-block';
             
             const img = document.createElement('img');
             img.src = node.attrs.src;
@@ -1166,7 +1166,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             <Save className="h-4 w-4" />
             {hasUnsavedChanges ? "Save" : "Saved"}
           </Button>
-          <Button
+          {/* <Button
             variant="outline"
             size="sm"
             onClick={exportNote}
@@ -1174,7 +1174,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           >
             <Download className="h-4 w-4" />
             Export
-          </Button>
+          </Button> */}
         </div>
       </div>
       
