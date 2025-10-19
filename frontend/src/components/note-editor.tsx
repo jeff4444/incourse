@@ -1,15 +1,68 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, startTransition } from "react";
 import { useEditor, EditorContent } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import Placeholder from "@tiptap/extension-placeholder";
 import Underline from "@tiptap/extension-underline";
 import Link from "@tiptap/extension-link";
 import Image from "@tiptap/extension-image";
+import HorizontalRule from "@tiptap/extension-horizontal-rule";
+import { Table } from "@tiptap/extension-table";
+import { TableRow } from "@tiptap/extension-table-row";
+import { TableCell } from "@tiptap/extension-table-cell";
+import { TableHeader } from "@tiptap/extension-table-header";
+import { Color } from "@tiptap/extension-color";
+import { TextStyle } from "@tiptap/extension-text-style";
+import { Youtube } from "@tiptap/extension-youtube";
+import { CodeBlockLowlight } from "@tiptap/extension-code-block-lowlight";
+import { Dropcursor } from "@tiptap/extension-dropcursor";
+import { createLowlight } from "lowlight";
 import { InlineMath } from "@/lib/tiptap/inline-math";
+
+// Create lowlight instance
+const lowlight = createLowlight();
+
+// Common programming languages for code blocks
+const PROGRAMMING_LANGUAGES = [
+  { value: 'javascript', label: 'JavaScript' },
+  { value: 'typescript', label: 'TypeScript' },
+  { value: 'python', label: 'Python' },
+  { value: 'java', label: 'Java' },
+  { value: 'cpp', label: 'C++' },
+  { value: 'c', label: 'C' },
+  { value: 'csharp', label: 'C#' },
+  { value: 'php', label: 'PHP' },
+  { value: 'ruby', label: 'Ruby' },
+  { value: 'go', label: 'Go' },
+  { value: 'rust', label: 'Rust' },
+  { value: 'swift', label: 'Swift' },
+  { value: 'kotlin', label: 'Kotlin' },
+  { value: 'scala', label: 'Scala' },
+  { value: 'r', label: 'R' },
+  { value: 'matlab', label: 'MATLAB' },
+  { value: 'sql', label: 'SQL' },
+  { value: 'html', label: 'HTML' },
+  { value: 'css', label: 'CSS' },
+  { value: 'scss', label: 'SCSS' },
+  { value: 'sass', label: 'Sass' },
+  { value: 'less', label: 'Less' },
+  { value: 'json', label: 'JSON' },
+  { value: 'xml', label: 'XML' },
+  { value: 'yaml', label: 'YAML' },
+  { value: 'markdown', label: 'Markdown' },
+  { value: 'bash', label: 'Bash' },
+  { value: 'shell', label: 'Shell' },
+  { value: 'powershell', label: 'PowerShell' },
+  { value: 'dockerfile', label: 'Dockerfile' },
+  { value: 'nginx', label: 'Nginx' },
+  { value: 'apache', label: 'Apache' },
+  { value: 'diff', label: 'Diff' },
+  { value: 'plaintext', label: 'Plain Text' },
+];
 import { BlockMath } from "@/lib/tiptap/block-math";
 import { MathInputRules, MathPasteRules } from "@/lib/tiptap/math-input-rule";
+import { NoteTocSidebar } from "@/components/note-toc-sidebar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -48,7 +101,20 @@ import {
   X,
   HelpCircle,
   Brain,
-  ImageIcon
+  ImageIcon,
+  Minus,
+  Table as TableIcon,
+  Strikethrough,
+  Youtube as YoutubeIcon,
+  ChevronRight,
+  Palette,
+  Type,
+  Plus,
+  Trash2,
+  Columns,
+  Rows,
+  Merge,
+  Split
 } from "lucide-react";
 import { useUpdateNote } from "@/lib/hooks/useNotes";
 import { useRouter } from "next/navigation";
@@ -97,6 +163,12 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   const [flashcardSearchQuery, setFlashcardSearchQuery] = useState("");
   const [showLinePlaceholder, setShowLinePlaceholder] = useState(false);
   const [linePlaceholderPosition, setLinePlaceholderPosition] = useState({ x: 0, y: 0 });
+  const [tocAnchors, setTocAnchors] = useState<any[]>([]);
+  const [showToc, setShowToc] = useState(false);
+  const [showYoutubeDialog, setShowYoutubeDialog] = useState(false);
+  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+  const [languageSelectorPosition, setLanguageSelectorPosition] = useState({ x: 0, y: 0 });
   const router = useRouter();
   const updateNote = useUpdateNote();
   const editorRef = useRef<HTMLDivElement>(null);
@@ -163,9 +235,9 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       Placeholder.configure({
         placeholder: ({ node }) => {
           if (node.type.name === 'doc') {
-            return "Start writing your note... Type / for formatting options and @ for modules, quizzes, or flashcard decks";
+            return "Start writing your note... Type / for formatting options or @ to embed content";
           }
-          return "Type / for formatting options and @ for modules, quizzes, or flashcard decks";
+          return "Type / for formatting options or @ to embed content";
         },
       }),
       Underline,
@@ -240,11 +312,13 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                     isResizing = true;
                     startPos = { x: e.clientX, y: e.clientY };
                     
-                    // Get the actual rendered size of the image
-                    const imgRect = img.getBoundingClientRect();
+                    // Use the current style dimensions of the image, which reflect the actual displayed size
+                    const currentWidth = parseInt(img.style.width) || (node.attrs.width || 600);
+                    const currentHeight = parseInt(img.style.height) || (node.attrs.height === 'auto' ? img.getBoundingClientRect().height : (node.attrs.height || 400));
+                    
                     startSize = { 
-                      width: imgRect.width, 
-                      height: node.attrs.height === 'auto' ? imgRect.height : (node.attrs.height || imgRect.height)
+                      width: currentWidth, 
+                      height: currentHeight
                     };
                     
                     const handleMouseMove = (e: MouseEvent) => {
@@ -269,19 +343,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                         newHeight = Math.max(50, startSize.height - deltaY);
                       }
                       
-                      // Update attributes using transaction
-                      const pos = getPos();
-                      if (pos !== undefined) {
-                        // Create a transaction to update the node attributes
-                        const newAttrs = {
-                          ...node.attrs,
-                          width: newWidth,
-                          height: newHeight
-                        };
-                        
-                        const tr = editor.state.tr.setNodeMarkup(pos, null, newAttrs);
-                        editor.view.dispatch(tr);
-                      }
+                      // Only update the visual appearance during mouse move to avoid flushSync issues
                       img.style.width = `${newWidth}px`;
                       img.style.height = typeof newHeight === 'string' ? newHeight : `${newHeight}px`;
                     };
@@ -290,6 +352,27 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                       isResizing = false;
                       document.removeEventListener('mousemove', handleMouseMove);
                       document.removeEventListener('mouseup', handleMouseUp);
+                      
+                      // Update the editor state with the final dimensions after resize is complete
+                      // Use startTransition and setTimeout to avoid flushSync issues by deferring the editor update
+                      startTransition(() => {
+                        setTimeout(() => {
+                          const pos = getPos();
+                          if (pos !== undefined) {
+                            const finalWidth = parseInt(img.style.width) || startSize.width;
+                            const finalHeight = parseInt(img.style.height) || startSize.height;
+                            
+                            const newAttrs = {
+                              ...node.attrs,
+                              width: finalWidth,
+                              height: finalHeight
+                            };
+                            
+                            const tr = editor.state.tr.setNodeMarkup(pos, null, newAttrs);
+                            editor.view.dispatch(tr);
+                          }
+                        }, 0);
+                      });
                     };
                     
                     document.addEventListener('mousemove', handleMouseMove);
@@ -354,6 +437,46 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           };
         },
       }),
+      HorizontalRule,
+      // Table extensions
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
+      // Color and styling
+      TextStyle.extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            fontSize: {
+              default: null,
+              parseHTML: element => element.style.fontSize || null,
+              renderHTML: attributes => {
+                if (!attributes.fontSize) {
+                  return {};
+                }
+                return {
+                  style: `font-size: ${attributes.fontSize}`,
+                };
+              },
+            },
+          };
+        },
+      }),
+      Color,
+      // YouTube
+      Youtube.configure({
+        controls: false,
+      }),
+      // Code block with syntax highlighting
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: 'javascript',
+      }),
+      // Drop cursor for drag and drop
+      Dropcursor,
       InlineMath,
       BlockMath,
       MathInputRules,
@@ -367,6 +490,9 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       setHasUnsavedChanges(true);
       // Auto-save on content change (debounced)
       debouncedSave(editor.getJSON());
+      
+      // Extract headings for TOC
+      extractHeadings();
       
       // Check for slash command
       const { state } = editor;
@@ -394,15 +520,19 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           setSelectedSlashCommandIndex(0);
           setShowAtCommand(false); // Hide @ command menu
           
-          // Position the menu
-          const editorRect = editorRef.current?.getBoundingClientRect();
-          if (editorRect) {
-            const coords = editor.view.coordsAtPos($from.pos);
-            setSlashCommandPosition({
-              x: coords.left - editorRect.left,
-              y: coords.top - editorRect.top
-            });
-          }
+          // Position the menu - defer DOM measurements to avoid flushSync issues
+          startTransition(() => {
+            setTimeout(() => {
+              const editorRect = editorRef.current?.getBoundingClientRect();
+              if (editorRect) {
+                const coords = editor.view.coordsAtPos($from.pos);
+                setSlashCommandPosition({
+                  x: coords.left - editorRect.left,
+                  y: coords.top - editorRect.top
+                });
+              }
+            }, 0);
+          });
         } else {
           setShowSlashCommand(false);
         }
@@ -426,15 +556,19 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           setSelectedAtCommandIndex(0);
           setShowSlashCommand(false); // Hide slash command menu
           
-          // Position the menu
-          const editorRect = editorRef.current?.getBoundingClientRect();
-          if (editorRect) {
-            const coords = editor.view.coordsAtPos($from.pos);
-            setAtCommandPosition({
-              x: coords.left - editorRect.left,
-              y: coords.top - editorRect.top
-            });
-          }
+          // Position the menu - defer DOM measurements to avoid flushSync issues
+          startTransition(() => {
+            setTimeout(() => {
+              const editorRect = editorRef.current?.getBoundingClientRect();
+              if (editorRect) {
+                const coords = editor.view.coordsAtPos($from.pos);
+                setAtCommandPosition({
+                  x: coords.left - editorRect.left,
+                  y: coords.top - editorRect.top
+                });
+              }
+            }, 0);
+          });
         } else {
           setShowAtCommand(false);
         }
@@ -450,15 +584,19 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         // Show line placeholder
         setShowLinePlaceholder(true);
         
-        // Position the placeholder
-        const editorRect = editorRef.current?.getBoundingClientRect();
-        if (editorRect) {
-          const coords = editor.view.coordsAtPos($from.pos);
-          setLinePlaceholderPosition({
-            x: coords.left - editorRect.left,
-            y: coords.top - editorRect.top
-          });
-        }
+        // Position the placeholder - defer DOM measurements to avoid flushSync issues
+        startTransition(() => {
+          setTimeout(() => {
+            const editorRect = editorRef.current?.getBoundingClientRect();
+            if (editorRect) {
+              const coords = editor.view.coordsAtPos($from.pos);
+              setLinePlaceholderPosition({
+                x: coords.left - editorRect.left,
+                y: coords.top - editorRect.top
+              });
+            }
+          }, 0);
+        });
       } else {
         setShowLinePlaceholder(false);
       }
@@ -471,58 +609,62 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         // Mark that we're in the process of selecting
         setIsSelecting(true);
         
-        // Get selection coordinates for positioning
-        const { view } = editor;
-        const { state } = view;
-        const { selection } = state;
-        const { $from, $to } = selection;
-        
-        // Get the DOM coordinates of the selection bounds
-        const fromCoords = view.coordsAtPos($from.pos);
-        const toCoords = view.coordsAtPos($to.pos);
-        const editorRect = editorRef.current?.getBoundingClientRect();
-        
-        if (editorRect) {
-          // Calculate center position of the selection horizontally
-          const centerX = (fromCoords.left + toCoords.right) / 2;
-          const topY = Math.min(fromCoords.top, toCoords.top);
-          
-          // Convert to relative coordinates within the editor
-          const relativeX = centerX - editorRect.left;
-          const relativeY = topY - editorRect.top;
-          
-          // Toolbar dimensions for boundary calculations
-          const toolbarWidth = 400; // Approximate toolbar width for all buttons
-          const toolbarHeight = 40; // Approximate toolbar height
-          
-           // Handle horizontal boundaries with padding
-           const padding = 70; // Extra padding from edges
-           const clampedX = Math.max(
-             toolbarWidth / 2 + padding, // Half toolbar width + padding from left edge
-             Math.min(
-               relativeX,
-               editorRect.width - toolbarWidth / 2 - padding // Half toolbar width + padding from right edge
-             )
-           );
-          
-          // Handle vertical positioning - prefer above, but below if too close to top
-          const spaceAbove = relativeY;
-          const spaceBelow = editorRect.height - relativeY;
-          
-          let finalY;
-          if (spaceAbove > toolbarHeight + 10) {
-            // Position above the selection
-            finalY = Math.max(10, relativeY - toolbarHeight - 10);
-          } else {
-            // Position below the selection if not enough space above
-            finalY = relativeY + 20;
-          }
-          
-          setToolbarPosition({
-            x: clampedX,
-            y: finalY
-          });
-        }
+        // Get selection coordinates for positioning - defer DOM measurements to avoid flushSync issues
+        startTransition(() => {
+          setTimeout(() => {
+            const { view } = editor;
+            const { state } = view;
+            const { selection } = state;
+            const { $from, $to } = selection;
+            
+            // Get the DOM coordinates of the selection bounds
+            const fromCoords = view.coordsAtPos($from.pos);
+            const toCoords = view.coordsAtPos($to.pos);
+            const editorRect = editorRef.current?.getBoundingClientRect();
+            
+            if (editorRect) {
+              // Calculate center position of the selection horizontally
+              const centerX = (fromCoords.left + toCoords.right) / 2;
+              const topY = Math.min(fromCoords.top, toCoords.top);
+              
+              // Convert to relative coordinates within the editor
+              const relativeX = centerX - editorRect.left;
+              const relativeY = topY - editorRect.top;
+              
+              // Toolbar dimensions for boundary calculations
+              const toolbarWidth = 400; // Approximate toolbar width for all buttons
+              const toolbarHeight = 40; // Approximate toolbar height
+              
+               // Handle horizontal boundaries with padding
+               const padding = 190; // Extra padding from edges
+               const clampedX = Math.max(
+                 toolbarWidth / 2 + padding, // Half toolbar width + padding from left edge
+                 Math.min(
+                   relativeX,
+                   editorRect.width - toolbarWidth / 2 - padding // Half toolbar width + padding from right edge
+                 )
+               );
+              
+              // Handle vertical positioning - prefer above, but below if too close to top
+              const spaceAbove = relativeY;
+              const spaceBelow = editorRect.height - relativeY;
+              
+              let finalY;
+              if (spaceAbove > toolbarHeight + 10) {
+                // Position above the selection
+                finalY = Math.max(10, relativeY - toolbarHeight - 10);
+              } else {
+                // Position below the selection if not enough space above
+                finalY = relativeY + 20;
+              }
+              
+              setToolbarPosition({
+                x: clampedX,
+                y: finalY
+              });
+            }
+          }, 0);
+        });
         
         // Don't show toolbar while actively selecting
         setShowFloatingToolbar(false);
@@ -545,6 +687,45 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       },
     },
   });
+
+  // Function to extract headings from editor content
+  const extractHeadings = useCallback(() => {
+    if (!editor) return;
+    
+    const headings: any[] = [];
+    const { state } = editor;
+    const { doc } = state;
+    
+    doc.descendants((node, pos) => {
+      if (node.type.name === 'heading') {
+        const level = node.attrs.level;
+        const textContent = node.textContent;
+        const id = `heading-${pos}-${level}`;
+        
+        headings.push({
+          id,
+          textContent,
+          level,
+          isActive: false,
+          isScrolledOver: false,
+          pos
+        });
+      }
+    });
+    
+    setTocAnchors(headings);
+    
+    // Add data attributes to heading elements in the DOM
+    setTimeout(() => {
+      const editorElement = editor.view.dom;
+      const headingElements = editorElement.querySelectorAll('h1, h2, h3');
+      headingElements.forEach((element, index) => {
+        if (headings[index]) {
+          element.setAttribute('data-heading-id', headings[index].id);
+        }
+      });
+    }, 100);
+  }, [editor]);
 
   // Check if content has actually changed
   const hasContentChanged = useCallback((newContent: any) => {
@@ -762,6 +943,83 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     }
   }, [title, note.title, debouncedSave]);
 
+  // Extract headings when editor is ready
+  useEffect(() => {
+    if (editor) {
+      extractHeadings();
+    }
+  }, [editor, extractHeadings]);
+
+  // Close language selector when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showLanguageSelector) {
+        const target = event.target as HTMLElement;
+        if (!target.closest('[data-language-selector]')) {
+          setShowLanguageSelector(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showLanguageSelector]);
+
+  // Track scroll position to highlight active heading in TOC
+  useEffect(() => {
+    if (!editor || tocAnchors.length === 0) return;
+
+    const handleScroll = () => {
+      const editorElement = editor.view.dom;
+      const scrollTop = editorElement.scrollTop;
+      const editorHeight = editorElement.clientHeight;
+      
+      // Find the heading that's currently in view
+      let activeHeading = null;
+      let minDistance = Infinity;
+      
+      for (let i = 0; i < tocAnchors.length; i++) {
+        const anchor = tocAnchors[i];
+        const headingElement = editorElement.querySelector(`[data-heading-id="${anchor.id}"]`);
+        
+        if (headingElement) {
+          const rect = headingElement.getBoundingClientRect();
+          const editorRect = editorElement.getBoundingClientRect();
+          const relativeTop = rect.top - editorRect.top;
+          
+          // If heading is visible and closer to the top, it's more likely to be active
+          if (relativeTop <= editorHeight && relativeTop >= -100) {
+            const distance = Math.abs(relativeTop);
+            if (distance < minDistance) {
+              minDistance = distance;
+              activeHeading = anchor.id;
+            }
+          }
+        }
+      }
+      
+      // Update active state
+      setTocAnchors(prevAnchors => 
+        prevAnchors.map(anchor => ({
+          ...anchor,
+          isActive: anchor.id === activeHeading
+        }))
+      );
+    };
+
+    const editorElement = editor.view.dom;
+    editorElement.addEventListener('scroll', handleScroll);
+    
+    // Initial check with a small delay to ensure DOM is ready
+    setTimeout(handleScroll, 200);
+    
+    return () => {
+      editorElement.removeEventListener('scroll', handleScroll);
+    };
+  }, [editor, tocAnchors]);
+
   const exportNote = async () => {
     try {
       const exportUrl = `/api/courses/${note.course_id}/notes/${note.id}/export`;
@@ -822,10 +1080,14 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       { id: 'bold', label: 'Bold', icon: Bold, action: () => editor?.chain().focus().toggleBold().run() },
       { id: 'italic', label: 'Italic', icon: Italic, action: () => editor?.chain().focus().toggleItalic().run() },
       { id: 'underline', label: 'Underline', icon: UnderlineIcon, action: () => editor?.chain().focus().toggleUnderline().run() },
+      { id: 'strike', label: 'Strikethrough', icon: Strikethrough, action: () => editor?.chain().focus().toggleStrike().run() },
       { id: 'bullet', label: 'Bullet List', icon: List, action: () => editor?.chain().focus().toggleBulletList().run() },
       { id: 'numbered', label: 'Numbered List', icon: ListOrdered, action: () => editor?.chain().focus().toggleOrderedList().run() },
       { id: 'quote', label: 'Quote', icon: Quote, action: () => editor?.chain().focus().toggleBlockquote().run() },
-      { id: 'code', label: 'Code Block', icon: Code, action: () => editor?.chain().focus().toggleCodeBlock().run() },
+      { id: 'code', label: 'Code Block', icon: Code, action: () => {
+        showLanguageSelectorPopup();
+      }},
+      { id: 'table', label: 'Table', icon: TableIcon, action: () => editor?.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run() },
       { id: 'math', label: 'Math', icon: Sigma, action: () => {
         const selectedText = editor?.state.doc.textBetween(
           editor.state.selection.from,
@@ -838,11 +1100,10 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         }).run();
       }},
       { 
-        id: 'image', 
-        label: 'Image', 
-        icon: ImageIcon, 
-        action: handleImageButtonClick,
-        subtitle: 'Insert an image'
+        id: 'divider', 
+        label: 'Divider', 
+        icon: Minus, 
+        action: () => editor?.chain().focus().setHorizontalRule().run(),
       },
     ];
 
@@ -857,7 +1118,25 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       icon: any;
       action: () => void;
       subtitle?: string;
-    }> = [];
+    }> = [
+      {
+        id: 'image',
+        label: 'Image',
+        icon: ImageIcon,
+        action: handleImageButtonClick,
+        subtitle: 'Insert an image'
+      },
+      {
+        id: 'youtube',
+        label: 'YouTube Video',
+        icon: YoutubeIcon,
+        action: () => {
+          setShowYoutubeDialog(true);
+          setShowAtCommand(false);
+        },
+        subtitle: 'Embed a YouTube video'
+      }
+    ];
 
     // Add module options
     if (modules.length > 0) {
@@ -1014,6 +1293,39 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
     imageInputRef.current?.click();
   }, []);
 
+  // Handle language selection for code blocks
+  const handleLanguageSelection = useCallback((language: string) => {
+    setShowLanguageSelector(false);
+    // Use startTransition and setTimeout to avoid flushSync issues by deferring the editor operations
+    startTransition(() => {
+      setTimeout(() => {
+        editor?.chain().focus().toggleCodeBlock({ language }).run();
+      }, 0);
+    });
+  }, [editor]);
+
+  // Show language selector popup
+  const showLanguageSelectorPopup = useCallback((event?: React.MouseEvent) => {
+    if (event) {
+      // Use startTransition and setTimeout to avoid flushSync issues by deferring DOM operations
+      startTransition(() => {
+        setTimeout(() => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          const editorRect = editorRef.current?.getBoundingClientRect();
+          if (editorRect) {
+            setLanguageSelectorPosition({
+              x: rect.left - editorRect.left,
+              y: rect.bottom - editorRect.top + 5
+            });
+          }
+          setShowLanguageSelector(true);
+        }, 0);
+      });
+    } else {
+      setShowLanguageSelector(true);
+    }
+  }, []);
+
   // Get filtered quizzes
   const getFilteredQuizzes = () => {
     if (!quizSearchQuery.trim()) return quizzes;
@@ -1032,6 +1344,13 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       deck.name.toLowerCase().includes(query) ||
       (deck.description && deck.description.toLowerCase().includes(query))
     );
+  };
+
+  // Get current font size from editor
+  const getCurrentFontSize = () => {
+    if (!editor) return '16px';
+    const fontSize = editor.getAttributes('textStyle').fontSize;
+    return fontSize || '16px';
   };
 
   // Execute selected slash command
@@ -1159,6 +1478,16 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setShowToc(!showToc)}
+            className="flex items-center gap-2 border-slate-200 hover:bg-slate-50 transition-colors"
+            title="Toggle Table of Contents"
+          >
+            <Menu className="h-4 w-4" />
+            TOC
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleManualSave}
             disabled={isSaving || !hasUnsavedChanges}
             className="flex items-center gap-2 border-slate-200 hover:bg-slate-50 transition-colors"
@@ -1187,6 +1516,14 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         <EditorContent 
           editor={editor} 
           className="min-h-full cursor-text"
+        />
+        
+        {/* Table of Contents Sidebar */}
+        <NoteTocSidebar 
+          anchors={tocAnchors}
+          editor={editor}
+          isVisible={showToc}
+          onToggle={() => setShowToc(!showToc)}
         />
         
         {/* Floating Toolbar */}
@@ -1253,106 +1590,242 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             >
               <UnderlineIcon className="h-4 w-4" />
             </Button>
+            <Button
+              variant={editor.isActive('strike') ? 'default' : 'ghost'}
+              size="sm"
+              onClick={() => {
+                editor.chain().focus().toggleStrike().run();
+                // Ensure focus remains on editor after button click
+                setTimeout(() => editor.commands.focus(), 0);
+              }}
+              className={cn(
+                "h-8 w-8 p-0 transition-all",
+                editor.isActive('strike') 
+                  ? "bg-blue-600 text-white hover:bg-blue-700" 
+                  : "hover:bg-slate-100/80"
+              )}
+              title="Strikethrough"
+            >
+              <Strikethrough className="h-4 w-4" />
+            </Button>
+            
+            {/* Font Size Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 hover:bg-slate-100/80 transition-colors"
+                  title="Font Size"
+                >
+                  <span className="text-xs font-medium min-w-[2rem] text-center">
+                    {getCurrentFontSize()}
+                  </span>
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                {[
+                  { size: '10px', label: '10px' },
+                  { size: '12px', label: '12px' },
+                  { size: '14px', label: '14px' },
+                  { size: '16px', label: '16px' },
+                  { size: '18px', label: '18px' },
+                  { size: '20px', label: '20px' },
+                  { size: '24px', label: '24px' },
+                  { size: '32px', label: '32px' },
+                ].map((option) => (
+                  <DropdownMenuItem
+                    key={option.size}
+                    onClick={() => {
+                      editor.chain().focus().setMark('textStyle', { fontSize: option.size }).run();
+                      setTimeout(() => editor.commands.focus(), 0);
+                    }}
+                  >
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            {/* Background Color Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 hover:bg-slate-100/80 transition-colors"
+                  title="Background Color"
+                >
+                  <Palette className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <div className="grid grid-cols-4 gap-1 p-2">
+                  {[
+                    { color: '#ffffff', label: 'White' },
+                    { color: '#fef3c7', label: 'Yellow' },
+                    { color: '#fde68a', label: 'Light Yellow' },
+                    { color: '#fecaca', label: 'Red' },
+                    { color: '#fed7aa', label: 'Orange' },
+                    { color: '#bbf7d0', label: 'Green' },
+                    { color: '#bfdbfe', label: 'Blue' },
+                    { color: '#e9d5ff', label: 'Purple' },
+                    { color: '#f3e8ff', label: 'Light Purple' },
+                    { color: '#fce7f3', label: 'Pink' },
+                    { color: '#f1f5f9', label: 'Gray' },
+                    { color: '#000000', label: 'Black' },
+                  ].map((option) => (
+                    <button
+                      key={option.color}
+                      className="w-8 h-8 rounded border border-slate-200 hover:scale-110 transition-transform"
+                      style={{ backgroundColor: option.color }}
+                      onClick={() => {
+                        editor.chain().focus().setMark('textStyle', { color: option.color }).run();
+                        setTimeout(() => editor.commands.focus(), 0);
+                      }}
+                      title={option.label}
+                    />
+                  ))}
+                </div>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* Separator */}
             <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
-            {/* Headings */}
-            <Button
-              variant={editor.isActive('heading', { level: 1 }) ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().toggleHeading({ level: 1 }).run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className={cn(
-                "h-8 w-8 p-0 transition-all",
-                editor.isActive('heading', { level: 1 }) 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "hover:bg-slate-100/80"
-              )}
-              title="Heading 1 (Ctrl+1)"
-            >
-              <Heading1 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={editor.isActive('heading', { level: 2 }) ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().toggleHeading({ level: 2 }).run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className={cn(
-                "h-8 w-8 p-0 transition-all",
-                editor.isActive('heading', { level: 2 }) 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "hover:bg-slate-100/80"
-              )}
-              title="Heading 2 (Ctrl+2)"
-            >
-              <Heading2 className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={editor.isActive('heading', { level: 3 }) ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().toggleHeading({ level: 3 }).run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className={cn(
-                "h-8 w-8 p-0 transition-all",
-                editor.isActive('heading', { level: 3 }) 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "hover:bg-slate-100/80"
-              )}
-              title="Heading 3 (Ctrl+3)"
-            >
-              <Heading3 className="h-4 w-4" />
-            </Button>
+            {/* Text Dropdown (Headings) */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 hover:bg-slate-100/80 transition-colors"
+                  title="Text Formatting"
+                >
+                  <Type className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().toggleHeading({ level: 1 }).run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('heading', { level: 1 }) && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <Heading1 className="h-4 w-4 mr-2" />
+                  Heading 1
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().toggleHeading({ level: 2 }).run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('heading', { level: 2 }) && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <Heading2 className="h-4 w-4 mr-2" />
+                  Heading 2
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().toggleHeading({ level: 3 }).run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('heading', { level: 3 }) && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <Heading3 className="h-4 w-4 mr-2" />
+                  Heading 3
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
             {/* Separator */}
             <div className="w-px h-6 bg-slate-300/60 mx-1" />
             
-            {/* Lists */}
-            <Button
-              variant={editor.isActive('bulletList') ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().toggleBulletList().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className={cn(
-                "h-8 w-8 p-0 transition-all",
-                editor.isActive('bulletList') 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "hover:bg-slate-100/80"
-              )}
-              title="Bullet List (Ctrl+Shift+8)"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={editor.isActive('orderedList') ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().toggleOrderedList().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className={cn(
-                "h-8 w-8 p-0 transition-all",
-                editor.isActive('orderedList') 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "hover:bg-slate-100/80"
-              )}
-              title="Numbered List (Ctrl+Shift+7)"
-            >
-              <ListOrdered className="h-4 w-4" />
-            </Button>
+            {/* Blocks Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 hover:bg-slate-100/80 transition-colors"
+                  title="Block Formatting"
+                >
+                  <FileText className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3 ml-1" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().toggleBulletList().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('bulletList') && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <List className="h-4 w-4 mr-2" />
+                  Bullet List
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().toggleOrderedList().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('orderedList') && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <ListOrdered className="h-4 w-4 mr-2" />
+                  Numbered List
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().toggleBlockquote().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('blockquote') && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <Quote className="h-4 w-4 mr-2" />
+                  Quote
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    showLanguageSelectorPopup(e);
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className={cn(
+                    editor.isActive('codeBlock') && "bg-blue-100 text-blue-900"
+                  )}
+                >
+                  <Code className="h-4 w-4 mr-2" />
+                  Code Block
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                >
+                  <TableIcon className="h-4 w-4 mr-2" />
+                  Table
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             
-            {/* Separator */}
-            <div className="w-px h-6 bg-slate-300/60 mx-1" />
-            
-            {/* Code and Quote */}
+            {/* Inline Code */}
             <Button
               variant={editor.isActive('code') ? 'default' : 'ghost'}
               size="sm"
@@ -1369,23 +1842,6 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               title="Inline Code (Ctrl+`)"
             >
               <Code className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={editor.isActive('blockquote') ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().toggleBlockquote().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className={cn(
-                "h-8 w-8 p-0 transition-all",
-                editor.isActive('blockquote') 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "hover:bg-slate-100/80"
-              )}
-              title="Quote (Ctrl+Shift+>)"
-            >
-              <Quote className="h-4 w-4" />
             </Button>
             
             {/* Separator */}
@@ -1413,34 +1869,35 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               <LinkIcon className="h-4 w-4" />
             </Button>
             
-            {/* Image */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleImageButtonClick}
-              className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
-              title="Insert Image"
-            >
-              <ImageIcon className="h-4 w-4" />
-            </Button>
-            
-            {/* Separator */}
-            <div className="w-px h-6 bg-slate-300/60 mx-1" />
-            
-            {/* Math */}
+            {/* Insert Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-8 px-1 hover:bg-slate-100/80 transition-colors"
-                  title="Insert Math"
+                  className="h-8 px-2 hover:bg-slate-100/80 transition-colors"
+                  title="Insert Content"
                 >
-                  <Sigma className="h-4 w-4" />
-                  <ChevronDown className="h-3 w-3 ml-0.5" />
+                  <Plus className="h-4 w-4" />
+                  <ChevronDown className="h-3 w-3 ml-1" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
+                <DropdownMenuItem
+                  onClick={handleImageButtonClick}
+                >
+                  <ImageIcon className="h-4 w-4 mr-2" />
+                  Image
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    editor.chain().focus().setHorizontalRule().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                >
+                  <Minus className="h-4 w-4 mr-2" />
+                  Divider
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
                     const selectedText = editor.state.doc.textBetween(
@@ -1455,7 +1912,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                     setTimeout(() => editor.commands.focus(), 0);
                   }}
                 >
-                  <span className="mr-2">$</span>
+                  <Sigma className="h-4 w-4 mr-2" />
                   Inline Math
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -1472,11 +1929,105 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                     setTimeout(() => editor.commands.focus(), 0);
                   }}
                 >
-                  <span className="mr-2">$$</span>
+                  <Sigma className="h-4 w-4 mr-2" />
                   Block Math
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            
+            {/* Table Controls - Show when cursor is in table */}
+            {editor?.isActive('table') && (
+              <>
+                {/* Separator */}
+                <div className="w-px h-6 bg-slate-300/60 mx-1" />
+                
+                {/* Table Controls */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().addColumnBefore().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Add Column Before"
+                >
+                  <Columns className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().addColumnAfter().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Add Column After"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().addRowBefore().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Add Row Before"
+                >
+                  <Rows className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().addRowAfter().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Add Row After"
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().deleteColumn().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Delete Column"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().deleteRow().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Delete Row"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    editor.chain().focus().deleteTable().run();
+                    setTimeout(() => editor.commands.focus(), 0);
+                  }}
+                  className="h-8 w-8 p-0 hover:bg-slate-100/80 transition-colors"
+                  title="Delete Table"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </>
+            )}
           </div>
         )}
         
@@ -1626,7 +2177,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             }}
           >
             <div className="text-slate-400 text-sm italic">
-              Type / for formatting options and @ for modules, quizzes, or flashcard decks
+              Type / for formatting options or @ to embed content
             </div>
           </div>
         )}
@@ -1778,6 +2329,90 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           </div>
         </DialogContent>
       </Dialog>
+      
+      {/* YouTube Video Dialog */}
+      <Dialog open={showYoutubeDialog} onOpenChange={setShowYoutubeDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Insert YouTube Video</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="youtube-url" className="block text-sm font-medium text-slate-700 mb-2">
+                YouTube URL
+              </label>
+              <Input
+                id="youtube-url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowYoutubeDialog(false);
+                  setYoutubeUrl("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (youtubeUrl.trim()) {
+                    editor?.chain().focus().setYoutubeVideo({ src: youtubeUrl.trim() }).run();
+                    setShowYoutubeDialog(false);
+                    setYoutubeUrl("");
+                    setTimeout(() => editor?.commands.focus(), 0);
+                  }
+                }}
+                disabled={!youtubeUrl.trim()}
+              >
+                Insert Video
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Language Selector Popup */}
+      {showLanguageSelector && (
+        <div
+          data-language-selector
+          className="absolute z-50 bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg shadow-slate-200/50 p-2 max-w-sm w-full max-h-80 overflow-y-auto"
+          style={{
+            left: `${languageSelectorPosition.x}px`,
+            top: `${languageSelectorPosition.y}px`,
+          }}
+        >
+          <div className="space-y-1">
+            <div className="px-3 py-2 text-sm font-medium text-slate-700 border-b border-slate-200/60 mb-2">
+              Select Programming Language
+            </div>
+            {PROGRAMMING_LANGUAGES.map((lang) => (
+              <button
+                key={lang.value}
+                onClick={() => handleLanguageSelection(lang.value)}
+                className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors hover:bg-slate-100/80"
+              >
+                <Code className="h-4 w-4 flex-shrink-0 text-slate-500" />
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {lang.label}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {lang.value}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       
       {/* Hidden file input for image upload */}
       <input
