@@ -2132,105 +2132,103 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               top: `${tableToolbarPosition.y}px`,
             }}
           >
-            <div className="flex items-center gap-1 text-xs font-medium text-slate-600 mr-2">
-              <TableIcon className="h-3 w-3" />
-              Table
+            {/* Column Controls - Left Group */}
+            <div className="flex items-center gap-1">
+              {/* Add Column Before */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  editor.chain().focus().addColumnBefore().run();
+                  setTimeout(() => editor.commands.focus(), 0);
+                }}
+                className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+                title="Add Column Before"
+              >
+                <Columns className="h-3 w-3" />
+              </Button>
+              
+              {/* Add Column After */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  editor.chain().focus().addColumnAfter().run();
+                  setTimeout(() => editor.commands.focus(), 0);
+                }}
+                className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+                title="Add Column After"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              
+              {/* Delete Column */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  editor.chain().focus().deleteColumn().run();
+                  setTimeout(() => editor.commands.focus(), 0);
+                }}
+                className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+                title="Delete Column"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
             </div>
             
-            {/* Separator */}
-            <div className="w-px h-4 bg-slate-300/60 mx-1" />
+            {/* Vertical Separator */}
+            <div className="w-px h-6 bg-slate-300/60 mx-2" />
             
-            {/* Add Column Before */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().addColumnBefore().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
-              title="Add Column Before"
-            >
-              <Columns className="h-3 w-3" />
-            </Button>
+            {/* Row Controls - Middle Group */}
+            <div className="flex items-center gap-1">
+              {/* Add Row Before */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  editor.chain().focus().addRowBefore().run();
+                  setTimeout(() => editor.commands.focus(), 0);
+                }}
+                className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+                title="Add Row Before"
+              >
+                <Rows className="h-3 w-3" />
+              </Button>
+              
+              {/* Add Row After */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  editor.chain().focus().addRowAfter().run();
+                  setTimeout(() => editor.commands.focus(), 0);
+                }}
+                className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
+                title="Add Row After"
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+              
+              {/* Delete Row */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  editor.chain().focus().deleteRow().run();
+                  setTimeout(() => editor.commands.focus(), 0);
+                }}
+                className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
+                title="Delete Row"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
+            </div>
             
-            {/* Add Column After */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().addColumnAfter().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
-              title="Add Column After"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
+            {/* Vertical Separator */}
+            <div className="w-px h-6 bg-slate-300/60 mx-2" />
             
-            {/* Separator */}
-            <div className="w-px h-4 bg-slate-300/60 mx-1" />
-            
-            {/* Add Row Before */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().addRowBefore().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
-              title="Add Row Before"
-            >
-              <Rows className="h-3 w-3" />
-            </Button>
-            
-            {/* Add Row After */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().addRowAfter().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className="h-7 w-7 p-0 hover:bg-slate-100/80 transition-colors"
-              title="Add Row After"
-            >
-              <Plus className="h-3 w-3" />
-            </Button>
-            
-            {/* Separator */}
-            <div className="w-px h-4 bg-slate-300/60 mx-1" />
-            
-            {/* Delete Column */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().deleteColumn().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
-              title="Delete Column"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-            
-            {/* Delete Row */}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                editor.chain().focus().deleteRow().run();
-                setTimeout(() => editor.commands.focus(), 0);
-              }}
-              className="h-7 w-7 p-0 hover:bg-red-100/80 hover:text-red-600 transition-colors"
-              title="Delete Row"
-            >
-              <Trash2 className="h-3 w-3" />
-            </Button>
-            
-            {/* Delete Table */}
+            {/* Delete Table - Right Group */}
             <Button
               variant="ghost"
               size="sm"
