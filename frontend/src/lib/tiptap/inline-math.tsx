@@ -40,15 +40,4 @@ export const InlineMath = Node.create({
   addNodeView() {
     return ReactNodeViewRenderer(InlineMathComponent)
   },
-
-  addCommands() {
-    return {
-      insertInlineMath: (latex = '') => ({ commands }) => {
-        return commands.insertContent({
-          type: this.name,
-          attrs: { latex },
-        })
-      },
-    }
-  },
 })

@@ -399,11 +399,12 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         
         {/* Center - Note title with larger font */}
         <div className="flex-1 flex justify-center h-full items-center">
-          <Input
+          <input
+            type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Note title..."
-            className="text-3xl font-bold border-none shadow-none focus-visible:ring-0 p-0 min-w-0 text-center max-w-md bg-transparent placeholder:text-slate-400"
+            className="text-3xl font-bold border-none shadow-none focus-visible:ring-0 p-0 min-w-0 text-center max-w-lg bg-transparent placeholder:text-slate-400 outline-none"
           />
         </div>
         

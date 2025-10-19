@@ -1,23 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { NodeViewWrapper } from '@tiptap/react'
+import { ReactNodeViewProps } from '@tiptap/react'
 import katex from 'katex'
+import { Trash2 } from 'lucide-react'
 import 'katex/dist/katex.min.css'
 
-interface BlockMathComponentProps {
-  node: {
-    attrs: {
-      latex: string
-    }
-  }
-  updateAttributes: (attrs: { latex: string }) => void
-}
-
-export const BlockMathComponent: React.FC<BlockMathComponentProps> = ({
+export const BlockMathComponent: React.FC<ReactNodeViewProps> = ({
   node,
   updateAttributes,
+  deleteNode,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
-  const [latex, setLatex] = useState(node.attrs.latex)
+  const [latex, setLatex] = useState((node.attrs as { latex: string }).latex || '')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
@@ -33,7 +27,7 @@ export const BlockMathComponent: React.FC<BlockMathComponentProps> = ({
 
   const handleBlur = () => {
     setIsEditing(false)
-    if (latex !== node.attrs.latex) {
+    if (latex !== (node.attrs as { latex: string }).latex) {
       updateAttributes({ latex })
     }
   }
@@ -44,13 +38,19 @@ export const BlockMathComponent: React.FC<BlockMathComponentProps> = ({
       handleBlur()
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      setLatex(node.attrs.latex)
+      setLatex((node.attrs as { latex: string }).latex)
       setIsEditing(false)
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setLatex(e.target.value)
+  }
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    deleteNode()
   }
 
   const renderMath = () => {
@@ -70,7 +70,16 @@ export const BlockMathComponent: React.FC<BlockMathComponentProps> = ({
   }
 
   return (
-    <NodeViewWrapper as="div" className="block-latex-component">
+    <NodeViewWrapper as="div" className="block-latex-component group relative">
+      {/* Delete button - appears on hover */}
+      <button
+        onClick={handleDelete}
+        className="absolute top-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-1 text-slate-500 hover:text-red-700"
+        title="Delete math block"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+
       {isEditing ? (
         <textarea
           ref={textareaRef}

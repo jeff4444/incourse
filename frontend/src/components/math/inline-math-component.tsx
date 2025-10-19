@@ -1,23 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { NodeViewWrapper } from '@tiptap/react'
+import { ReactNodeViewProps } from '@tiptap/react'
 import katex from 'katex'
+import { Trash2 } from 'lucide-react'
 import 'katex/dist/katex.min.css'
 
-interface InlineMathComponentProps {
-  node: {
-    attrs: {
-      latex: string
-    }
-  }
-  updateAttributes: (attrs: { latex: string }) => void
-}
-
-export const InlineMathComponent: React.FC<InlineMathComponentProps> = ({
+export const InlineMathComponent: React.FC<ReactNodeViewProps> = ({
   node,
   updateAttributes,
+  deleteNode,
 }) => {
   const [isEditing, setIsEditing] = useState(false)
-  const [latex, setLatex] = useState(node.attrs.latex)
+  const [latex, setLatex] = useState((node.attrs as { latex: string }).latex || '')
   const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -34,7 +28,7 @@ export const InlineMathComponent: React.FC<InlineMathComponentProps> = ({
 
   const handleBlur = () => {
     setIsEditing(false)
-    if (latex !== node.attrs.latex) {
+    if (latex !== (node.attrs as { latex: string }).latex) {
       updateAttributes({ latex })
     }
   }
@@ -45,13 +39,19 @@ export const InlineMathComponent: React.FC<InlineMathComponentProps> = ({
       handleBlur()
     } else if (e.key === 'Escape') {
       e.preventDefault()
-      setLatex(node.attrs.latex)
+      setLatex((node.attrs as { latex: string }).latex)
       setIsEditing(false)
     }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setLatex(e.target.value)
+  }
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    deleteNode()
   }
 
   const renderMath = () => {
@@ -71,7 +71,16 @@ export const InlineMathComponent: React.FC<InlineMathComponentProps> = ({
   }
 
   return (
-    <NodeViewWrapper as="span">
+    <NodeViewWrapper as="span" className="group relative inline-block">
+      {/* Delete button - appears on hover */}
+      <button
+        onClick={handleDelete}
+        className="absolute -top-1 -right-1 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-200 p-0.5 text-slate-500 hover:text-slate-700"
+        title="Delete math"
+      >
+        <Trash2 className="h-2 w-2" />
+      </button>
+
       {isEditing ? (
         <input
           ref={inputRef}

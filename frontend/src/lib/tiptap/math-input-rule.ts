@@ -8,6 +8,7 @@ export const MathInputRules = Extension.create({
       // Block math rule - must come first
       {
         find: /\$\$([^$]+)\$\$/g,
+        undoable: true,
         handler: ({ state, range, match }) => {
           const { tr } = state
           const start = range.from
@@ -25,6 +26,7 @@ export const MathInputRules = Extension.create({
       // Inline math rule - check context to avoid conflicts
       {
         find: /\$([^$\n]+)\$/g,
+        undoable: true,
         handler: ({ state, range, match }) => {
           const { tr } = state
           const start = range.from
@@ -60,6 +62,7 @@ export const MathPasteRules = Extension.create({
     return [
       {
         find: /\$\$([^$]+)\$\$/g,
+        undoable: true,
         handler: ({ state, range, match }) => {
           const { tr } = state
           const start = range.from
@@ -74,6 +77,7 @@ export const MathPasteRules = Extension.create({
       },
       {
         find: /\$([^$\n]+)\$/g,
+        undoable: true,
         handler: ({ state, range, match }) => {
           const { tr } = state
           const start = range.from

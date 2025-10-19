@@ -39,16 +39,4 @@ export const BlockMath = Node.create({
   addNodeView() {
     return ReactNodeViewRenderer(BlockMathComponent)
   },
-
-
-  addCommands() {
-    return {
-      insertBlockMath: (latex = '') => ({ commands }) => {
-        return commands.insertContent({
-          type: this.name,
-          attrs: { latex },
-        })
-      },
-    }
-  },
 })
