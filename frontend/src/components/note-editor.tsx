@@ -1119,7 +1119,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.back()}
+            onClick={() => router.push(`/courses/${note.course_id}`)}
             className="flex items-center gap-2 hover:bg-slate-100/80 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />

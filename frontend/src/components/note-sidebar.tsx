@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Note, NoteFolder } from "@/lib/types/course";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ interface NoteSidebarProps {
 }
 
 export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarProps) {
+  const router = useRouter();
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
   const [expandedAllNotes, setExpandedAllNotes] = useState(true); // Default to expanded
   const [searchQuery, setSearchQuery] = useState("");
@@ -99,7 +101,7 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
       });
       
       // Navigate to the new note
-      window.location.href = `/courses/${courseID}/notes/${newNote.id}`;
+      router.push(`/courses/${courseID}/notes/${newNote.id}`);
     } catch (error) {
       console.error("Error creating note:", error);
     }
@@ -282,7 +284,7 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
                       <div
                         key={note.id}
                         className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100/60 cursor-pointer group transition-colors"
-                        onClick={() => window.location.href = `/courses/${courseID}/notes/${note.id}`}
+                        onClick={() => router.push(`/courses/${courseID}/notes/${note.id}`)}
                       >
                         <FileText className="h-4 w-4 text-slate-400" />
                         <span className="text-sm text-slate-700 truncate">{note.title}</span>
@@ -341,7 +343,7 @@ export function NoteSidebar({ notes, folders, courseID, userId }: NoteSidebarPro
                   <div
                     key={note.id}
                     className="flex items-center gap-2 px-4 py-2 hover:bg-slate-100/60 cursor-pointer group transition-colors"
-                    onClick={() => window.location.href = `/courses/${courseID}/notes/${note.id}`}
+                    onClick={() => router.push(`/courses/${courseID}/notes/${note.id}`)}
                   >
                     <FileText className="h-4 w-4 text-slate-400" />
                     <span className="text-sm text-slate-700 truncate">{note.title}</span>
