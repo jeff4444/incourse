@@ -9,9 +9,11 @@ import uvicorn
 from dotenv import load_dotenv
 
 # add the project root to path so we can find the .env file
-sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))))
+incourse_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+print(f"InCourse root: {incourse_root}")
+sys.path.append(incourse_root)
 
-load_dotenv()
+load_dotenv(os.path.join(incourse_root, ".env"))
 
 def main():
     """Start the FastAPI server with uvicorn."""

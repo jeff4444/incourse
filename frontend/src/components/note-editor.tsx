@@ -18,6 +18,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { 
   Bold, 
   Italic, 
@@ -36,11 +42,20 @@ import {
   Loader2,
   Menu,
   Sigma,
-  ChevronDown
+  ChevronDown,
+  FileText,
+  Search,
+  X,
+  HelpCircle,
+  Brain
 } from "lucide-react";
 import { useUpdateNote } from "@/lib/hooks/useNotes";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useModules } from "@/lib/hooks/useModules";
+import { useQuizzes } from "@/lib/hooks/useQuizzes";
+import { useFlashcardDecks } from "@/lib/hooks/useFlashcards";
+import { Module, ModuleItem } from "@/lib/types/course";
 
 interface NoteEditorProps {
   note: {
@@ -63,9 +78,39 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   const [showFloatingToolbar, setShowFloatingToolbar] = useState(false);
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 });
   const [isSelecting, setIsSelecting] = useState(false);
+  const [showSlashCommand, setShowSlashCommand] = useState(false);
+  const [slashCommandPosition, setSlashCommandPosition] = useState({ x: 0, y: 0 });
+  const [slashCommandQuery, setSlashCommandQuery] = useState("");
+  const [selectedSlashCommandIndex, setSelectedSlashCommandIndex] = useState(0);
+  const [showModuleSelector, setShowModuleSelector] = useState(false);
+  const [moduleSearchQuery, setModuleSearchQuery] = useState("");
+  const [showQuizSelector, setShowQuizSelector] = useState(false);
+  const [quizSearchQuery, setQuizSearchQuery] = useState("");
+  const [showFlashcardSelector, setShowFlashcardSelector] = useState(false);
+  const [flashcardSearchQuery, setFlashcardSearchQuery] = useState("");
+  const [showLinePlaceholder, setShowLinePlaceholder] = useState(false);
+  const [linePlaceholderPosition, setLinePlaceholderPosition] = useState({ x: 0, y: 0 });
   const router = useRouter();
   const updateNote = useUpdateNote();
   const editorRef = useRef<HTMLDivElement>(null);
+  const { data: modules = [] } = useModules(note.course_id);
+  
+  // Get user ID for quizzes and flashcards
+  const [userId, setUserId] = useState<string>("");
+  useEffect(() => {
+    const getUserId = async () => {
+      const { createClient } = await import("@/lib/utils/supabase/client");
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUserId();
+  }, []);
+  
+  const { data: quizzes = [] } = useQuizzes(note.course_id, userId);
+  const { data: flashcardDecks = [] } = useFlashcardDecks(note.course_id, userId);
 
   const editor = useEditor({
     extensions: [
@@ -108,13 +153,19 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         },
       }),
       Placeholder.configure({
-        placeholder: "Start writing your note...",
+        placeholder: ({ node }) => {
+          if (node.type.name === 'doc') {
+            return "Start writing your note... Type / for formatting options and to attach modules, quizzes, or flashcard decks";
+          }
+          return "Type / for formatting options and to attach modules, quizzes, or flashcard decks";
+        },
       }),
       Underline,
       Link.configure({
         openOnClick: false,
         HTMLAttributes: {
           class: "text-blue-600 underline cursor-pointer hover:text-blue-700",
+          target: "_self",
         },
       }),
       InlineMath,
@@ -130,6 +181,68 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
       setHasUnsavedChanges(true);
       // Auto-save on content change (debounced)
       debouncedSave(editor.getJSON());
+      
+      // Check for slash command
+      const { state } = editor;
+      const { selection } = state;
+      const { $from } = selection;
+      
+      // Get the text before the cursor
+      const textBefore = $from.nodeBefore?.textContent || '';
+      const textAfter = $from.nodeAfter?.textContent || '';
+      const currentText = textBefore + textAfter;
+      
+      // Check if we just typed a slash at the beginning of a line or after whitespace
+      const slashIndex = currentText.lastIndexOf('/');
+      if (slashIndex !== -1) {
+        const beforeSlash = currentText.substring(0, slashIndex);
+        const afterSlash = currentText.substring(slashIndex + 1);
+        
+        // Check if slash is at start of line or after whitespace/newline
+        const isAtLineStart = beforeSlash === '' || beforeSlash.endsWith('\n') || beforeSlash.endsWith(' ');
+        
+        if (isAtLineStart && !afterSlash.includes(' ')) {
+          // Show slash command menu
+          setShowSlashCommand(true);
+          setSlashCommandQuery(afterSlash);
+          setSelectedSlashCommandIndex(0);
+          
+          // Position the menu
+          const editorRect = editorRef.current?.getBoundingClientRect();
+          if (editorRect) {
+            const coords = editor.view.coordsAtPos($from.pos);
+            setSlashCommandPosition({
+              x: coords.left - editorRect.left,
+              y: coords.top - editorRect.top
+            });
+          }
+        } else {
+          setShowSlashCommand(false);
+        }
+      } else {
+        setShowSlashCommand(false);
+      }
+      
+      // Check if we're at the start of a new line (for line placeholder)
+      const isAtLineStart = $from.parentOffset === 0;
+      const isEmptyLine = $from.parent.textContent === '';
+      
+      if (isAtLineStart && isEmptyLine && !showSlashCommand) {
+        // Show line placeholder
+        setShowLinePlaceholder(true);
+        
+        // Position the placeholder
+        const editorRect = editorRef.current?.getBoundingClientRect();
+        if (editorRect) {
+          const coords = editor.view.coordsAtPos($from.pos);
+          setLinePlaceholderPosition({
+            x: coords.left - editorRect.left,
+            y: coords.top - editorRect.top
+          });
+        }
+      } else {
+        setShowLinePlaceholder(false);
+      }
     },
     onSelectionUpdate: ({ editor }) => {
       const { from, to } = editor.state.selection;
@@ -327,6 +440,25 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
         handleManualSave();
         return;
       }
+      
+      // Handle slash command navigation
+      if (showSlashCommand) {
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          setSelectedSlashCommandIndex(prev => 
+            Math.min(prev + 1, getSlashCommandOptions().length - 1)
+          );
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          setSelectedSlashCommandIndex(prev => Math.max(prev - 1, 0));
+        } else if (event.key === 'Enter') {
+          event.preventDefault();
+          executeSlashCommand();
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          setShowSlashCommand(false);
+        }
+      }
     };
 
     // Add listener to editor element instead of document
@@ -360,6 +492,222 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
   const exportNote = () => {
     const exportUrl = `/api/courses/${note.course_id}/notes/${note.id}/export`;
     window.open(exportUrl, '_blank');
+  };
+
+  // Get all available module items for reference
+  const getAllModuleItems = (): (ModuleItem & { moduleName: string })[] => {
+    const items: (ModuleItem & { moduleName: string })[] = [];
+    modules.forEach(module => {
+      module.moduleItems.forEach(item => {
+        items.push({
+          ...item,
+          moduleName: module.name
+        });
+      });
+    });
+    return items;
+  };
+
+  // Get slash command options
+  const getSlashCommandOptions = () => {
+    const formattingOptions: Array<{
+      id: string;
+      label: string;
+      icon: any;
+      action: () => void;
+      subtitle?: string;
+    }> = [
+      { id: 'h1', label: 'Heading 1', icon: Heading1, action: () => editor?.chain().focus().toggleHeading({ level: 1 }).run() },
+      { id: 'h2', label: 'Heading 2', icon: Heading2, action: () => editor?.chain().focus().toggleHeading({ level: 2 }).run() },
+      { id: 'h3', label: 'Heading 3', icon: Heading3, action: () => editor?.chain().focus().toggleHeading({ level: 3 }).run() },
+      { id: 'bold', label: 'Bold', icon: Bold, action: () => editor?.chain().focus().toggleBold().run() },
+      { id: 'italic', label: 'Italic', icon: Italic, action: () => editor?.chain().focus().toggleItalic().run() },
+      { id: 'underline', label: 'Underline', icon: UnderlineIcon, action: () => editor?.chain().focus().toggleUnderline().run() },
+      { id: 'bullet', label: 'Bullet List', icon: List, action: () => editor?.chain().focus().toggleBulletList().run() },
+      { id: 'numbered', label: 'Numbered List', icon: ListOrdered, action: () => editor?.chain().focus().toggleOrderedList().run() },
+      { id: 'quote', label: 'Quote', icon: Quote, action: () => editor?.chain().focus().toggleBlockquote().run() },
+      { id: 'code', label: 'Code Block', icon: Code, action: () => editor?.chain().focus().toggleCodeBlock().run() },
+      { id: 'math', label: 'Math', icon: Sigma, action: () => {
+        const selectedText = editor?.state.doc.textBetween(
+          editor.state.selection.from,
+          editor.state.selection.to
+        );
+        const latex = selectedText || 'x^2';
+        editor?.chain().focus().insertContent({
+          type: 'inlineMath',
+          attrs: { latex }
+        }).run();
+      }},
+    ];
+
+    // Add attachment options
+    const attachmentOptions = [];
+    
+    if (modules.length > 0) {
+      attachmentOptions.push({
+        id: 'attach-module',
+        label: 'Attach Module Item',
+        icon: FileText,
+        action: () => {
+          setShowModuleSelector(true);
+          setShowSlashCommand(false);
+        }
+      });
+    }
+    
+    if (quizzes.length > 0) {
+      attachmentOptions.push({
+        id: 'attach-quiz',
+        label: 'Attach Quiz',
+        icon: HelpCircle,
+        action: () => {
+          setShowQuizSelector(true);
+          setShowSlashCommand(false);
+        }
+      });
+    }
+    
+    if (flashcardDecks.length > 0) {
+      attachmentOptions.push({
+        id: 'attach-flashcard',
+        label: 'Attach Flashcard Deck',
+        icon: Brain,
+        action: () => {
+          setShowFlashcardSelector(true);
+          setShowSlashCommand(false);
+        }
+      });
+    }
+
+    return [...formattingOptions, ...attachmentOptions];
+  };
+
+  // Get href for module item
+  const getModuleItemHref = (item: ModuleItem) => {
+    switch (item.type) {
+      case 'File':
+        return `/courses/${note.course_id}/files/${item.lmsContentId}`;
+      case 'Page':
+        return `/courses/${note.course_id}/pages/${item.lmsContentId}`;
+      case 'Discussion':
+        return `/courses/${note.course_id}/discussion_topics/${item.lmsContentId}`;
+      default:
+        return `/courses/${note.course_id}/files/${item.lmsContentId}`;
+    }
+  };
+
+  // Get filtered module items for the popup
+  const getFilteredModuleItems = () => {
+    const allItems = getAllModuleItems();
+    if (!moduleSearchQuery.trim()) return allItems;
+    
+    const query = moduleSearchQuery.toLowerCase();
+    return allItems.filter(item => 
+      item.name.toLowerCase().includes(query) ||
+      item.moduleName.toLowerCase().includes(query)
+    );
+  };
+
+  // Handle module item selection
+  const handleModuleItemSelect = (item: ModuleItem & { moduleName: string }) => {
+    const href = getModuleItemHref(item);
+    editor?.chain().focus().insertContent({
+      type: 'text',
+      text: item.name,
+      marks: [{
+        type: 'link',
+        attrs: { href }
+      }]
+    }).run();
+    setShowModuleSelector(false);
+    setModuleSearchQuery("");
+    setTimeout(() => editor?.commands.focus(), 0);
+  };
+
+  // Handle quiz selection
+  const handleQuizSelect = (quiz: any) => {
+    const href = `/courses/${note.course_id}/quiz/${quiz.id}`;
+    editor?.chain().focus().insertContent({
+      type: 'text',
+      text: quiz.name,
+      marks: [{
+        type: 'link',
+        attrs: { href }
+      }]
+    }).run();
+    setShowQuizSelector(false);
+    setQuizSearchQuery("");
+    setTimeout(() => editor?.commands.focus(), 0);
+  };
+
+  // Handle flashcard deck selection
+  const handleFlashcardSelect = (deck: any) => {
+    const href = `/courses/${note.course_id}/flashcards/${deck.id}`;
+    editor?.chain().focus().insertContent({
+      type: 'text',
+      text: deck.name,
+      marks: [{
+        type: 'link',
+        attrs: { href }
+      }]
+    }).run();
+    setShowFlashcardSelector(false);
+    setFlashcardSearchQuery("");
+    setTimeout(() => editor?.commands.focus(), 0);
+  };
+
+  // Get filtered quizzes
+  const getFilteredQuizzes = () => {
+    if (!quizSearchQuery.trim()) return quizzes;
+    const query = quizSearchQuery.toLowerCase();
+    return quizzes.filter(quiz => 
+      quiz.name.toLowerCase().includes(query) ||
+      (quiz.description && quiz.description.toLowerCase().includes(query))
+    );
+  };
+
+  // Get filtered flashcard decks
+  const getFilteredFlashcardDecks = () => {
+    if (!flashcardSearchQuery.trim()) return flashcardDecks;
+    const query = flashcardSearchQuery.toLowerCase();
+    return flashcardDecks.filter(deck => 
+      deck.name.toLowerCase().includes(query) ||
+      (deck.description && deck.description.toLowerCase().includes(query))
+    );
+  };
+
+  // Execute selected slash command
+  const executeSlashCommand = () => {
+    const options = getSlashCommandOptions();
+    const selectedOption = options[selectedSlashCommandIndex];
+    if (selectedOption) {
+      // Remove the slash and any text after it
+      const { state } = editor!;
+      const { selection } = state;
+      const { $from } = selection;
+      
+      // Find the position of the slash
+      const textBefore = $from.nodeBefore?.textContent || '';
+      const textAfter = $from.nodeAfter?.textContent || '';
+      const currentText = textBefore + textAfter;
+      const slashIndex = currentText.lastIndexOf('/');
+      
+      if (slashIndex !== -1) {
+        // Calculate the position to delete from (the slash position)
+        const deleteFrom = $from.pos - (textAfter.length + 1); // +1 for the slash itself
+        
+        // Delete the slash and everything after it
+        editor?.chain()
+          .focus()
+          .deleteRange({ from: deleteFrom, to: $from.pos })
+          .run();
+      }
+      
+      // Execute the selected action
+      selectedOption.action();
+      setShowSlashCommand(false);
+      setTimeout(() => editor?.commands.focus(), 0);
+    }
   };
 
   if (!editor) {
@@ -733,7 +1081,237 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
             </DropdownMenu>
           </div>
         )}
+        
+        {/* Slash Command Dropdown */}
+        {showSlashCommand && (
+          <div
+            className="absolute z-50 bg-white/95 backdrop-blur-sm border border-slate-200/60 rounded-xl shadow-lg shadow-slate-200/50 p-2 max-w-sm w-full max-h-80 overflow-y-auto"
+            style={{
+              left: `${slashCommandPosition.x}px`,
+              top: `${slashCommandPosition.y + 20}px`,
+            }}
+          >
+            <div className="space-y-1">
+              {getSlashCommandOptions().map((option, index) => {
+                const IconComponent = option.icon;
+                return (
+                  <button
+                    key={option.id}
+                    onClick={() => {
+                      // Remove the slash and any text after it
+                      const { state } = editor!;
+                      const { selection } = state;
+                      const { $from } = selection;
+                      
+                      // Find the position of the slash
+                      const textBefore = $from.nodeBefore?.textContent || '';
+                      const textAfter = $from.nodeAfter?.textContent || '';
+                      const currentText = textBefore + textAfter;
+                      const slashIndex = currentText.lastIndexOf('/');
+                      
+                      if (slashIndex !== -1) {
+                        // Calculate the position to delete from (the slash position)
+                        const deleteFrom = $from.pos - (textAfter.length + 1); // +1 for the slash itself
+                        
+                        // Delete the slash and everything after it
+                        editor?.chain()
+                          .focus()
+                          .deleteRange({ from: deleteFrom, to: $from.pos })
+                          .run();
+                      }
+                      
+                      // Execute the selected action
+                      option.action();
+                      setShowSlashCommand(false);
+                      setTimeout(() => editor?.commands.focus(), 0);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors",
+                      index === selectedSlashCommandIndex
+                        ? "bg-blue-100 text-blue-900"
+                        : "hover:bg-slate-100/80"
+                    )}
+                  >
+                    <IconComponent className="h-4 w-4 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-sm truncate">
+                        {option.label}
+                      </div>
+                      {'subtitle' in option && option.subtitle && (
+                        <div className="text-xs text-slate-500 truncate">
+                          {option.subtitle}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        
+        {/* Line Placeholder */}
+        {showLinePlaceholder && (
+          <div
+            className="absolute z-40 pointer-events-none"
+            style={{
+              left: `${linePlaceholderPosition.x}px`,
+              top: `${linePlaceholderPosition.y}px`,
+            }}
+          >
+            <div className="text-slate-400 text-sm italic">
+              Type / for formatting options and to attach modules, quizzes, or flashcard decks
+            </div>
+          </div>
+        )}
       </div>
+      
+      {/* Module Item Selector Dialog */}
+      <Dialog open={showModuleSelector} onOpenChange={setShowModuleSelector}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Attach Module Item</DialogTitle>
+          </DialogHeader>
+          
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search module items..."
+              value={moduleSearchQuery}
+              onChange={(e) => setModuleSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* Module Items List */}
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {getFilteredModuleItems().map((item) => (
+              <button
+                key={item.lmsContentId}
+                onClick={() => handleModuleItemSelect(item)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 transition-colors text-left"
+              >
+                <div className="flex-shrink-0">
+                  <FileText className="h-5 w-5 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {item.name}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {item.moduleName} • {item.type}
+                  </div>
+                </div>
+              </button>
+            ))}
+            
+            {getFilteredModuleItems().length === 0 && (
+              <div className="text-center py-8 text-slate-500">
+                {moduleSearchQuery ? 'No module items found matching your search.' : 'No module items available.'}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Quiz Selector Dialog */}
+      <Dialog open={showQuizSelector} onOpenChange={setShowQuizSelector}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Attach Quiz</DialogTitle>
+          </DialogHeader>
+          
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search quizzes..."
+              value={quizSearchQuery}
+              onChange={(e) => setQuizSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* Quizzes List */}
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {getFilteredQuizzes().map((quiz) => (
+              <button
+                key={quiz.id}
+                onClick={() => handleQuizSelect(quiz)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 transition-colors text-left"
+              >
+                <div className="flex-shrink-0">
+                  <HelpCircle className="h-5 w-5 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {quiz.name}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {quiz.question_count} questions • {quiz.difficulty}
+                  </div>
+                </div>
+              </button>
+            ))}
+            
+            {getFilteredQuizzes().length === 0 && (
+              <div className="text-center py-8 text-slate-500">
+                {quizSearchQuery ? 'No quizzes found matching your search.' : 'No quizzes available.'}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Flashcard Selector Dialog */}
+      <Dialog open={showFlashcardSelector} onOpenChange={setShowFlashcardSelector}>
+        <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Attach Flashcard Deck</DialogTitle>
+          </DialogHeader>
+          
+          {/* Search Bar */}
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              placeholder="Search flashcard decks..."
+              value={flashcardSearchQuery}
+              onChange={(e) => setFlashcardSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          
+          {/* Flashcard Decks List */}
+          <div className="flex-1 overflow-y-auto space-y-2">
+            {getFilteredFlashcardDecks().map((deck) => (
+              <button
+                key={deck.id}
+                onClick={() => handleFlashcardSelect(deck)}
+                className="w-full flex items-center gap-3 p-3 rounded-lg border hover:bg-slate-50 transition-colors text-left"
+              >
+                <div className="flex-shrink-0">
+                  <Brain className="h-5 w-5 text-slate-500" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium text-sm truncate">
+                    {deck.name}
+                  </div>
+                  <div className="text-xs text-slate-500 truncate">
+                    {deck.card_count} cards • {deck.card_type}
+                  </div>
+                </div>
+              </button>
+            ))}
+            
+            {getFilteredFlashcardDecks().length === 0 && (
+              <div className="text-center py-8 text-slate-500">
+                {flashcardSearchQuery ? 'No flashcard decks found matching your search.' : 'No flashcard decks available.'}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
