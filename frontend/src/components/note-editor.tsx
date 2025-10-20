@@ -653,7 +653,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               const coords = editor.view.coordsAtPos($from.pos);
               setLinePlaceholderPosition({
                 x: coords.left - editorRect.left,
-                y: coords.top - editorRect.top
+                y: coords.top - editorRect.top + (editorRef.current?.scrollTop || 0)
               });
             }
           }, 0);
