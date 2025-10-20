@@ -5,6 +5,7 @@ from pydantic_ai import Agent, Tool
 from prompts.chat_agent_prompt import CHAT_AGENT_PROMPT
 from tools.pinecone_tools import search_file_with_query, search_file_with_chunk_index
 from tools.supabase_tools import get_course_and_file_info, get_chat_context
+from tools.generation_tools import generate_quiz_from_chat, generate_flashcard_from_chat
 from shared.model import get_model
 from shared.managers import ChatSessionManager
 
@@ -55,6 +56,8 @@ def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
             Tool(get_chat_context, takes_ctx=True),
             Tool(search_file_with_query, takes_ctx=True),
             Tool(search_file_with_chunk_index, takes_ctx=True),
+            Tool(generate_quiz_from_chat, takes_ctx=True),
+            Tool(generate_flashcard_from_chat, takes_ctx=True),
         ],
         retries=3,
         output_retries=3,

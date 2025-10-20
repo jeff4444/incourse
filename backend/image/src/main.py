@@ -20,6 +20,7 @@ from agents.nudge_agent.agent import Nudge, Deps as NudgeDeps
 from agents.take_action_agent.agent import RouteOutput, Deps as TakeActionDeps
 from agents.chat_agent.agent import ChatAnswer, Deps as ChatDeps
 from agents.chat_agent.streaming_handler import stream_chat_agent
+from agents.note_update_agent.agent import NoteUpdate, Deps as NoteUpdateDeps
 
 # Import managers and tools
 from shared.managers import ChatSessionManager
@@ -63,6 +64,10 @@ def get_chat_agent_lazy(**kwargs):
     from agents.chat_agent.agent import get_chat_agent
     return get_chat_agent(**kwargs)
 
+def get_note_update_agent_lazy(**kwargs):
+    from agents.note_update_agent.agent import get_note_update_agent
+    return get_note_update_agent(**kwargs)
+
 app = FastAPI(
     title="InCourse AI Agents API",
     description="Backend API for InCourse AI agents including flashcard generation, quiz generation, nudges, and action routing",
@@ -83,19 +88,43 @@ class FlashcardRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(default=[], description="File IDs for generation")
+    note_ids: List[str] = Field(default=[], description="Note IDs for generation")
     num_flashcards: int = 10
     card_type: str = "term-definition"
     extra_context: Optional[str] = None
+    
+    @validator('note_ids', always=True)
+    def validate_content_sources(cls, v, values):
+        file_ids = values.get('file_ids', [])
+        note_ids = v or []
+        
+        # At least one source must be provided
+        if not file_ids and not note_ids:
+            raise ValueError('At least one file_id or note_id must be provided')
+        
+        return v
 
 class QuizRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(default=[], description="File IDs for generation")
+    note_ids: List[str] = Field(default=[], description="Note IDs for generation")
     num_questions: int = 5
     difficulty: str = "medium"
     extra_context: Optional[str] = None
+    
+    @validator('note_ids', always=True)
+    def validate_content_sources(cls, v, values):
+        file_ids = values.get('file_ids', [])
+        note_ids = v or []
+        
+        # At least one source must be provided
+        if not file_ids and not note_ids:
+            raise ValueError('At least one file_id or note_id must be provided')
+        
+        return v
 
 class NudgeRequest(BaseModel):
     user_id: str
@@ -145,6 +174,19 @@ class ChatResponse(BaseModel):
     message: str
     session_id: str
 
+class AddToNotesRequest(BaseModel):
+    user_id: str
+    course_id: str
+    note_ids: List[str] = Field(..., min_length=1, description="At least one note ID must be provided")
+    ai_message: str
+    conversation_context: List[Dict[str, str]] = Field(default=[], description="Recent chat history for context")
+    file_id: str = Field(..., description="Source file ID for attribution")
+
+class AddToNotesResponse(BaseModel):
+    success: bool
+    updated_note_ids: List[str]
+    message: str
+
 # Health check endpoint
 @app.get("/")
 async def root():
@@ -184,11 +226,17 @@ async def generate_flashcards(request: FlashcardRequest):
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
             lms_base_url=lms_info["base_url"],
-            course_info=course_info
+            course_info=course_info,
+            note_ids=request.note_ids,
+            notes_info=[]  # Will be fetched by tools if needed
         )
         
-        # Get the flashcard agent with file_ids injected
-        agent = get_flashcard_agent_lazy(num_flashcards=request.num_flashcards, file_ids=request.file_ids)
+        # Get the flashcard agent with file_ids and note_ids injected
+        agent = get_flashcard_agent_lazy(
+            num_flashcards=request.num_flashcards, 
+            file_ids=request.file_ids,
+            note_ids=request.note_ids
+        )
         
         # Build prompt with extra context if provided
         prompt = f"Generate {request.num_flashcards} flashcards"
@@ -209,7 +257,8 @@ async def generate_flashcards(request: FlashcardRequest):
             file_ids=request.file_ids,
             card_count=len(flashcard_dicts),
             extra_context=request.extra_context,
-            card_type=request.card_type
+            card_type=request.card_type,
+            note_ids=request.note_ids
         )
         
         # Store flashcards in database
@@ -262,11 +311,18 @@ async def generate_quiz(request: QuizRequest):
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
             lms_base_url=lms_info["base_url"],
-            course_info=course_info
+            course_info=course_info,
+            note_ids=request.note_ids,
+            notes_info=[]  # Will be fetched by tools if needed
         )
         
-        # Get the quiz agent with file_ids injected
-        agent = get_quiz_agent_lazy(num_quizzes=request.num_questions, difficulty=request.difficulty, file_ids=request.file_ids)
+        # Get the quiz agent with file_ids and note_ids injected
+        agent = get_quiz_agent_lazy(
+            num_quizzes=request.num_questions, 
+            difficulty=request.difficulty, 
+            file_ids=request.file_ids,
+            note_ids=request.note_ids
+        )
         
         # Build prompt with difficulty and extra context
         prompt = f"Generate {request.num_questions} {request.difficulty} difficulty quiz questions"
@@ -287,7 +343,8 @@ async def generate_quiz(request: QuizRequest):
             file_ids=request.file_ids,
             question_count=len(quiz_dicts),
             extra_context=request.extra_context,
-            difficulty=request.difficulty
+            difficulty=request.difficulty,
+            note_ids=request.note_ids
         )
         
         # Store quiz questions in database
@@ -949,6 +1006,90 @@ async def grade_assignment(
                 await cleanup_openai_assistant(assistant_id)
         except Exception as cleanup_error:
             print(f"Warning: Error during cleanup: {cleanup_error}")
+
+
+# Add Chat Message to Notes Endpoint
+@app.post("/agents/notes/add-chat-message", response_model=AddToNotesResponse)
+async def add_chat_message_to_notes(request: AddToNotesRequest):
+    """
+    Add an AI chat message to one or more notes with proper formatting and source attribution.
+    The agent analyzes the message and intelligently formats it for note-taking.
+    """
+    try:
+        from datetime import datetime
+        from tools.note_update_tools import append_content_to_note
+        
+        # Create dependencies for the agent
+        deps = NoteUpdateDeps(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            file_id=request.file_id,
+            ai_message=request.ai_message,
+            conversation_context=request.conversation_context,
+            note_ids=request.note_ids
+        )
+        
+        # Get the note update agent
+        agent = get_note_update_agent_lazy()
+        
+        # Prepare the prompt with context
+        context_str = ""
+        if request.conversation_context:
+            context_str = "\n\nConversation Context (most recent 5 messages):\n"
+            for msg in request.conversation_context[-5:]:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                context_str += f"{role}: {content[:200]}...\n" if len(content) > 200 else f"{role}: {content}\n"
+        
+        prompt = f"""
+Please format the following AI chat message for insertion into course notes.
+
+AI Message to Format:
+{request.ai_message}
+{context_str}
+
+Source File ID: {request.file_id}
+Course ID: {request.course_id}
+Current Date: {datetime.now().strftime('%Y-%m-%d')}
+
+Analyze the message, decide whether to expand it with additional context, format it properly with markdown, and include source attribution.
+"""
+        
+        # Run the agent to get formatted content
+        result = await agent.run(prompt, deps=deps)
+        formatted_markdown = result.output.formatted_content
+        
+        # Update each note with the formatted content
+        updated_note_ids = []
+        for note_id in request.note_ids:
+            try:
+                await append_content_to_note(
+                    note_id=note_id,
+                    new_content_markdown=formatted_markdown,
+                    source_file_id=request.file_id,
+                    course_id=request.course_id
+                )
+                updated_note_ids.append(note_id)
+            except Exception as note_error:
+                print(f"Error updating note {note_id}: {str(note_error)}")
+                # Continue with other notes even if one fails
+        
+        if not updated_note_ids:
+            raise Exception("Failed to update any notes")
+        
+        return AddToNotesResponse(
+            success=True,
+            updated_note_ids=updated_note_ids,
+            message=f"Successfully added content to {len(updated_note_ids)} note(s)"
+        )
+        
+    except Exception as e:
+        import traceback
+        print("=" * 80)
+        print("ERROR IN /agents/notes/add-chat-message ENDPOINT:")
+        print(traceback.format_exc())
+        print("=" * 80)
+        raise HTTPException(status_code=500, detail=f"Error adding chat message to notes: {str(e)}")
 
 
 if __name__ == "__main__":

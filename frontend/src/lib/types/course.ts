@@ -137,3 +137,25 @@ export interface Assignment {
   submission_types: string[];
   has_submitted_submissions: boolean;
 }
+
+export interface NoteFolder {
+  id: string;
+  user_id: string;
+  course_id: string;
+  name: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Note {
+  id: string;
+  user_id: string;
+  course_id: string;
+  folder_id: string | null;
+  title: string;
+  content: any; // Tiptap JSON
+  position: number;
+  created_at: string;
+  updated_at: string;
+}

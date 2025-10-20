@@ -72,7 +72,7 @@ export class BackendStack extends cdk.Stack {
     const funcUrl = dockerFunc.addFunctionUrl({
       authType: lambda.FunctionUrlAuthType.NONE,
       cors: {
-        allowedOrigins: ['*'],
+        allowedOrigins: ['https://incourse-three.vercel.app'],
         allowedMethods: [lambda.HttpMethod.ALL],
         allowedHeaders: ['*'],
       },

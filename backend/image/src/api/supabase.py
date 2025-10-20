@@ -97,7 +97,7 @@ async def get_user_lms_info(user_id: str) -> str:
     
     api_key = api_keys[0]
     encrypted_api_key = api_key["encrypted_api_key"]
-    api_base_url =f"{api_key["api_base_url"]}/api/v1"
+    api_base_url = f"{api_key['api_base_url']}/api/v1"
     decrypted_api_key = decrypt_api_key(encrypted_api_key)
     return {
         "api_key": decrypted_api_key,
@@ -885,7 +885,8 @@ async def create_flashcard_deck(
     file_ids: List[str],
     card_count: int,
     extra_context: str = None,
-    card_type: str = "term-definition"
+    card_type: str = "term-definition",
+    note_ids: List[str] = None
 ) -> str:
     """
     Create a new flashcard deck.
@@ -912,7 +913,8 @@ async def create_flashcard_deck(
         "name": name,
         "file_ids": file_ids,
         "card_type": card_type,
-        "card_count": card_count
+        "card_count": card_count,
+        "note_ids": note_ids or []
     }
     
     if extra_context:
@@ -1113,7 +1115,8 @@ async def create_quiz(
     file_ids: List[str],
     question_count: int,
     extra_context: str = None,
-    difficulty: str = "medium"
+    difficulty: str = "medium",
+    note_ids: List[str] = None
 ) -> str:
     """
     Create a new quiz.
@@ -1140,7 +1143,8 @@ async def create_quiz(
         "name": name,
         "file_ids": file_ids,
         "difficulty": difficulty,
-        "question_count": question_count
+        "question_count": question_count,
+        "note_ids": note_ids or []
     }
     
     if extra_context:
@@ -1552,3 +1556,169 @@ async def get_user_autograder_feedback_history(
     )
     
     return response.data
+
+
+# =====================================================
+# Note Functions
+# =====================================================
+
+async def get_notes_by_ids(note_ids: List[str]) -> List[Dict[str, Any]]:
+    """
+    Fetch multiple notes by their IDs.
+    
+    Args:
+        note_ids: List of note IDs to fetch
+    
+    Returns:
+        List of note dictionaries with content (Tiptap JSON)
+    """
+    print(f"calling get_notes_by_ids with note_ids={note_ids}")
+    
+    if not note_ids:
+        return []
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("notes")
+        .select("*")
+        .in_("id", note_ids)
+        .execute()
+    )
+    
+    return response.data or []
+
+
+def extract_text_from_note_content(content: dict) -> str:
+    """
+    Parse Tiptap JSON structure and extract text while preserving formatting.
+    
+    Args:
+        content: Tiptap JSON content structure
+    
+    Returns:
+        Plain text with basic markdown formatting
+    """
+    if not content or not isinstance(content, dict):
+        return ""
+    
+    def extract_text_from_node(node: dict) -> str:
+        if not isinstance(node, dict):
+            return ""
+        
+        node_type = node.get("type", "")
+        text_content = node.get("text", "")
+        
+        # Handle text nodes
+        if node_type == "text":
+            marks = node.get("marks", [])
+            text = text_content
+            
+            # Apply formatting marks
+            for mark in marks:
+                mark_type = mark.get("type", "")
+                if mark_type == "bold":
+                    text = f"**{text}**"
+                elif mark_type == "italic":
+                    text = f"*{text}*"
+                elif mark_type == "code":
+                    text = f"`{text}`"
+                elif mark_type == "strike":
+                    text = f"~~{text}~~"
+            
+            return text
+        
+        # Handle block nodes
+        elif node_type in ["paragraph", "heading"]:
+            level = node.get("attrs", {}).get("level", 1) if node_type == "heading" else 0
+            content_text = ""
+            
+            if "content" in node:
+                content_text = "".join(extract_text_from_node(child) for child in node["content"])
+            
+            if node_type == "heading":
+                prefix = "#" * level + " "
+                return f"{prefix}{content_text}\n\n"
+            else:
+                return f"{content_text}\n\n"
+        
+        # Handle list items
+        elif node_type in ["bulletList", "orderedList"]:
+            content_text = ""
+            if "content" in node:
+                for item in node["content"]:
+                    if item.get("type") == "listItem":
+                        item_content = ""
+                        if "content" in item:
+                            item_content = "".join(extract_text_from_node(child) for child in item["content"])
+                        prefix = "- " if node_type == "bulletList" else "1. "
+                        content_text += f"{prefix}{item_content}\n"
+            return f"{content_text}\n"
+        
+        # Handle blockquote
+        elif node_type == "blockquote":
+            content_text = ""
+            if "content" in node:
+                content_text = "".join(extract_text_from_node(child) for child in node["content"])
+            return f"> {content_text}\n\n"
+        
+        # Handle code blocks
+        elif node_type == "codeBlock":
+            content_text = ""
+            if "content" in node:
+                content_text = "".join(extract_text_from_node(child) for child in node["content"])
+            return f"```\n{content_text}\n```\n\n"
+        
+        # Handle horizontal rule
+        elif node_type == "horizontalRule":
+            return "---\n\n"
+        
+        # Handle hard break
+        elif node_type == "hardBreak":
+            return "\n"
+        
+        # Handle other nodes with content
+        elif "content" in node:
+            return "".join(extract_text_from_node(child) for child in node["content"])
+        
+        return ""
+    
+    # Extract text from the document structure
+    if "content" in content:
+        return "".join(extract_text_from_node(child) for child in content["content"])
+    
+    return ""
+
+
+async def update_note_content(
+    note_id: str,
+    content: dict
+) -> Dict[str, Any]:
+    """
+    Update note content in Supabase.
+    
+    Args:
+        note_id: Note ID to update
+        content: Tiptap JSON content structure
+    
+    Returns:
+        Updated note data
+    
+    Raises:
+        Exception: If note update fails
+    """
+    print(f"calling update_note_content with note_id={note_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("notes")
+        .update({"content": content})
+        .eq("id", note_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception(f"Failed to update note content for note_id: {note_id}")
+    
+    return response.data[0]
