@@ -23,7 +23,8 @@ async def generate_quiz_from_chat(
     ctx: RunContext,
     num_questions: int = 5,
     difficulty: str = "medium",
-    extra_context: str = ""
+    extra_context: str = "",
+    quiz_name: str = ""
 ) -> str:
     """
     Generate a quiz based on the current file and chat context.
@@ -33,6 +34,7 @@ async def generate_quiz_from_chat(
         num_questions: Number of quiz questions to generate (default 5)
         difficulty: Quiz difficulty level - easy, medium, or hard (default medium)
         extra_context: Additional context from chat conversation
+        quiz_name: Custom name for the quiz (optional, defaults to "Chat Quiz - {course_name}")
     
     Returns:
         Formatted markdown response with quiz link and summary
@@ -82,11 +84,14 @@ async def generate_quiz_from_chat(
         quiz_dicts = [quiz.to_dict() for quiz in quiz_questions]
         
         # Create quiz in database
-        quiz_name = f"Chat Quiz - {ctx.deps.course_info.get('name', 'Course')}"
+        if quiz_name:
+            final_quiz_name = f"Chat Quiz - {quiz_name}"
+        else:
+            final_quiz_name = f"Chat Quiz - {ctx.deps.course_info.get('name', 'Course')}"
         quiz_id = await create_quiz(
             user_id=ctx.deps.user_id,
             course_id=ctx.deps.course_id,
-            name=quiz_name,
+            name=final_quiz_name,
             file_ids=[ctx.deps.file_id],
             question_count=len(quiz_dicts),
             extra_context=extra_context,
@@ -103,7 +108,7 @@ async def generate_quiz_from_chat(
         
         # Build response with quiz summary
         response = f"✅ I've created a {num_questions}-question {difficulty} quiz!\n\n"
-        response += f"[View Quiz: {quiz_name}]({quiz_url})\n\n"
+        response += f"[View Quiz: {final_quiz_name}]({quiz_url})\n\n"
         
         # Add summary of question topics
         topics = []
@@ -130,7 +135,8 @@ async def generate_flashcard_from_chat(
     ctx: RunContext,
     num_flashcards: int = 10,
     card_type: str = "term-definition",
-    extra_context: str = ""
+    extra_context: str = "",
+    flashcard_name: str = ""
 ) -> str:
     """
     Generate flashcards based on the current file and chat context.
@@ -140,6 +146,7 @@ async def generate_flashcard_from_chat(
         num_flashcards: Number of flashcards to generate (default 10)
         card_type: Type of flashcards - term-definition or concept-explanation (default term-definition)
         extra_context: Additional context from chat conversation
+        flashcard_name: Custom name for the flashcard deck (optional, defaults to "Chat Flashcards - {course_name}")
     
     Returns:
         Formatted markdown response with flashcard deck link and summary
@@ -187,11 +194,14 @@ async def generate_flashcard_from_chat(
         flashcard_dicts = [flashcard.to_dict() for flashcard in flashcards]
         
         # Create flashcard deck in database
-        deck_name = f"Chat Flashcards - {ctx.deps.course_info.get('name', 'Course')}"
+        if flashcard_name:
+            final_deck_name = f"Chat Flashcards - {flashcard_name}"
+        else:
+            final_deck_name = f"Chat Flashcards - {ctx.deps.course_info.get('name', 'Course')}"
         deck_id = await create_flashcard_deck(
             user_id=ctx.deps.user_id,
             course_id=ctx.deps.course_id,
-            name=deck_name,
+            name=final_deck_name,
             file_ids=[ctx.deps.file_id],
             card_count=len(flashcard_dicts),
             extra_context=extra_context,
@@ -208,7 +218,7 @@ async def generate_flashcard_from_chat(
         
         # Build response with flashcard summary
         response = f"✅ I've created {num_flashcards} {card_type} flashcards!\n\n"
-        response += f"[View Flashcards: {deck_name}]({deck_url})\n\n"
+        response += f"[View Flashcards: {final_deck_name}]({deck_url})\n\n"
         
         # Add summary of flashcard topics
         topics = []
