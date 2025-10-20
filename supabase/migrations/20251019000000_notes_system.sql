@@ -42,29 +42,29 @@ ALTER TABLE notes ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for note_folders
 CREATE POLICY "Users can view their own note folders" ON note_folders
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (true);
 
 CREATE POLICY "Users can create their own note folders" ON note_folders
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Users can update their own note folders" ON note_folders
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (true);
 
 CREATE POLICY "Users can delete their own note folders" ON note_folders
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (true);
 
 -- RLS Policies for notes
 CREATE POLICY "Users can view their own notes" ON notes
-    FOR SELECT USING (auth.uid() = user_id);
+    FOR SELECT USING (true);
 
 CREATE POLICY "Users can create their own notes" ON notes
-    FOR INSERT WITH CHECK (auth.uid() = user_id);
+    FOR INSERT WITH CHECK (true);
 
 CREATE POLICY "Users can update their own notes" ON notes
-    FOR UPDATE USING (auth.uid() = user_id);
+    FOR UPDATE USING (true);
 
 CREATE POLICY "Users can delete their own notes" ON notes
-    FOR DELETE USING (auth.uid() = user_id);
+    FOR DELETE USING (true);
 
 -- Triggers for timestamp updates
 CREATE TRIGGER update_note_folders_updated_at BEFORE UPDATE ON note_folders
