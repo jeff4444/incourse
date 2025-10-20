@@ -12,8 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Slider } from "@/components/ui/slider"
 import { Navbar } from "@/components/navbar"
 import { FileSelector } from "@/components/file-selector"
+import { NoteSelector } from "@/components/note-selector"
 import { Brain, ChevronLeft, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/utils/supabase/client"
 
 export default function CreateFlashcardsPage({ params }: { params: Promise<{ courseID: string }> }) {
   const router = useRouter()
@@ -21,9 +23,11 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
   const [isGenerating, setIsGenerating] = useState(false)
   const [title, setTitle] = useState("")
   const [selectedFiles, setSelectedFiles] = useState<string[]>([])
+  const [selectedNotes, setSelectedNotes] = useState<string[]>([])
   const [extraContext, setExtraContext] = useState("")
   const [cardCount, setCardCount] = useState(10)
   const [cardType, setCardType] = useState("term-definition")
+  const [userId, setUserId] = useState<string>("")
 
   useEffect(() => {
     const getParams = async () => {
@@ -33,7 +37,24 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
     getParams();
   }, [params]);
 
+  useEffect(() => {
+    const getUserId = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUserId();
+  }, []);
+
   const handleGenerate = async () => {
+    // Validate that at least one source is selected
+    if (selectedFiles.length === 0 && selectedNotes.length === 0) {
+      alert('Please select at least one file or note to generate flashcards from.')
+      return
+    }
+
     setIsGenerating(true)
 
     try {
@@ -45,6 +66,7 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
             courseId: courseID,
             name: title,
             fileIds: selectedFiles,
+            noteIds: selectedNotes,
             numFlashcards: cardCount,
             cardType,
             extraContext: extraContext || undefined,
@@ -110,6 +132,19 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
             </div>
 
             <div className="space-y-2">
+              <Label>Select Notes</Label>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose which notes to use for generating flashcards.
+              </p>
+              <NoteSelector
+                courseId={courseID}
+                userId={userId}
+                selectedNoteIds={selectedNotes}
+                onSelectionChange={setSelectedNotes}
+              />
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="extra-context">Additional Instructions (optional)</Label>
               <Textarea
                 id="extra-context"
@@ -151,7 +186,7 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
             </div>
           </CardContent>
           <CardFooter>
-            <Button className="w-full" onClick={handleGenerate} disabled={isGenerating || !title || selectedFiles.length === 0}>
+            <Button className="w-full" onClick={handleGenerate} disabled={isGenerating || !title || (selectedFiles.length === 0 && selectedNotes.length === 0)}>
               {isGenerating ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

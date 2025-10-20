@@ -9,6 +9,10 @@ from tools.pinecone_tools import (
     search_single_file_with_query,
     search_single_file_with_chunk_index
 )
+from tools.note_tools import (
+    search_note_with_chunk_index,
+    search_multiple_notes_overview
+)
 
 class Flashcard(BaseModel):
     """
@@ -71,6 +75,14 @@ def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
         for file_id in file_ids:
             system_prompt += f"- {file_id}\n"
         system_prompt += "\nUse these file_ids when calling search_single_file_with_query() or search_single_file_with_chunk_index()."
+    
+    # Inject note_ids into prompt if available
+    note_ids = kwargs.get("note_ids", [])
+    if note_ids:
+        system_prompt += f"\n\n📝 AVAILABLE NOTES:\n"
+        for note_id in note_ids:
+            system_prompt += f"- {note_id}\n"
+        system_prompt += "\nUse these note_ids when calling search_note_with_chunk_index() or search_multiple_notes_overview()."
             
     model = get_model()
     
@@ -86,5 +98,8 @@ def get_flashcard_agent(**kwargs) -> Agent[Deps, List[Flashcard]]:
             Tool(search_multiple_files_with_query, takes_ctx=True),
             Tool(search_single_file_with_query, takes_ctx=True),
             Tool(search_single_file_with_chunk_index, takes_ctx=True),
+            # Note search tools - for note content retrieval
+            Tool(search_note_with_chunk_index, takes_ctx=True),
+            Tool(search_multiple_notes_overview, takes_ctx=True),
         ],
     )

@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function POST(request: NextRequest) {
-  let courseId, name, fileIds, numFlashcards, cardType, extraContext;
+  let courseId, name, fileIds, noteIds, numFlashcards, cardType, extraContext;
   
   try {
     const requestBody = await request.json();
-    ({ courseId, name, fileIds, numFlashcards, cardType, extraContext } = requestBody);
+    ({ courseId, name, fileIds, noteIds, numFlashcards, cardType, extraContext } = requestBody);
 
     // Get user id from request
     const userData = await getUserFromRequest(request);
@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
         course_id: courseId,
         name,
         file_ids: fileIds,
+        note_ids: noteIds,
         num_flashcards: numFlashcards,
         card_type: cardType,
         extra_context: extraContext,

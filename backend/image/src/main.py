@@ -83,19 +83,43 @@ class FlashcardRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(default=[], description="File IDs for generation")
+    note_ids: List[str] = Field(default=[], description="Note IDs for generation")
     num_flashcards: int = 10
     card_type: str = "term-definition"
     extra_context: Optional[str] = None
+    
+    @validator('note_ids', always=True)
+    def validate_content_sources(cls, v, values):
+        file_ids = values.get('file_ids', [])
+        note_ids = v or []
+        
+        # At least one source must be provided
+        if not file_ids and not note_ids:
+            raise ValueError('At least one file_id or note_id must be provided')
+        
+        return v
 
 class QuizRequest(BaseModel):
     user_id: str
     course_id: str
     name: str
-    file_ids: List[str] = Field(..., min_length=1, description="At least one file ID must be provided")
+    file_ids: List[str] = Field(default=[], description="File IDs for generation")
+    note_ids: List[str] = Field(default=[], description="Note IDs for generation")
     num_questions: int = 5
     difficulty: str = "medium"
     extra_context: Optional[str] = None
+    
+    @validator('note_ids', always=True)
+    def validate_content_sources(cls, v, values):
+        file_ids = values.get('file_ids', [])
+        note_ids = v or []
+        
+        # At least one source must be provided
+        if not file_ids and not note_ids:
+            raise ValueError('At least one file_id or note_id must be provided')
+        
+        return v
 
 class NudgeRequest(BaseModel):
     user_id: str
@@ -187,8 +211,12 @@ async def generate_flashcards(request: FlashcardRequest):
             course_info=course_info
         )
         
-        # Get the flashcard agent with file_ids injected
-        agent = get_flashcard_agent_lazy(num_flashcards=request.num_flashcards, file_ids=request.file_ids)
+        # Get the flashcard agent with file_ids and note_ids injected
+        agent = get_flashcard_agent_lazy(
+            num_flashcards=request.num_flashcards, 
+            file_ids=request.file_ids,
+            note_ids=request.note_ids
+        )
         
         # Build prompt with extra context if provided
         prompt = f"Generate {request.num_flashcards} flashcards"
@@ -209,7 +237,8 @@ async def generate_flashcards(request: FlashcardRequest):
             file_ids=request.file_ids,
             card_count=len(flashcard_dicts),
             extra_context=request.extra_context,
-            card_type=request.card_type
+            card_type=request.card_type,
+            note_ids=request.note_ids
         )
         
         # Store flashcards in database
@@ -265,8 +294,13 @@ async def generate_quiz(request: QuizRequest):
             course_info=course_info
         )
         
-        # Get the quiz agent with file_ids injected
-        agent = get_quiz_agent_lazy(num_quizzes=request.num_questions, difficulty=request.difficulty, file_ids=request.file_ids)
+        # Get the quiz agent with file_ids and note_ids injected
+        agent = get_quiz_agent_lazy(
+            num_quizzes=request.num_questions, 
+            difficulty=request.difficulty, 
+            file_ids=request.file_ids,
+            note_ids=request.note_ids
+        )
         
         # Build prompt with difficulty and extra context
         prompt = f"Generate {request.num_questions} {request.difficulty} difficulty quiz questions"
@@ -287,7 +321,8 @@ async def generate_quiz(request: QuizRequest):
             file_ids=request.file_ids,
             question_count=len(quiz_dicts),
             extra_context=request.extra_context,
-            difficulty=request.difficulty
+            difficulty=request.difficulty,
+            note_ids=request.note_ids
         )
         
         # Store quiz questions in database
