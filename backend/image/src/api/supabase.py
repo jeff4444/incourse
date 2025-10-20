@@ -1688,3 +1688,37 @@ def extract_text_from_note_content(content: dict) -> str:
         return "".join(extract_text_from_node(child) for child in content["content"])
     
     return ""
+
+
+async def update_note_content(
+    note_id: str,
+    content: dict
+) -> Dict[str, Any]:
+    """
+    Update note content in Supabase.
+    
+    Args:
+        note_id: Note ID to update
+        content: Tiptap JSON content structure
+    
+    Returns:
+        Updated note data
+    
+    Raises:
+        Exception: If note update fails
+    """
+    print(f"calling update_note_content with note_id={note_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("notes")
+        .update({"content": content})
+        .eq("id", note_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception(f"Failed to update note content for note_id: {note_id}")
+    
+    return response.data[0]

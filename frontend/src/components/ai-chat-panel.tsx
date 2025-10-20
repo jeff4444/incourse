@@ -2,14 +2,22 @@
 
 import type React from "react"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { MessageSquare, Lightbulb, Send, X, Loader2, MessageCircle } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
+import { Folder, Search } from "lucide-react"
+import { MessageSquare, Lightbulb, Send, X, Loader2, MessageCircle, Copy, FileText } from "lucide-react"
 import ReactMarkdown from "react-markdown"
 import type { ContextItem } from "./pdf-viewer"
 import { authenticatedFetchJson, authenticatedFetch } from "@/lib/utils/apiClient"
+import { useCreateNote, useCreateFolder, useNotes, useNoteFolders } from "@/lib/hooks/useNotes"
 
 interface ChatPanelProps {
   activeTab: "chat" | "suggestions"
@@ -75,6 +83,48 @@ export function ChatPanel({
     messageIndex: number | null
   }>({ range: null, rect: null, text: null, messageIndex: null })
   const [showMessageSelectionPopup, setShowMessageSelectionPopup] = useState(false)
+
+  // Hover state for AI messages
+  const [hoveredMessageIndex, setHoveredMessageIndex] = useState<number | null>(null)
+  const [copiedMessageIndex, setCopiedMessageIndex] = useState<number | null>(null)
+
+  // Add to notes dialog state
+  const [showAddToNotesDialog, setShowAddToNotesDialog] = useState(false)
+  const [selectedMessageForNotes, setSelectedMessageForNotes] = useState<{ content: string; index: number } | null>(null)
+  const [selectedNoteIds, setSelectedNoteIds] = useState<string[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showCreateNewNote, setShowCreateNewNote] = useState(false)
+  const [newNoteTitle, setNewNoteTitle] = useState("")
+  const [selectedFolderForNewNote, setSelectedFolderForNewNote] = useState<string>("")
+  const [showCreateNewFolder, setShowCreateNewFolder] = useState(false)
+  const [newFolderName, setNewFolderName] = useState("")
+  const [isCreatingNote, setIsCreatingNote] = useState(false)
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false)
+  const [createdNoteId, setCreatedNoteId] = useState<string | null>(null)
+
+  // Note and folder hooks
+  const createNote = useCreateNote()
+  const createFolder = useCreateFolder()
+  const { data: notes = [] } = useNotes(courseId, "dummy-user-id") // TODO: Get actual user ID
+  const { data: folders = [] } = useNoteFolders(courseId, "dummy-user-id") // TODO: Get actual user ID
+
+  // Filter notes based on search query
+  const filteredNotes = useMemo(() => {
+    if (!searchQuery.trim()) return notes;
+    const query = searchQuery.toLowerCase();
+    return notes.filter((note) =>
+      note.title.toLowerCase().includes(query) ||
+      JSON.stringify(note.content).toLowerCase().includes(query)
+    );
+  }, [notes, searchQuery]);
+
+  // Add folder names to notes for display
+  const notesWithFolders = useMemo(() => {
+    return filteredNotes.map((note) => ({
+      ...note,
+      folderName: note.folder_id ? folders.find(f => f.id === note.folder_id)?.name : null
+    }));
+  }, [filteredNotes, folders]);
 
   const suggestions = [
     "Summarize this document for me",
@@ -384,6 +434,155 @@ export function ChatPanel({
     }
   }
 
+  // Handle copying AI message content
+  const handleCopyMessage = async (messageIndex: number) => {
+    const message = messages[messageIndex]
+    if (message) {
+      try {
+        await navigator.clipboard.writeText(message.content)
+        setCopiedMessageIndex(messageIndex)
+        setTimeout(() => setCopiedMessageIndex(null), 2000)
+      } catch (error) {
+        console.error('Failed to copy message:', error)
+      }
+    }
+  }
+
+  // Handle opening add to notes dialog
+  const handleAddToNotes = (messageIndex: number) => {
+    const message = messages[messageIndex]
+    if (message) {
+      setSelectedMessageForNotes({ content: message.content, index: messageIndex })
+      setSelectedNoteIds([])
+      setSearchQuery("")
+      setShowCreateNewNote(false)
+      setNewNoteTitle("")
+      setSelectedFolderForNewNote("")
+      setShowCreateNewFolder(false)
+      setNewFolderName("")
+      setShowAddToNotesDialog(true)
+    }
+  }
+
+  // Unified function to add message to notes (both existing and new)
+  const handleAddMessageToNotes = async (noteIds: string[], isNewNote: boolean = false) => {
+    if (!selectedMessageForNotes) return
+
+    setIsCreatingNote(true)
+    
+    try {
+      // Get the last 5 messages for context
+      const conversationContext = messages.slice(-5).map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+      
+      // Add the chat message to the notes
+      const response = await authenticatedFetchJson<{ success: boolean; updated_note_ids: string[]; message: string }>(
+        '/api/agents/notes/add-chat-message',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            courseId: courseId,
+            noteIds: noteIds,
+            aiMessage: selectedMessageForNotes.content,
+            conversationContext: conversationContext,
+            fileId: String(fileIdList[0] || '')
+          }),
+        }
+      )
+      
+      if (response.success) {
+        console.log(`Successfully added message to ${response.updated_note_ids.length} note(s)`)
+        
+        // Show success message for both new and existing notes
+        setCreatedNoteId(noteIds[0]) // Always set the first note ID to enable "View Note" button
+        setShowSuccessMessage(true)
+      }
+      
+    } catch (error) {
+      console.error("Error adding message to notes:", error)
+    } finally {
+      setIsCreatingNote(false)
+    }
+  }
+
+  // Handle creating note with AI message content
+  const handleCreateNoteWithContent = async () => {
+    if (!selectedMessageForNotes) return
+
+    try {
+      let folderId: string | undefined
+      
+      if (showCreateNewFolder && newFolderName.trim()) {
+        // Create new folder first
+        const newFolder = await createFolder.mutateAsync({
+          courseId: courseId,
+          name: newFolderName.trim()
+        })
+        folderId = newFolder.id
+      } else if (selectedFolderForNewNote) {
+        folderId = selectedFolderForNewNote
+      }
+      
+      // Create the note with AI message content
+      const newNote = await createNote.mutateAsync({
+        courseId: courseId,
+        title: newNoteTitle.trim() || "AI Chat Note",
+        folderId
+      })
+      
+      // Use the unified function to add the message to the newly created note
+      await handleAddMessageToNotes([newNote.id], true)
+      
+    } catch (error) {
+      console.error("Error creating note:", error)
+      setIsCreatingNote(false)
+    }
+  }
+
+  // Handle toggling note selection
+  const handleToggleNote = (noteId: string) => {
+    if (selectedNoteIds.includes(noteId)) {
+      setSelectedNoteIds(selectedNoteIds.filter((id) => id !== noteId));
+    } else {
+      setSelectedNoteIds([...selectedNoteIds, noteId]);
+    }
+  };
+
+  // Handle closing the dialog and resetting state
+  const handleCloseDialog = () => {
+    setShowAddToNotesDialog(false)
+    setSelectedMessageForNotes(null)
+    setSelectedNoteIds([])
+    setSearchQuery("")
+    setShowCreateNewNote(false)
+    setNewNoteTitle("")
+    setSelectedFolderForNewNote("")
+    setShowCreateNewFolder(false)
+    setNewFolderName("")
+    setShowSuccessMessage(false)
+    setCreatedNoteId(null)
+  };
+
+  // Handle viewing the created note
+  const handleViewNote = () => {
+    if (createdNoteId) {
+      window.location.href = `/courses/${courseId}/notes/${createdNoteId}`
+    }
+  };
+
+  // Handle adding content to existing notes
+  const handleAddToExistingNotes = async () => {
+    if (!selectedMessageForNotes || selectedNoteIds.length === 0) return
+    
+    // Use the unified function to add the message to existing notes
+    await handleAddMessageToNotes(selectedNoteIds, false)
+  }
+
   // Message selection popup component
   const MessageSelectionPopup = () => {
     if (!showMessageSelectionPopup || !messageSelection.rect) return null
@@ -474,7 +673,11 @@ export function ChatPanel({
                   </div>
                 ) : (
                   // AI message - background/widget style (like Notion)
-                  <div className="max-w-full">
+                  <div 
+                    className="max-w-full relative group"
+                    onMouseEnter={() => setHoveredMessageIndex(index)}
+                    onMouseLeave={() => setHoveredMessageIndex(null)}
+                  >
                     {message.contextPreview && (
                       <div className="bg-blue-50 text-blue-700 border border-blue-200 rounded-lg px-3 py-2 text-xs mb-3">
                         {message.contextPreview}
@@ -503,6 +706,34 @@ export function ChatPanel({
                       >
                         {message.content}
                       </ReactMarkdown>
+                    </div>
+                    
+                    {/* Hover actions - inline with message */}
+                    <div 
+                      className={`flex gap-1 transition-all duration-200 ease-in-out ${
+                        hoveredMessageIndex === index 
+                          ? 'opacity-100 translate-y-0' 
+                          : 'opacity-0 translate-y-2 pointer-events-none'
+                      }`}
+                    >
+                      <button
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                        onClick={() => handleCopyMessage(index)}
+                        title="Copy message"
+                      >
+                        {copiedMessageIndex === index ? (
+                          <div className="h-4 w-4 text-green-600">✓</div>
+                        ) : (
+                          <Copy className="h-4 w-4 text-gray-500" />
+                        )}
+                      </button>
+                      <button
+                        className="p-1 rounded hover:bg-gray-100 transition-colors"
+                        onClick={() => handleAddToNotes(index)}
+                        title="Add to notes"
+                      >
+                        <FileText className="h-4 w-4 text-gray-500" />
+                      </button>
                     </div>
                   </div>
                 )}
@@ -628,6 +859,268 @@ export function ChatPanel({
       
       {/* Message selection popup */}
       <MessageSelectionPopup />
+      
+      {/* Add to Notes Dialog */}
+      <Dialog open={showAddToNotesDialog} onOpenChange={handleCloseDialog}>
+        <DialogContent className="sm:max-w-[600px] max-h-[80vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Add to Notes</DialogTitle>
+            <DialogDescription>
+              Choose where to save this AI message. You can add it to existing notes or create a new note.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {showSuccessMessage ? (
+            <div className="flex-1 flex flex-col items-center justify-center space-y-4 py-8">
+              <div className="text-center space-y-2">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-green-800">Message Added Successfully!</h3>
+                <p className="text-sm text-muted-foreground">
+                  {createdNoteId 
+                    ? "Your AI message has been added to the new note."
+                    : "Your AI message has been added to the selected note(s)."
+                  }
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={handleCloseDialog}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={handleViewNote}
+                >
+                  View Note
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col space-y-4 overflow-hidden">
+            {/* Search Bar */}
+            <div className="relative px-1 py-1">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search notes by title or content..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            {/* Action Buttons and Count */}
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const allNoteIds = notesWithFolders.map((note) => note.id);
+                    setSelectedNoteIds(allNoteIds);
+                  }}
+                  disabled={notesWithFolders.length === 0}
+                >
+                  Select All
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedNoteIds([])}
+                  disabled={selectedNoteIds.length === 0}
+                >
+                  Clear All
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {selectedNoteIds.length} of {notesWithFolders.length} selected
+              </p>
+            </div>
+
+            {/* Notes List */}
+            <div className="border rounded-lg flex-1 overflow-y-auto">
+              {notesWithFolders.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
+                  <p>No notes available.</p>
+                  <p className="text-sm mt-1">Create notes to use them for saving AI messages.</p>
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {notesWithFolders.map((note) => {
+                    const isSelected = selectedNoteIds.includes(note.id);
+                    
+                    return (
+                      <div
+                        key={note.id}
+                        className={`flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer ${
+                          isSelected && "bg-muted/30"
+                        }`}
+                        onClick={() => handleToggleNote(note.id)}
+                      >
+                        <Checkbox
+                          checked={isSelected}
+                          onCheckedChange={() => handleToggleNote(note.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                            <p className="font-medium text-sm truncate">{note.title}</p>
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {note.folderName && (
+                              <Badge variant="secondary" className="text-xs">
+                                {note.folderName}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Create New Note Section */}
+            <div className="border-t pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-sm font-medium">Create New Note</h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowCreateNewNote(!showCreateNewNote)}
+                >
+                  {showCreateNewNote ? "Cancel" : "Create New Note"}
+                </Button>
+              </div>
+
+              {showCreateNewNote && (
+                <div className="space-y-3">
+                  <div>
+                    <Label htmlFor="new-note-title" className="text-sm font-medium">
+                      Note Title
+                    </Label>
+                    <Input
+                      id="new-note-title"
+                      value={newNoteTitle}
+                      onChange={(e) => setNewNoteTitle(e.target.value)}
+                      placeholder="Enter note title..."
+                      className="mt-1"
+                    />
+                  </div>
+
+                  {/* Folder Selection */}
+                  <div>
+                    <Label className="text-sm font-medium">Folder (optional)</Label>
+                    <div className="mt-1 space-y-2">
+                      {folders.map((folder) => (
+                        <div key={folder.id} className="flex items-center space-x-2">
+                          <input
+                            type="radio"
+                            id={`folder-${folder.id}`}
+                            name="selectedFolder"
+                            value={folder.id}
+                            checked={selectedFolderForNewNote === folder.id}
+                            onChange={(e) => setSelectedFolderForNewNote(e.target.value)}
+                            className="h-4 w-4"
+                          />
+                          <Label htmlFor={`folder-${folder.id}`} className="flex items-center gap-2 cursor-pointer">
+                            <Folder className="h-4 w-4" />
+                            <span>{folder.name}</span>
+                          </Label>
+                        </div>
+                      ))}
+                      
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="radio"
+                          id="create-new-folder"
+                          name="selectedFolder"
+                          value="create-new"
+                          checked={showCreateNewFolder}
+                          onChange={(e) => setShowCreateNewFolder(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="create-new-folder" className="flex items-center gap-2 cursor-pointer">
+                          <Folder className="h-4 w-4" />
+                          <span>Create new folder</span>
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* New Folder Name Input */}
+                  {showCreateNewFolder && (
+                    <div>
+                      <Label htmlFor="new-folder-name" className="text-sm font-medium">
+                        Folder Name
+                      </Label>
+                      <Input
+                        id="new-folder-name"
+                        value={newFolderName}
+                        onChange={(e) => setNewFolderName(e.target.value)}
+                        placeholder="Enter folder name..."
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          )}
+
+          {!showSuccessMessage && (
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={handleCloseDialog}
+              >
+                Cancel
+              </Button>
+              {selectedNoteIds.length > 0 && (
+              <Button
+                onClick={handleAddToExistingNotes}
+                disabled={isCreatingNote}
+              >
+                {isCreatingNote ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Adding...
+                  </>
+                ) : (
+                  `Add to ${selectedNoteIds.length} Note${selectedNoteIds.length > 1 ? 's' : ''}`
+                )}
+              </Button>
+            )}
+            {showCreateNewNote && (
+              <Button
+                onClick={handleCreateNoteWithContent}
+                disabled={isCreatingNote || (!newNoteTitle.trim() && !selectedNoteIds.length)}
+              >
+                {isCreatingNote ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Note"
+                )}
+              </Button>
+            )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
