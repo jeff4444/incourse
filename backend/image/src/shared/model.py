@@ -26,7 +26,7 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 # OpenAI model configuration
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-def get_model(model_type: str = "openai"):
+def get_model(model_type: str = "bedrock"):
     # Only import and initialize the specific model provider needed
     if model_type == "bedrock":
         return get_bedrock_model()
