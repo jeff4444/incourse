@@ -208,7 +208,9 @@ async def generate_flashcards(request: FlashcardRequest):
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
             lms_base_url=lms_info["base_url"],
-            course_info=course_info
+            course_info=course_info,
+            note_ids=request.note_ids,
+            notes_info=[]  # Will be fetched by tools if needed
         )
         
         # Get the flashcard agent with file_ids and note_ids injected
@@ -291,7 +293,9 @@ async def generate_quiz(request: QuizRequest):
             file_ids=request.file_ids,
             lms_api_key=lms_info["api_key"],
             lms_base_url=lms_info["base_url"],
-            course_info=course_info
+            course_info=course_info,
+            note_ids=request.note_ids,
+            notes_info=[]  # Will be fetched by tools if needed
         )
         
         # Get the quiz agent with file_ids and note_ids injected

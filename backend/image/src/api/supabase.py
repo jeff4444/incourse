@@ -97,7 +97,7 @@ async def get_user_lms_info(user_id: str) -> str:
     
     api_key = api_keys[0]
     encrypted_api_key = api_key["encrypted_api_key"]
-    api_base_url =f"{api_key["api_base_url"]}/api/v1"
+    api_base_url = f"{api_key['api_base_url']}/api/v1"
     decrypted_api_key = decrypt_api_key(encrypted_api_key)
     return {
         "api_key": decrypted_api_key,

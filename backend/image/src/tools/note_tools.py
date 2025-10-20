@@ -61,13 +61,30 @@ async def search_note_with_chunk_index(
         Formatted string with note title and chunk content
     """
     try:
-        # Fetch the note
-        notes = await get_notes_by_ids([note_id])
+        # Sanity check: ensure note_id is in the allowed note_ids list
+        if ctx.deps.note_ids and note_id not in ctx.deps.note_ids:
+            return f"Error: Note ID '{note_id}' is not in the allowed note_ids list: {ctx.deps.note_ids}"
         
-        if not notes:
-            return f"Error: Note with ID '{note_id}' not found."
+        # Check if we already have this note in notes_info
+        note = None
+        if ctx.deps.notes_info:
+            for n in ctx.deps.notes_info:
+                if n.get("id") == note_id:
+                    note = n
+                    break
         
-        note = notes[0]
+        # Fetch the note if not already cached
+        if not note:
+            notes = await get_notes_by_ids([note_id])
+            if not notes:
+                return f"Error: Note with ID '{note_id}' not found."
+            note = notes[0]
+            
+            # Update notes_info in deps to cache the note
+            if not ctx.deps.notes_info:
+                ctx.deps.notes_info = []
+            ctx.deps.notes_info.append(note)
+        
         note_title = note.get("title", "Untitled")
         note_content = note.get("content", {})
         
@@ -112,25 +129,52 @@ async def search_note_with_chunk_index(
 
 
 async def search_multiple_notes_overview(
-    ctx,
-    note_ids: List[str]
+    ctx
 ) -> str:
     """
     Fetch all notes and return overview with note titles and first chunk of each.
+    Uses note_ids from ctx.deps to avoid requiring the model to pass note IDs.
     
     Args:
-        ctx: Run context
-        note_ids: List of note IDs to fetch
+        ctx: Run context (note_ids will be taken from ctx.deps.note_ids)
     
     Returns:
         Formatted string with overview of all notes
     """
     try:
-        if not note_ids:
-            return "No notes provided."
+        # Use note_ids from deps instead of requiring them as parameters
+        note_ids = ctx.deps.note_ids or []
         
-        # Fetch all notes
-        notes = await get_notes_by_ids(note_ids)
+        if not note_ids:
+            return "No notes available in context."
+        
+        # Check if we already have all notes cached
+        cached_notes = []
+        missing_note_ids = []
+        
+        if ctx.deps.notes_info:
+            for note_id in note_ids:
+                found = False
+                for cached_note in ctx.deps.notes_info:
+                    if cached_note.get("id") == note_id:
+                        cached_notes.append(cached_note)
+                        found = True
+                        break
+                if not found:
+                    missing_note_ids.append(note_id)
+        else:
+            missing_note_ids = note_ids
+        
+        # Fetch missing notes if any
+        notes = cached_notes.copy()
+        if missing_note_ids:
+            fetched_notes = await get_notes_by_ids(missing_note_ids)
+            notes.extend(fetched_notes)
+            
+            # Update notes_info in deps to cache the fetched notes
+            if not ctx.deps.notes_info:
+                ctx.deps.notes_info = []
+            ctx.deps.notes_info.extend(fetched_notes)
         
         if not notes:
             return "No notes found."

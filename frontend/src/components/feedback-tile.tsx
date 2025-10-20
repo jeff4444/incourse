@@ -80,6 +80,7 @@ export function FeedbackTile({ feedback }: FeedbackTileProps) {
                   li: ({ children }: any) => <span>• {children} </span>,
                   blockquote: ({ children }: any) => <span className="italic">"{children}"</span>,
                   pre: ({ children }: any) => <code className="bg-gray-100 px-1 py-0.5 rounded text-xs">{children}</code>,
+                  a: ({ children, href }: any) => <a href={href} className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer">{children}</a>,
                 }}
               >
                 {feedback.feedback_preview}

@@ -498,6 +498,7 @@ export function ChatPanel({
                           blockquote: ({ children }: any) => <blockquote className="border-l-4 border-blue-300 bg-blue-50 pl-4 py-2 mb-3 italic text-gray-700">{children}</blockquote>,
                           strong: ({ children }: any) => <strong className="font-semibold text-gray-900">{children}</strong>,
                           em: ({ children }: any) => <em className="italic text-gray-700">{children}</em>,
+                          a: ({ children, href }: any) => <a href={href} className="text-blue-600 underline hover:text-blue-800" target="_blank" rel="noopener noreferrer">{children}</a>,
                         }}
                       >
                         {message.content}

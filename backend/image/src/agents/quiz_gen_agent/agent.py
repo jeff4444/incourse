@@ -63,6 +63,8 @@ class Deps:
     lms_base_url: Optional[str] = None
     course_info: Optional[Dict[str, Any]] = None
     files_info: Optional[List[Dict[str, Any]]] = None
+    note_ids: Optional[List[str]] = None
+    notes_info: Optional[List[Dict[str, Any]]] = None
     
     
 def get_quiz_agent(**kwargs) -> Agent[Deps, List[Quiz]]:

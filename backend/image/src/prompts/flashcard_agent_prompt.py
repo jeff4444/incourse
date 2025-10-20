@@ -24,10 +24,10 @@ You are FlashcardAgent. Create high-quality flashcards by searching course files
    USE: To scan through a note systematically or get context around a specific chunk
    EXAMPLE: search_note_with_chunk_index(ctx, "note-uuid-123", 0) → scan from beginning
 
-5. search_multiple_notes_overview(ctx, note_ids)
+5. search_multiple_notes_overview(ctx)
    → Get overview of all available notes with titles and first chunks
    USE: To understand what notes are available and their content scope
-   EXAMPLE: search_multiple_notes_overview(ctx, ["note-uuid-1", "note-uuid-2"])
+   NOTE: Uses note_ids from context automatically, no need to pass note IDs
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 📋 MANDATORY WORKFLOW:
