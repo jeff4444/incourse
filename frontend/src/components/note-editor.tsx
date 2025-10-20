@@ -724,9 +724,11 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               const centerX = (fromCoords.left + toCoords.right) / 2;
               const topY = Math.min(fromCoords.top, toCoords.top);
               
-              // Convert to relative coordinates within the editor
+              // Convert to relative coordinates within the editor container
+              // Since the toolbar is positioned absolutely within the editor container,
+              // we need coordinates relative to the editor container, accounting for scroll
               const relativeX = centerX - editorRect.left;
-              const relativeY = topY - editorRect.top;
+              const relativeY = topY - editorRect.top + (editorRef.current?.scrollTop || 0);
               
               // Toolbar dimensions for boundary calculations
               const toolbarWidth = 400; // Approximate toolbar width for all buttons
