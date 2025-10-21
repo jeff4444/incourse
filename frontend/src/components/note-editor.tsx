@@ -589,7 +589,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                 const coords = editor.view.coordsAtPos($from.pos);
                 setSlashCommandPosition({
                   x: coords.left - editorRect.left,
-                  y: coords.top - editorRect.top
+                  y: coords.top - editorRect.top + (editorRef.current?.scrollTop || 0)
                 });
               }
             }, 0);
@@ -625,7 +625,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
                 const coords = editor.view.coordsAtPos($from.pos);
                 setAtCommandPosition({
                   x: coords.left - editorRect.left,
-                  y: coords.top - editorRect.top
+                  y: coords.top - editorRect.top + (editorRef.current?.scrollTop || 0)
                 });
               }
             }, 0);
@@ -735,7 +735,7 @@ export function NoteEditor({ note, onSave, sidebarOpen, onToggleSidebar }: NoteE
               const toolbarHeight = 40; // Approximate toolbar height
               
                // Handle horizontal boundaries with padding
-               const padding = 190; // Extra padding from edges
+               const padding = 140; // Extra padding from edges
                const clampedX = Math.max(
                  toolbarWidth / 2 + padding, // Half toolbar width + padding from left edge
                  Math.min(
