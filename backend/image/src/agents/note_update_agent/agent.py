@@ -62,7 +62,6 @@ def get_note_update_agent(**kwargs) -> Agent[Deps, NoteUpdate]:
         system_prompt=SYSTEM_PROMPT,
         tools=[
             Tool(convert_markdown_to_tiptap, takes_ctx=False),
-            Tool(append_content_to_note, takes_ctx=False),
             Tool(validate_tiptap_format, takes_ctx=False),
         ],
         retries=2,
