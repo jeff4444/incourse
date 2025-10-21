@@ -322,12 +322,5 @@ async def append_content_to_note(
     if "content" in new_content_tiptap:
         combined_content["content"].extend(new_content_tiptap["content"])
     
-    # Validate the combined content before saving
-    is_combined_valid, combined_errors, combined_warnings = validate_tiptap_content(combined_content)
-    
-    if not is_combined_valid:
-        error_summary = get_validation_summary(combined_errors, combined_warnings)
-        raise Exception(f"Invalid combined TipTap content:\n{error_summary}")
-    
     # Update the note
     return await update_note_content(note_id, combined_content)

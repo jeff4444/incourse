@@ -160,6 +160,7 @@ class TipTapValidator:
     def _validate_container_node(self, node: Dict[str, Any], path: str) -> None:
         """Validate container nodes (heading, paragraph, etc.)."""
         if "content" not in node:
+            print(f"Node: {node}")
             raise TipTapValidationError(f"{node['type']} node must have 'content' field", path)
         
         if not isinstance(node["content"], list):
