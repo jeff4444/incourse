@@ -106,59 +106,27 @@ async def get_chat_context(ctx: RunContext) -> Dict[str, Any]:
     This loads recent chat history and any existing conversation summary
     to help you understand what was discussed before.
     
+    Note: Context is now preloaded before the agent runs, so this tool
+    primarily formats the already-loaded data for the agent.
+    
     Returns:
         Dictionary with:
         - has_history: Whether there's any prior conversation
         - message_count: Number of messages in history
         - context_summary: Summary of previous conversation (if available)
-        - recent_messages: Last 5 messages for immediate context
+        - recent_messages: Last 10 messages for immediate context
     """
-    # Get or create chat session
-    if not ctx.deps.chat_id:
-        # Determine document_id for session lookup
-        # Need to check if file_info is loaded to determine document_id
-        if ctx.deps.file_info:
-            # File info is loaded, check if it's from LMS
-            if ctx.deps.is_file_from_lms:
-                document_id = ctx.deps.file_id
-            else:
-                document_id = ctx.deps.file_info.get("id", ctx.deps.file_id)
-        else:
-            # File info not loaded yet, try to determine from DB first
-            try:
-                file_info = await get_module_items_by_course_id(
-                    course_id=ctx.deps.course_id,
-                    lms_id=ctx.deps.file_id
-                )
-                document_id = file_info["id"]
-                ctx.deps.file_info = file_info
-                ctx.deps.is_file_from_lms = False
-            except Exception:
-                # Not in our DB, so it's from LMS
-                document_id = ctx.deps.file_id
-                ctx.deps.is_file_from_lms = True
-        
-        if ctx.deps.session_id:
-            ctx.deps.chat_id = ctx.deps.session_id
-        else:
-            chat_session = await get_or_create_chat_session(
-                user_id=ctx.deps.user_id,
-                document_id=document_id
-            )
-            ctx.deps.chat_id = chat_session["id"]
-    
-    # Load chat history if not already loaded
+    # Context should already be preloaded, but provide fallback for safety
     if ctx.deps.chat_history is None:
-        ctx.deps.chat_history = await get_chat_messages(chat_id=ctx.deps.chat_id, limit=20)
+        ctx.deps.chat_history = await get_chat_messages(chat_id=ctx.deps.chat_id, limit=10)
     
-    # Load context summary if not already loaded
     if ctx.deps.context_summary is None:
         snapshot = await get_latest_context_snapshot(chat_id=ctx.deps.chat_id)
         ctx.deps.context_summary = snapshot["summary"] if snapshot else None
     
-    # Format recent messages for the agent
+    # Format recent messages for the agent (now using all 10 messages)
     recent_messages = []
-    for msg in ctx.deps.chat_history[-5:] if ctx.deps.chat_history else []:
+    for msg in ctx.deps.chat_history if ctx.deps.chat_history else []:
         role = "User" if msg["sender"] == "user" else "Assistant"
         recent_messages.append({
             "role": role,

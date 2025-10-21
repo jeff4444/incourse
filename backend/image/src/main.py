@@ -64,6 +64,11 @@ def get_chat_agent_lazy(**kwargs):
     from agents.chat_agent.agent import get_chat_agent
     return get_chat_agent(**kwargs)
 
+
+def get_chat_agent_with_context_lazy(deps, **kwargs):
+    from agents.chat_agent.agent import get_chat_agent_with_context
+    return get_chat_agent_with_context(deps, **kwargs)
+
 def get_note_update_agent_lazy(**kwargs):
     from agents.note_update_agent.agent import get_note_update_agent
     return get_note_update_agent(**kwargs)
@@ -479,9 +484,12 @@ async def chat(request: ChatRequest):
             session_id=request.session_id
         )
 
+        # Preload context (last 10 messages and summary) before agent runs
+        await deps.preload_context()
+
         # Let the agent handle the query - it will fetch context as needed
         user_prompt = request.prompt or request.message
-        agent = get_chat_agent_lazy()
+        agent = get_chat_agent_with_context_lazy(deps)
         result = await agent.run(user_prompt, deps=deps)
         
         # Always do session management - we need to save all messages
@@ -611,11 +619,14 @@ async def chat_stream(request: ChatRequest):
                 session_id=request.session_id
             )
             
+            # Preload context (last 10 messages and summary) before agent runs
+            await deps.preload_context()
+            
             # Build user prompt
             user_prompt = request.prompt or request.message
             
             # Get agent and stream response
-            agent = get_chat_agent_lazy()
+            agent = get_chat_agent_with_context_lazy(deps)
             
             # Buffer to collect full response for session management
             full_response = ""
