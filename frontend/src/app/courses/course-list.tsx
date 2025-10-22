@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CourseCard } from "@/components/course-card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ export function CourseList() {
   const currentMonth = currentDate.getMonth();
   const currentSemester = currentMonth >= 7 ? "Fall" : "Spring";
   const currentSemesterYear = `${currentSemester} ${currentYear}`;
-  
+
   const [selectedSemester, setSelectedSemester] = useState(currentSemesterYear);
 
   // Generate semester options for the last 6 semesters
@@ -49,7 +50,9 @@ export function CourseList() {
 
     const matchesSemester =
       selectedSemester === "All Courses" ||
-      (course.semester && course.year && `${course.semester} ${course.year}` === selectedSemester);
+      (course.semester &&
+        course.year &&
+        `${course.semester} ${course.year}` === selectedSemester);
 
     return matchesSearchTerm && matchesSemester;
   });
@@ -58,7 +61,7 @@ export function CourseList() {
     return (
       <div className="text-center py-12">
         <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">
+        <h2 className="text-xl font-semibold text-foreground mb-2">
           Failed to load courses
         </h2>
         <p className="text-muted-foreground">
@@ -106,10 +109,7 @@ export function CourseList() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
           {[...Array(4)].map((_, i) => (
-            <div
-              key={i}
-              className="rounded-xl bg-gray-200 h-64 animate-pulse"
-            />
+            <Skeleton key={i} className="rounded-xl h-64" />
           ))}
         </div>
       ) : filteredCourses.length > 0 ? (
@@ -121,7 +121,7 @@ export function CourseList() {
       ) : (
         <div className="text-center py-12">
           <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+          <h2 className="text-xl font-semibold text-foreground mb-2">
             No courses found
           </h2>
           <p className="text-muted-foreground">

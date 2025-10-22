@@ -22,64 +22,75 @@ import { useMemo } from "react";
 // Simple time ago formatter
 function formatTimeAgo(date: Date): string {
   const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return 'just now';
+
+  if (seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+  if (minutes < 60)
+    return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+  if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
   const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`;
   const weeks = Math.floor(days / 7);
-  if (weeks < 4) return `${weeks} ${weeks === 1 ? 'week' : 'weeks'} ago`;
+  if (weeks < 4) return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+  if (months < 12) return `${months} ${months === 1 ? "month" : "months"} ago`;
   const years = Math.floor(days / 365);
-  return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+  return `${years} ${years === 1 ? "year" : "years"} ago`;
 }
 
 function DashboardPage() {
   const { user } = useAuth();
   const [activityFilter, setActivityFilter] = useState<string>("all");
-  
+
   // Fetch all activity types once and cache them
-  const { quizzes, flashcards, summaries, isLoading: activitiesLoading, refetchAll } = useAllActivitiesByType(5);
-  
+  const {
+    quizzes,
+    flashcards,
+    summaries,
+    isLoading: activitiesLoading,
+    refetchAll,
+  } = useAllActivitiesByType(5);
+
   // Filter activities based on selected tab (client-side)
   const activities = useMemo(() => {
     let filtered: typeof quizzes = [];
-    
+
     switch (activityFilter) {
-      case 'quizzes':
+      case "quizzes":
         filtered = quizzes;
         break;
-      case 'flashcards':
+      case "flashcards":
         filtered = flashcards;
         break;
-      case 'summaries':
+      case "summaries":
         filtered = summaries;
         break;
-      case 'all':
+      case "all":
       default:
         // Merge all activities and sort by created_at
         filtered = [...quizzes, ...flashcards, ...summaries]
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .sort(
+            (a, b) =>
+              new Date(b.created_at).getTime() -
+              new Date(a.created_at).getTime()
+          )
           .slice(0, 5); // Take top 5 most recent
         break;
     }
-    
+
     return filtered;
   }, [activityFilter, quizzes, flashcards, summaries]);
-  
+
   // Get user's display name
   const getUserName = () => {
     if (user?.user_metadata?.full_name) {
-      return user.user_metadata.full_name.split(' ')[0]; // Get first name
+      return user.user_metadata.full_name.split(" ")[0]; // Get first name
     }
     if (user?.email) {
-      return user.email.split('@')[0];
+      return user.email.split("@")[0];
     }
-    return 'there';
+    return "there";
   };
 
   // Sample nudges
@@ -114,7 +125,7 @@ function DashboardPage() {
       {/* Header Section */}
       <div className="container mx-auto px-4 md:px-6 py-6">
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Good morning, {getUserName()}!
           </h1>
           <p className="text-lg text-muted-foreground">
@@ -134,8 +145,8 @@ function DashboardPage() {
                     View All
                   </Button>
                 </div>
-                <Tabs 
-                  value={activityFilter} 
+                <Tabs
+                  value={activityFilter}
                   onValueChange={setActivityFilter}
                   className="mt-4"
                 >
@@ -163,9 +174,11 @@ function DashboardPage() {
                     </div>
                   ) : (
                     activities.map((activity) => {
-                      const Icon = getActivityIcon(activity.activity_type as any);
+                      const Icon = getActivityIcon(
+                        activity.activity_type as any
+                      );
                       const colors = getActivityColor(activity.feedback);
-                      
+
                       return (
                         <div
                           key={activity.id}
@@ -183,7 +196,8 @@ function DashboardPage() {
                                   {activity.activity_summary}
                                 </p>
                                 <p className="text-xs md:text-sm text-muted-foreground">
-                                  {activity.courses?.name || 'Unknown Course'} • {formatTimeAgo(new Date(activity.created_at))}
+                                  {activity.courses?.name || "Unknown Course"} •{" "}
+                                  {formatTimeAgo(new Date(activity.created_at))}
                                 </p>
                               </div>
                             </div>
@@ -199,11 +213,15 @@ function DashboardPage() {
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">
-                      {activities.length > 0 ? `Last updated ${formatTimeAgo(new Date(activities[0].created_at))}` : 'No activities'}
+                      {activities.length > 0
+                        ? `Last updated ${formatTimeAgo(
+                            new Date(activities[0].created_at)
+                          )}`
+                        : "No activities"}
                     </span>
                   </div>
-                  <Button 
-                    variant="ghost" 
+                  <Button
+                    variant="ghost"
                     size="sm"
                     onClick={() => refetchAll()}
                     disabled={activitiesLoading}

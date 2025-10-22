@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import {
   Bell,
   BookOpen,
@@ -45,15 +46,14 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-screen bg-background/95 border-b backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 md:px-6">
       <div className="max-w-screen-2xl mx-auto flex h-16 items-center justify-between">
         <div className="flex items-center gap-2 md:gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden"
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-          >
-            <Menu className="h-5 w-5" />
-            <span className="sr-only">Toggle menu</span>
-          </Button>
+          <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="md:hidden">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">Toggle menu</span>
+              </Button>
+            </SheetTrigger>
+          </Sheet>
           <Link href="/dashboard" className="flex items-center gap-2">
             <Sparkles className="h-6 w-6 text-pink-500" />
             <span className="text-xl font-bold hidden md:inline-block bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
@@ -144,15 +144,15 @@ export function Navbar() {
       </div>
 
       {/* Mobile menu */}
-      {isMenuOpen && (
-        <div className="md:hidden border-t p-4">
-          <nav className="grid gap-2">
+      <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+        <SheetContent side="left" className="w-64">
+          <nav className="grid gap-2 mt-6">
             <Button
               variant={isActive("/dashboard") ? "secondary" : "ghost"}
               className="justify-start"
               asChild
             >
-              <Link href="/dashboard">
+              <Link href="/dashboard" onClick={() => setIsMenuOpen(false)}>
                 <Home className="h-4 w-4 mr-2" />
                 Dashboard
               </Link>
@@ -162,7 +162,7 @@ export function Navbar() {
               className="justify-start"
               asChild
             >
-              <Link href="/courses">
+              <Link href="/courses" onClick={() => setIsMenuOpen(false)}>
                 <BookOpen className="h-4 w-4 mr-2" />
                 Courses
               </Link>
@@ -172,7 +172,7 @@ export function Navbar() {
               className="justify-start"
               asChild
             >
-              <Link href="/calendar">
+              <Link href="/calendar" onClick={() => setIsMenuOpen(false)}>
                 <Calendar className="h-4 w-4 mr-2" />
                 Calendar
               </Link>
@@ -182,14 +182,14 @@ export function Navbar() {
               className="justify-start"
               asChild
             >
-              <Link href="/profile">
+              <Link href="/profile" onClick={() => setIsMenuOpen(false)}>
                 <User className="h-4 w-4 mr-2" />
                 Profile
               </Link>
             </Button>
           </nav>
-        </div>
-      )}
+        </SheetContent>
+      </Sheet>
     </header>
   );
 }

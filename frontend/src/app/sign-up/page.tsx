@@ -27,7 +27,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SUPPORTED_SCHOOLS, validateEmailForSchool } from "@/constants/supported_schools";
+import {
+  SUPPORTED_SCHOOLS,
+  validateEmailForSchool,
+} from "@/constants/supported_schools";
 import { isSuperUser } from "@/constants/super_users";
 import { isAllowedUser } from "@/constants/allowed_users";
 
@@ -50,32 +53,34 @@ export default function SignUpPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    
+
     // Check if user is in allowed users list
     if (!isAllowedUser(email)) {
       setError("Access is currently limited to invited users only.");
       setLoading(false);
       return;
     }
-    
+
     // Validate school selection
     if (!selectedSchool) {
       setError("Please select your school");
       setLoading(false);
       return;
     }
-    
+
     const isSuper = isSuperUser(email);
-    
+
     // Validate email domain matches selected school (skip for super users)
     if (!isSuper && !validateEmailForSchool(email, selectedSchool)) {
       const schoolConfig = SUPPORTED_SCHOOLS[selectedSchool];
       const domains = schoolConfig.acceptable_domains.join(", ");
-      setError(`Please use a valid ${selectedSchool} email address (${domains})`);
+      setError(
+        `Please use a valid ${selectedSchool} email address (${domains})`
+      );
       setLoading(false);
       return;
     }
-    
+
     try {
       const { data, error } = await supabase.auth.signUp({
         email: email,
@@ -115,23 +120,25 @@ export default function SignUpPage() {
         setError("Access is currently limited to invited users only.");
         return;
       }
-      
+
       // Validate school selection
       if (!selectedSchool) {
         setError("Please select your school");
         return;
       }
-      
+
       const isSuper = isSuperUser(email);
-      
+
       // Validate email domain matches selected school (skip for super users)
       if (!isSuper && !validateEmailForSchool(email, selectedSchool)) {
         const schoolConfig = SUPPORTED_SCHOOLS[selectedSchool];
         const domains = schoolConfig.acceptable_domains.join(", ");
-        setError(`Please use a valid ${selectedSchool} email address (${domains})`);
+        setError(
+          `Please use a valid ${selectedSchool} email address (${domains})`
+        );
         return;
       }
-      
+
       setLoading(true);
       setError(null);
       try {
@@ -285,7 +292,7 @@ export default function SignUpPage() {
                 transition={{ delay: 0.6, duration: 0.5 }}
                 className="mb-6"
               >
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                <h3 className="text-2xl font-bold text-foreground mb-2">
                   Good morning, Iman!
                 </h3>
                 <p className="text-gray-600">
@@ -333,7 +340,7 @@ export default function SignUpPage() {
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-foreground truncate">
                             {activity.activity}
                           </p>
                           <p className="text-xs text-gray-500">
@@ -380,7 +387,7 @@ export default function SignUpPage() {
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
+                            <p className="text-sm font-medium text-foreground">
                               {nudge.message}
                             </p>
                             <p className="text-xs text-gray-600 mt-1">
@@ -500,17 +507,26 @@ export default function SignUpPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={loading}
                         />
-                        {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
-                          <p className="text-xs text-green-600 font-medium">
-                            ✓ Valid {selectedSchool} email
-                          </p>
-                        )}
-                        {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
-                          <p className="text-xs text-muted-foreground">
-                            Use your {selectedSchool} email (
-                            {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
-                          </p>
-                        )}
+                        {selectedSchool &&
+                          !isSuperUser(email) &&
+                          email &&
+                          validateEmailForSchool(email, selectedSchool) && (
+                            <p className="text-xs text-green-600 font-medium">
+                              ✓ Valid {selectedSchool} email
+                            </p>
+                          )}
+                        {selectedSchool &&
+                          !isSuperUser(email) &&
+                          (!email ||
+                            !validateEmailForSchool(email, selectedSchool)) && (
+                            <p className="text-xs text-muted-foreground">
+                              Use your {selectedSchool} email (
+                              {SUPPORTED_SCHOOLS[
+                                selectedSchool
+                              ].acceptable_domains.join(", ")}
+                              )
+                            </p>
+                          )}
                         {isSuperUser(email) && (
                           <p className="text-xs text-green-600 font-medium">
                             ✓ Super user - can use any email domain
@@ -591,17 +607,26 @@ export default function SignUpPage() {
                           onChange={(e) => setEmail(e.target.value)}
                           disabled={loading || magicLinkSent}
                         />
-                        {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
-                          <p className="text-xs text-green-600 font-medium">
-                            ✓ Valid {selectedSchool} email
-                          </p>
-                        )}
-                        {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
-                          <p className="text-xs text-muted-foreground">
-                            Use your {selectedSchool} email (
-                            {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
-                          </p>
-                        )}
+                        {selectedSchool &&
+                          !isSuperUser(email) &&
+                          email &&
+                          validateEmailForSchool(email, selectedSchool) && (
+                            <p className="text-xs text-green-600 font-medium">
+                              ✓ Valid {selectedSchool} email
+                            </p>
+                          )}
+                        {selectedSchool &&
+                          !isSuperUser(email) &&
+                          (!email ||
+                            !validateEmailForSchool(email, selectedSchool)) && (
+                            <p className="text-xs text-muted-foreground">
+                              Use your {selectedSchool} email (
+                              {SUPPORTED_SCHOOLS[
+                                selectedSchool
+                              ].acceptable_domains.join(", ")}
+                              )
+                            </p>
+                          )}
                         {isSuperUser(email) && (
                           <p className="text-xs text-green-600 font-medium">
                             ✓ Super user - can use any email domain

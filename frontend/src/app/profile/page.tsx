@@ -4,7 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -35,20 +41,25 @@ function ProfilePage() {
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [syncProgress, setSyncProgress] = useState<{
-    stage: string;
-    status: 'pending' | 'loading' | 'complete' | 'error';
-    detail?: string;
-  }[]>([]);
-  
+  const [message, setMessage] = useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
+  const [syncProgress, setSyncProgress] = useState<
+    {
+      stage: string;
+      status: "pending" | "loading" | "complete" | "error";
+      detail?: string;
+    }[]
+  >([]);
+
   // Course sync tracking
   const [courseProgress, setCourseProgress] = useState<{
     current: number;
     total: number;
     courseName?: string;
   }>({ current: 0, total: 0 });
-  
+
   // Ref for auto-scrolling sync progress
   const syncProgressRef = useRef<HTMLDivElement>(null);
 
@@ -86,7 +97,7 @@ function ProfilePage() {
       setTimeout(() => {
         syncProgressRef.current?.scrollTo({
           top: syncProgressRef.current.scrollHeight,
-          behavior: 'smooth'
+          behavior: "smooth",
         });
       }, 100);
     }
@@ -94,12 +105,14 @@ function ProfilePage() {
 
   const fetchLMSTokenStatus = async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
 
-      const response = await fetch('/api/user/lms-token', {
+      const response = await fetch("/api/user/lms-token", {
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
@@ -111,13 +124,17 @@ function ProfilePage() {
         }
       }
     } catch (error) {
-      console.error('Error fetching LMS token status:', error);
+      console.error("Error fetching LMS token status:", error);
     }
   };
 
-  const updateSyncProgress = (stage: string, status: 'pending' | 'loading' | 'complete' | 'error', detail?: string) => {
-    setSyncProgress(prev => {
-      const existingIndex = prev.findIndex(p => p.stage === stage);
+  const updateSyncProgress = (
+    stage: string,
+    status: "pending" | "loading" | "complete" | "error",
+    detail?: string
+  ) => {
+    setSyncProgress((prev) => {
+      const existingIndex = prev.findIndex((p) => p.stage === stage);
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = { stage, status, detail };
@@ -137,7 +154,9 @@ function ProfilePage() {
     setMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("No active session");
       }
@@ -149,35 +168,39 @@ function ProfilePage() {
       }
 
       // Update LMS token
-      const response = await fetch('/api/user/lms-token', {
-        method: 'PUT',
+      const response = await fetch("/api/user/lms-token", {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           apiKey: newApiKey,
           apiBaseUrl: `${schoolConfig.api_url}/api/v1`,
-          lmsProvider: 'canvas',
+          lmsProvider: "canvas",
         }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.error || 'Failed to update LMS token');
+        throw new Error(error.error || "Failed to update LMS token");
       }
 
-      setMessage({ type: "success", text: "LMS token updated successfully! Starting resync..." });
+      setMessage({
+        type: "success",
+        text: "LMS token updated successfully! Starting resync...",
+      });
       setNewApiKey("");
       setHasExistingToken(true);
 
       // Start resync process
       await handleResyncEnrollments();
     } catch (error) {
-      console.error('Error updating LMS token:', error);
+      console.error("Error updating LMS token:", error);
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : 'Failed to update LMS token'
+        text:
+          error instanceof Error ? error.message : "Failed to update LMS token",
       });
     } finally {
       setIsLoading(false);
@@ -191,34 +214,36 @@ function ProfilePage() {
     setMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         throw new Error("No active session");
       }
 
       // Use streaming API endpoint
-      const response = await fetch('/api/user/enrollments/resync/stream', {
-        method: 'POST',
+      const response = await fetch("/api/user/enrollments/resync/stream", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
         },
       });
 
       if (!response.ok) {
         const error = await response.text();
-        throw new Error(error || 'Failed to resync enrollments');
+        throw new Error(error || "Failed to resync enrollments");
       }
 
       // Handle streaming response
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      
+
       if (!reader) {
-        throw new Error('No response body');
+        throw new Error("No response body");
       }
 
-      let buffer = '';
+      let buffer = "";
       let finalResults: any = null;
 
       while (true) {
@@ -226,71 +251,88 @@ function ProfilePage() {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
+        const lines = buffer.split("\n\n");
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (!line.trim() || !line.startsWith('data: ')) continue;
-          
+          if (!line.trim() || !line.startsWith("data: ")) continue;
+
           try {
-            const jsonStr = line.replace('data: ', '');
+            const jsonStr = line.replace("data: ", "");
             const event = JSON.parse(jsonStr);
 
-            if (event.type === 'progress') {
+            if (event.type === "progress") {
               updateSyncProgress(event.stage, event.status, event.detail);
-              
+
               // Extract course progress from stage text
-              const courseMatch = event.stage.match(/Syncing course (\d+)\/(\d+): (.+)/);
+              const courseMatch = event.stage.match(
+                /Syncing course (\d+)\/(\d+): (.+)/
+              );
               if (courseMatch) {
                 setCourseProgress({
                   current: parseInt(courseMatch[1]),
                   total: parseInt(courseMatch[2]),
-                  courseName: courseMatch[3]
+                  courseName: courseMatch[3],
                 });
               }
-              
+
               // Extract total courses from "Fetching courses from Canvas" stage
-              const fetchMatch = event.stage.match(/Fetching courses from Canvas/);
+              const fetchMatch = event.stage.match(
+                /Fetching courses from Canvas/
+              );
               if (fetchMatch && event.detail) {
                 const totalMatch = event.detail.match(/(\d+) courses found/);
                 if (totalMatch) {
-                  setCourseProgress(prev => ({
+                  setCourseProgress((prev) => ({
                     ...prev,
-                    total: parseInt(totalMatch[1])
+                    total: parseInt(totalMatch[1]),
                   }));
                 }
               }
-            } else if (event.type === 'done') {
+            } else if (event.type === "done") {
               finalResults = event.data;
-              console.log('Resync completed successfully:', finalResults);
-              
+              console.log("Resync completed successfully:", finalResults);
+
               const summaryParts = [];
-              if (finalResults.enrollmentsCreated > 0) summaryParts.push(`${finalResults.enrollmentsCreated} new`);
-              if (finalResults.enrollmentsKept > 0) summaryParts.push(`${finalResults.enrollmentsKept} kept`);
-              if (finalResults.enrollmentsDeleted > 0) summaryParts.push(`${finalResults.enrollmentsDeleted} removed`);
-              
+              if (finalResults.enrollmentsCreated > 0)
+                summaryParts.push(`${finalResults.enrollmentsCreated} new`);
+              if (finalResults.enrollmentsKept > 0)
+                summaryParts.push(`${finalResults.enrollmentsKept} kept`);
+              if (finalResults.enrollmentsDeleted > 0)
+                summaryParts.push(`${finalResults.enrollmentsDeleted} removed`);
+
               setMessage({
                 type: "success",
-                text: `Successfully resynced! Enrollments: ${summaryParts.join(', ')}`
+                text: `Successfully resynced! Enrollments: ${summaryParts.join(
+                  ", "
+                )}`,
               });
-            } else if (event.type === 'error') {
-              throw new Error(event.detail || 'Resync failed');
+            } else if (event.type === "error") {
+              throw new Error(event.detail || "Resync failed");
             }
           } catch (parseError) {
-            console.error('Error parsing SSE event:', line, parseError);
+            console.error("Error parsing SSE event:", line, parseError);
           }
         }
       }
 
       // Wait a moment to show completion state
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (error) {
-      console.error('Error resyncing enrollments:', error);
-      const currentStage = syncProgress[syncProgress.length - 1]?.stage || 'Syncing';
-      updateSyncProgress(currentStage, 'error', error instanceof Error ? error.message : 'Unknown error');
+      console.error("Error resyncing enrollments:", error);
+      const currentStage =
+        syncProgress[syncProgress.length - 1]?.stage || "Syncing";
+      updateSyncProgress(
+        currentStage,
+        "error",
+        error instanceof Error ? error.message : "Unknown error"
+      );
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : 'Failed to resync enrollments'
+        text:
+          error instanceof Error
+            ? error.message
+            : "Failed to resync enrollments",
       });
     } finally {
       setIsSyncing(false);
@@ -305,17 +347,18 @@ function ProfilePage() {
       const { error } = await supabase.auth.updateUser({
         data: {
           full_name: fullName,
-        }
+        },
       });
 
       if (error) throw error;
 
       setMessage({ type: "success", text: "Profile updated successfully!" });
     } catch (error) {
-      console.error('Error updating profile:', error);
+      console.error("Error updating profile:", error);
       setMessage({
         type: "error",
-        text: error instanceof Error ? error.message : 'Failed to update profile'
+        text:
+          error instanceof Error ? error.message : "Failed to update profile",
       });
     } finally {
       setIsLoading(false);
@@ -363,7 +406,7 @@ function ProfilePage() {
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="profile">
                 <User className="h-4 w-4 mr-2" />
-            Profile
+                Profile
               </TabsTrigger>
               <TabsTrigger value="lms">
                 <Key className="h-4 w-4 mr-2" />
@@ -470,7 +513,8 @@ function ProfilePage() {
                   <CardHeader>
                     <CardTitle>Canvas LMS Token</CardTitle>
                     <CardDescription>
-                      Update your Canvas API token to sync your courses and materials
+                      Update your Canvas API token to sync your courses and
+                      materials
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -480,10 +524,13 @@ function ProfilePage() {
                           <div className="flex items-center gap-3">
                             <CheckCircle2 className="h-5 w-5 text-green-600" />
                             <div>
-                              <p className="font-medium text-sm">Token Active</p>
+                              <p className="font-medium text-sm">
+                                Token Active
+                              </p>
                               {lastUpdated && (
                                 <p className="text-xs text-muted-foreground">
-                                  Last updated: {new Date(lastUpdated).toLocaleDateString()}
+                                  Last updated:{" "}
+                                  {new Date(lastUpdated).toLocaleDateString()}
                                 </p>
                               )}
                             </div>
@@ -496,12 +543,13 @@ function ProfilePage() {
                       <div className="grid gap-2">
                         <Label htmlFor="school-info">Your School</Label>
                         <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-foreground">
                             {schoolName || "Loading..."}
                           </p>
                           {schoolName && SUPPORTED_SCHOOLS[schoolName] && (
                             <p className="text-sm text-gray-600 mt-1">
-                              Canvas URL: {SUPPORTED_SCHOOLS[schoolName].api_url}
+                              Canvas URL:{" "}
+                              {SUPPORTED_SCHOOLS[schoolName].api_url}
                             </p>
                           )}
                         </div>
@@ -509,7 +557,9 @@ function ProfilePage() {
 
                       <div className="grid gap-2">
                         <Label htmlFor="new-api-token">
-                          {hasExistingToken ? "Update Canvas API Token" : "Canvas API Token"}
+                          {hasExistingToken
+                            ? "Update Canvas API Token"
+                            : "Canvas API Token"}
                         </Label>
                         <Input
                           id="new-api-token"
@@ -519,8 +569,8 @@ function ProfilePage() {
                           onChange={(e) => setNewApiKey(e.target.value)}
                         />
                         <p className="text-sm text-muted-foreground">
-                          You can find your API token in Canvas under Account &gt; Settings
-                          &gt; Approved Integrations
+                          You can find your API token in Canvas under Account
+                          &gt; Settings &gt; Approved Integrations
                         </p>
                       </div>
                     </div>
@@ -528,10 +578,13 @@ function ProfilePage() {
                     <div className="flex items-start space-x-2 p-4 bg-gray-50 rounded-lg">
                       <Lock className="h-5 w-5 text-gray-400 mt-0.5" />
                       <div className="space-y-1">
-                        <p className="text-sm font-medium">Privacy & Security</p>
+                        <p className="text-sm font-medium">
+                          Privacy & Security
+                        </p>
                         <p className="text-sm text-muted-foreground">
-                          Your API token is encrypted and stored securely. Updating your
-                          token will automatically resync your enrollments.
+                          Your API token is encrypted and stored securely.
+                          Updating your token will automatically resync your
+                          enrollments.
                         </p>
                       </div>
                     </div>
@@ -570,21 +623,30 @@ function ProfilePage() {
                           <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
                           Syncing Progress
                         </CardTitle>
-                        
+
                         {/* Course Progress Counter */}
                         {courseProgress.total > 0 && (
                           <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm font-medium text-gray-700">Course Progress</span>
+                              <span className="text-sm font-medium text-gray-700">
+                                Course Progress
+                              </span>
                               <span className="text-sm text-gray-600">
-                                {courseProgress.current} of {courseProgress.total}
+                                {courseProgress.current} of{" "}
+                                {courseProgress.total}
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <motion.div
                                 className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
                                 initial={{ width: 0 }}
-                                animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
+                                animate={{
+                                  width: `${
+                                    (courseProgress.current /
+                                      courseProgress.total) *
+                                    100
+                                  }%`,
+                                }}
                                 transition={{ duration: 0.5 }}
                               />
                             </div>
@@ -597,7 +659,10 @@ function ProfilePage() {
                         )}
                       </CardHeader>
                       <CardContent>
-                        <div ref={syncProgressRef} className="space-y-3 max-h-80 overflow-y-auto">
+                        <div
+                          ref={syncProgressRef}
+                          className="space-y-3 max-h-80 overflow-y-auto"
+                        >
                           {syncProgress.map((progress, index) => (
                             <motion.div
                               key={`${progress.stage}-${index}`}
@@ -605,51 +670,63 @@ function ProfilePage() {
                               animate={{ opacity: 1, x: 0 }}
                               transition={{ delay: index * 0.1 }}
                               className={`flex items-start gap-3 p-3 rounded-lg transition-all duration-200 ${
-                                progress.status === 'loading' 
-                                  ? 'bg-orange-50 border border-orange-200' 
-                                  : progress.status === 'complete'
-                                  ? 'bg-green-50 border border-green-200'
-                                  : progress.status === 'error'
-                                  ? 'bg-red-50 border border-red-200'
-                                  : 'bg-gray-50 border border-gray-200'
+                                progress.status === "loading"
+                                  ? "bg-orange-50 border border-orange-200"
+                                  : progress.status === "complete"
+                                  ? "bg-green-50 border border-green-200"
+                                  : progress.status === "error"
+                                  ? "bg-red-50 border border-red-200"
+                                  : "bg-gray-50 border border-gray-200"
                               }`}
                             >
                               <div className="mt-0.5">
-                                {progress.status === 'loading' && (
+                                {progress.status === "loading" && (
                                   <Loader2 className="h-5 w-5 text-orange-500 animate-spin" />
                                 )}
-                                {progress.status === 'complete' && (
+                                {progress.status === "complete" && (
                                   <CheckCircle2 className="h-5 w-5 text-green-500" />
                                 )}
-                                {progress.status === 'error' && (
+                                {progress.status === "error" && (
                                   <div className="h-5 w-5 rounded-full bg-red-500 flex items-center justify-center text-white text-xs font-bold">
                                     !
                                   </div>
                                 )}
-                                {progress.status === 'pending' && (
+                                {progress.status === "pending" && (
                                   <div className="h-5 w-5 rounded-full bg-gray-300" />
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className={`font-medium ${
-                                  progress.status === 'error' ? 'text-red-600' : 'text-gray-900'
-                                }`}>
+                                <p
+                                  className={`font-medium ${
+                                    progress.status === "error"
+                                      ? "text-red-600"
+                                      : "text-foreground"
+                                  }`}
+                                >
                                   {progress.stage}
                                 </p>
                                 {progress.detail && (
-                                  <p className={`text-sm mt-0.5 ${
-                                    progress.status === 'error' ? 'text-red-500' : 'text-gray-500'
-                                  }`}>
+                                  <p
+                                    className={`text-sm mt-0.5 ${
+                                      progress.status === "error"
+                                        ? "text-red-500"
+                                        : "text-gray-500"
+                                    }`}
+                                  >
                                     {progress.detail}
                                   </p>
                                 )}
-                                {progress.status === 'loading' && (
+                                {progress.status === "loading" && (
                                   <div className="mt-2 w-full bg-gray-200 rounded-full h-1">
                                     <motion.div
                                       className="bg-orange-500 h-1 rounded-full"
                                       initial={{ width: 0 }}
                                       animate={{ width: "100%" }}
-                                      transition={{ duration: 2, repeat: Infinity, repeatType: "reverse" }}
+                                      transition={{
+                                        duration: 2,
+                                        repeat: Infinity,
+                                        repeatType: "reverse",
+                                      }}
                                     />
                                   </div>
                                 )}
@@ -657,25 +734,30 @@ function ProfilePage() {
                             </motion.div>
                           ))}
                         </div>
-                        
+
                         {/* Completion Message */}
-                        {syncProgress.length > 0 && syncProgress[syncProgress.length - 1].status === 'complete' && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="mt-6"
-                          >
-                            <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
-                              <div className="flex items-center gap-2 mb-2">
-                                <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                <p className="font-medium text-green-800">Resync Complete!</p>
+                        {syncProgress.length > 0 &&
+                          syncProgress[syncProgress.length - 1].status ===
+                            "complete" && (
+                            <motion.div
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="mt-6"
+                            >
+                              <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <CheckCircle2 className="h-5 w-5 text-green-500" />
+                                  <p className="font-medium text-green-800">
+                                    Resync Complete!
+                                  </p>
+                                </div>
+                                <p className="text-sm text-green-700">
+                                  Your courses and materials have been
+                                  successfully synced.
+                                </p>
                               </div>
-                              <p className="text-sm text-green-700">
-                                Your courses and materials have been successfully synced.
-                              </p>
-                            </div>
-                          </motion.div>
-                        )}
+                            </motion.div>
+                          )}
                       </CardContent>
                     </Card>
                   </motion.div>
@@ -697,19 +779,25 @@ function ProfilePage() {
                         </p>
                         <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
                           <li>
-                            <strong>Compare enrollments:</strong> Check your current enrollments against Canvas
+                            <strong>Compare enrollments:</strong> Check your
+                            current enrollments against Canvas
                           </li>
                           <li>
-                            <strong>Remove dropped courses:</strong> Delete courses you&apos;re no longer enrolled in
+                            <strong>Remove dropped courses:</strong> Delete
+                            courses you&apos;re no longer enrolled in
                           </li>
                           <li>
-                            <strong>Add new courses:</strong> Add any new courses from Canvas
+                            <strong>Add new courses:</strong> Add any new
+                            courses from Canvas
                           </li>
                           <li>
-                            <strong>Keep existing enrollments:</strong> Preserve enrollments that haven&apos;t changed
+                            <strong>Keep existing enrollments:</strong> Preserve
+                            enrollments that haven&apos;t changed
                           </li>
                           <li>
-                            <strong>Smart module sync:</strong> For each course, compare modules and items - add new ones, update existing ones, and remove obsolete ones
+                            <strong>Smart module sync:</strong> For each course,
+                            compare modules and items - add new ones, update
+                            existing ones, and remove obsolete ones
                           </li>
                         </ul>
                       </div>
@@ -755,22 +843,28 @@ function ProfilePage() {
                   <CardContent className="space-y-6">
                     <div className="space-y-3">
                       <Label>Preferred learning mode</Label>
-                      <RadioGroup value={learningMode} onValueChange={setLearningMode}>
+                      <RadioGroup
+                        value={learningMode}
+                        onValueChange={setLearningMode}
+                      >
                         {[
                           {
                             id: "quiz",
                             title: "Quiz-focused",
-                            description: "Emphasize quizzes and active recall for better retention",
+                            description:
+                              "Emphasize quizzes and active recall for better retention",
                           },
                           {
                             id: "flashcard",
                             title: "Flashcard-focused",
-                            description: "Focus on spaced repetition with flashcards",
+                            description:
+                              "Focus on spaced repetition with flashcards",
                           },
                           {
                             id: "balanced",
                             title: "Balanced",
-                            description: "Mix of summaries, quizzes, and flashcards",
+                            description:
+                              "Mix of summaries, quizzes, and flashcards",
                           },
                         ].map((mode) => (
                           <div
@@ -806,17 +900,20 @@ function ProfilePage() {
                         {
                           id: "nudgeReview",
                           label: "Nudge me to review material",
-                          description: "Get reminders when it's time to review course content",
+                          description:
+                            "Get reminders when it's time to review course content",
                         },
                         {
                           id: "nudgeQuiz",
                           label: "Remind me to take quizzes",
-                          description: "Receive notifications about upcoming quizzes",
+                          description:
+                            "Receive notifications about upcoming quizzes",
                         },
                         {
                           id: "syncCalendar",
                           label: "Sync with my calendar",
-                          description: "Automatically add course events to your calendar",
+                          description:
+                            "Automatically add course events to your calendar",
                         },
                       ].map((pref) => (
                         <div
@@ -825,7 +922,11 @@ function ProfilePage() {
                         >
                           <Checkbox
                             id={pref.id}
-                            checked={notificationPrefs[pref.id as keyof typeof notificationPrefs]}
+                            checked={
+                              notificationPrefs[
+                                pref.id as keyof typeof notificationPrefs
+                              ]
+                            }
                             onCheckedChange={(checked) =>
                               setNotificationPrefs((prev) => ({
                                 ...prev,
@@ -847,12 +948,17 @@ function ProfilePage() {
 
                     <div className="pt-6 border-t mt-6">
                       <Button
-                        onClick={() => setMessage({ type: "success", text: "Preferences saved!" })}
+                        onClick={() =>
+                          setMessage({
+                            type: "success",
+                            text: "Preferences saved!",
+                          })
+                        }
                         className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
                         Save Preferences
                       </Button>
-          </div>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
