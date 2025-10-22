@@ -10,76 +10,29 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { BookOpen, Clock, RefreshCw } from "lucide-react";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
 import { useAllActivitiesByType } from "@/lib/hooks/useActivities";
 import { getActivityIcon, getActivityColor } from "@/lib/utils/activityUtils";
-import { useMemo } from "react";
-
-// Simple time ago formatter
-function formatTimeAgo(date: Date): string {
-  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
-
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60)
-    return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days} ${days === 1 ? "day" : "days"} ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 4) return `${weeks} ${weeks === 1 ? "week" : "weeks"} ago`;
-  const months = Math.floor(days / 30);
-  if (months < 12) return `${months} ${months === 1 ? "month" : "months"} ago`;
-  const years = Math.floor(days / 365);
-  return `${years} ${years === 1 ? "year" : "years"} ago`;
-}
 
 function DashboardPage() {
   const { user } = useAuth();
   const [activityFilter, setActivityFilter] = useState<string>("all");
 
   // Fetch all activity types once and cache them
-  const {
-    quizzes,
-    flashcards,
-    summaries,
-    isLoading: activitiesLoading,
-    refetchAll,
-  } = useAllActivitiesByType(5);
+  const { isLoading: activitiesLoading, refetchAll } =
+    useAllActivitiesByType(5);
 
-  // Filter activities based on selected tab (client-side)
-  const activities = useMemo(() => {
-    let filtered: typeof quizzes = [];
-
-    switch (activityFilter) {
-      case "quizzes":
-        filtered = quizzes;
-        break;
-      case "flashcards":
-        filtered = flashcards;
-        break;
-      case "summaries":
-        filtered = summaries;
-        break;
-      case "all":
-      default:
-        // Merge all activities and sort by created_at
-        filtered = [...quizzes, ...flashcards, ...summaries]
-          .sort(
-            (a, b) =>
-              new Date(b.created_at).getTime() -
-              new Date(a.created_at).getTime()
-          )
-          .slice(0, 5); // Take top 5 most recent
-        break;
-    }
-
-    return filtered;
-  }, [activityFilter, quizzes, flashcards, summaries]);
+  // Note: Currently using dummyActivities for display
+  // Real activity filtering logic is ready but commented out until data integration
 
   // Get user's display name
   const getUserName = () => {
@@ -117,11 +70,97 @@ function DashboardPage() {
     },
   ];
 
+  // Dummy accordion activities
+  const dummyActivities = [
+    {
+      id: 1,
+      title: "Completed Data Structures Quiz",
+      course: "CS 101",
+      timestamp: "2 hours ago",
+      type: "quiz_completion",
+      content: {
+        score: "85%",
+        totalQuestions: 20,
+        correctAnswers: 17,
+        timeSpent: "12 minutes",
+        topics: ["Arrays", "Linked Lists", "Stacks", "Queues"],
+        feedback: "Great job! Focus on queue operations for improvement.",
+      },
+    },
+    {
+      id: 2,
+      title: "Flashcard Study Session",
+      course: "BIOL 201",
+      timestamp: "4 hours ago",
+      type: "flashcard_study",
+      content: {
+        cardsStudied: 45,
+        correctRate: "78%",
+        timeSpent: "18 minutes",
+        difficulty: "Medium",
+        topics: ["Cell Biology", "Genetics", "Evolution"],
+        notes: "Need to review mitosis phases more thoroughly.",
+      },
+    },
+    {
+      id: 3,
+      title: "Generated Lecture Summary",
+      course: "HIST 150",
+      timestamp: "1 day ago",
+      type: "summary_generation",
+      content: {
+        lectureTitle: "World War II: Causes and Consequences",
+        keyPoints: [
+          "Treaty of Versailles impact on Germany",
+          "Rise of fascism in Europe",
+          "Pearl Harbor and US entry",
+          "Holocaust and its aftermath",
+        ],
+        summaryLength: "2,400 words",
+        confidence: "High",
+      },
+    },
+    {
+      id: 4,
+      title: "Reading Activity",
+      course: "ENG 101",
+      timestamp: "2 days ago",
+      type: "reading",
+      content: {
+        pagesRead: 15,
+        highlights: 8,
+        notes: 12,
+        readingTime: "45 minutes",
+        comprehension: "Good",
+        keyInsights: [
+          "Author's use of symbolism",
+          "Character development patterns",
+          "Thematic connections to modern society",
+        ],
+      },
+    },
+    {
+      id: 5,
+      title: "Note-Taking Session",
+      course: "CHEM 201",
+      timestamp: "3 days ago",
+      type: "note_taking",
+      content: {
+        notesCreated: 23,
+        formulas: 8,
+        diagrams: 3,
+        sessionLength: "35 minutes",
+        topics: ["Organic Chemistry", "Reaction Mechanisms", "Stereochemistry"],
+        reviewStatus: "Needs review",
+      },
+    },
+  ];
+
   return (
-    <SidebarLayout>
+    <SidebarLayout breadcrumbs={[{ label: "Home" }]}>
       {/* Header Section */}
-      <div className="container mx-auto px-4 md:px-6 h-full flex flex-col -mt-2">
-        <div className="mb-4 flex-shrink-0">
+      <div className="container mx-auto px-4 md:px-6 flex flex-col -mt-2 min-h-0 flex-1">
+        <div className="mb-4 shrink-0">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Good morning, {getUserName()}!
           </h1>
@@ -134,8 +173,8 @@ function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
           {/* Recent Activity */}
           <div className="w-full h-full">
-            <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col !bg-[#F5F5F5]">
-              <CardHeader className="pb-3">
+            <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col bg-[#F5F5F5]!">
+              <CardHeader className="pb-3 shrink-0">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
                   <Button variant="ghost" size="sm">
@@ -189,12 +228,12 @@ function DashboardPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0 flex-1 flex flex-col">
-                <div className="divide-y flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto">
                   {activitiesLoading ? (
                     <div className="p-4 text-center text-muted-foreground">
                       Loading activities...
                     </div>
-                  ) : activities.length === 0 ? (
+                  ) : dummyActivities.length === 0 ? (
                     <div className="text-center text-muted-foreground py-8">
                       <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
                       <p className="text-sm">No activities yet.</p>
@@ -203,55 +242,279 @@ function DashboardPage() {
                       </p>
                     </div>
                   ) : (
-                    activities.map((activity) => {
-                      const Icon = getActivityIcon(
-                        activity.activity_type as
-                          | "quiz_completion"
-                          | "quiz_generation"
-                          | "flashcard_generation"
-                          | "flashcard_study"
-                          | "reading"
-                      );
-                      const colors = getActivityColor(activity.feedback);
+                    <Accordion type="single" collapsible className="w-full">
+                      {dummyActivities.map((activity) => {
+                        const Icon = getActivityIcon(
+                          activity.type as
+                            | "quiz_completion"
+                            | "quiz_generation"
+                            | "flashcard_generation"
+                            | "flashcard_study"
+                            | "reading"
+                        );
+                        const colors = getActivityColor("good");
 
-                      return (
-                        <div
-                          key={activity.id}
-                          className="flex items-start p-4 hover:bg-accent/50 transition-colors"
-                        >
-                          <div
-                            className={`rounded-full p-2 mr-4 ${colors.bg} ${colors.text}`}
+                        return (
+                          <AccordionItem
+                            key={activity.id}
+                            value={`item-${activity.id}`}
                           >
-                            <Icon className="h-5 w-5" />
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-medium text-sm md:text-base">
-                                  {activity.activity_summary}
-                                </p>
-                                <p className="text-xs md:text-sm text-muted-foreground">
-                                  {activity.courses?.name || "Unknown Course"} •{" "}
-                                  {formatTimeAgo(new Date(activity.created_at))}
-                                </p>
+                            <AccordionTrigger className="hover:bg-accent/50 transition-colors px-4 py-3">
+                              <div className="flex items-center gap-3 text-left">
+                                <div
+                                  className={`rounded-full p-2 ${colors.bg} ${colors.text}`}
+                                >
+                                  <Icon className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm md:text-base">
+                                    {activity.title}
+                                  </p>
+                                  <p className="text-xs md:text-sm text-muted-foreground">
+                                    {activity.course} • {activity.timestamp}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
+                            </AccordionTrigger>
+                            <AccordionContent className="px-4 pb-4">
+                              <div className="space-y-3 text-sm">
+                                {activity.type === "quiz_completion" && (
+                                  <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="font-medium">
+                                          Score:
+                                        </span>{" "}
+                                        {activity.content.score}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Questions:
+                                        </span>{" "}
+                                        {activity.content.totalQuestions}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Correct:
+                                        </span>{" "}
+                                        {activity.content.correctAnswers}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Time:
+                                        </span>{" "}
+                                        {activity.content.timeSpent}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Topics:
+                                      </span>{" "}
+                                      {activity.content.topics?.join(", ") ||
+                                        "N/A"}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      <span className="font-medium">
+                                        Feedback:
+                                      </span>{" "}
+                                      {activity.content.feedback}
+                                    </div>
+                                  </>
+                                )}
+                                {activity.type === "flashcard_study" && (
+                                  <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="font-medium">
+                                          Cards Studied:
+                                        </span>{" "}
+                                        {activity.content.cardsStudied}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Correct Rate:
+                                        </span>{" "}
+                                        {activity.content.correctRate}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Time:
+                                        </span>{" "}
+                                        {activity.content.timeSpent}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Difficulty:
+                                        </span>{" "}
+                                        {activity.content.difficulty}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Topics:
+                                      </span>{" "}
+                                      {activity.content.topics?.join(", ") ||
+                                        "N/A"}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      <span className="font-medium">
+                                        Notes:
+                                      </span>{" "}
+                                      {activity.content.notes}
+                                    </div>
+                                  </>
+                                )}
+                                {activity.type === "summary_generation" && (
+                                  <>
+                                    <div>
+                                      <span className="font-medium">
+                                        Lecture:
+                                      </span>{" "}
+                                      {activity.content.lectureTitle}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Length:
+                                      </span>{" "}
+                                      {activity.content.summaryLength}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Confidence:
+                                      </span>{" "}
+                                      {activity.content.confidence}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Key Points:
+                                      </span>
+                                      <ul className="list-disc list-inside mt-1 space-y-1">
+                                        {activity.content.keyPoints?.map(
+                                          (point, index) => (
+                                            <li
+                                              key={index}
+                                              className="text-muted-foreground"
+                                            >
+                                              {point}
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    </div>
+                                  </>
+                                )}
+                                {activity.type === "reading" && (
+                                  <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="font-medium">
+                                          Pages:
+                                        </span>{" "}
+                                        {activity.content.pagesRead}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Highlights:
+                                        </span>{" "}
+                                        {activity.content.highlights}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Notes:
+                                        </span>{" "}
+                                        {activity.content.notes}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Time:
+                                        </span>{" "}
+                                        {activity.content.readingTime}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Comprehension:
+                                      </span>{" "}
+                                      {activity.content.comprehension}
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Key Insights:
+                                      </span>
+                                      <ul className="list-disc list-inside mt-1 space-y-1">
+                                        {activity.content.keyInsights?.map(
+                                          (insight, index) => (
+                                            <li
+                                              key={index}
+                                              className="text-muted-foreground"
+                                            >
+                                              {insight}
+                                            </li>
+                                          )
+                                        )}
+                                      </ul>
+                                    </div>
+                                  </>
+                                )}
+                                {activity.type === "note_taking" && (
+                                  <>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <span className="font-medium">
+                                          Notes Created:
+                                        </span>{" "}
+                                        {activity.content.notesCreated}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Formulas:
+                                        </span>{" "}
+                                        {activity.content.formulas}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Diagrams:
+                                        </span>{" "}
+                                        {activity.content.diagrams}
+                                      </div>
+                                      <div>
+                                        <span className="font-medium">
+                                          Duration:
+                                        </span>{" "}
+                                        {activity.content.sessionLength}
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium">
+                                        Topics:
+                                      </span>{" "}
+                                      {activity.content.topics?.join(", ") ||
+                                        "N/A"}
+                                    </div>
+                                    <div className="text-muted-foreground">
+                                      <span className="font-medium">
+                                        Review Status:
+                                      </span>{" "}
+                                      {activity.content.reviewStatus}
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        );
+                      })}
+                    </Accordion>
                   )}
                 </div>
               </CardContent>
-              <CardFooter className="border-t bg-muted/50 p-3 [.border-t]:pt-3">
+              <CardFooter className="border-t bg-muted/50 p-3 [.border-t]:pt-3 shrink-0">
                 <div className="flex justify-between items-center w-full text-xs md:text-sm">
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">
-                      {activities.length > 0
-                        ? `Last updated ${formatTimeAgo(
-                            new Date(activities[0].created_at)
-                          )}`
+                      {dummyActivities.length > 0
+                        ? `Last updated ${dummyActivities[0].timestamp}`
                         : "No activities"}
                     </span>
                   </div>
@@ -275,8 +538,8 @@ function DashboardPage() {
 
           {/* Smart Nudges */}
           <div className="w-full h-full">
-            <Card className="shadow-sm border-border/50 h-full flex flex-col !bg-[#F5F5F5]">
-              <CardHeader className="pb-3">
+            <Card className="shadow-sm border-border/50 h-full flex flex-col bg-[#F5F5F5]!">
+              <CardHeader className="pb-3 shrink-0">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Smart Nudges</h2>
                   <Button variant="ghost" size="sm">
