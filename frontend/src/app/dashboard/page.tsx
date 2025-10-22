@@ -10,7 +10,7 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { BookOpen, Clock } from "lucide-react";
+import { BookOpen, Clock, RefreshCw } from "lucide-react";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
@@ -131,7 +131,7 @@ function DashboardPage() {
         </div>
 
         {/* Main Content - Side by Side Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-screen-3xl mx-auto flex-1 min-h-0">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
           {/* Recent Activity */}
           <div className="w-full h-full">
             <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col !bg-[#F5F5F5]">
@@ -257,11 +257,16 @@ function DashboardPage() {
                   </div>
                   <Button
                     variant="ghost"
-                    size="sm"
+                    size="icon"
                     onClick={() => refetchAll()}
                     disabled={activitiesLoading}
+                    className="h-8 w-8"
                   >
-                    Refresh
+                    <RefreshCw
+                      className={`h-4 w-4 ${
+                        activitiesLoading ? "animate-spin" : ""
+                      }`}
+                    />
                   </Button>
                 </div>
               </CardFooter>
@@ -282,14 +287,16 @@ function DashboardPage() {
                   Your personalized learning recommendations
                 </p>
               </CardHeader>
-              <CardContent className="space-y-4 flex-1 flex flex-col">
-                <div className="flex-1">
+              <CardContent className="flex-1 flex flex-col p-0">
+                <div className="flex-1 overflow-y-auto">
                   {nudges.length > 0 ? (
-                    nudges.map((nudge) => (
-                      <NudgeCard key={nudge.id} nudge={nudge} />
-                    ))
+                    <div className="space-y-3 p-4">
+                      {nudges.map((nudge) => (
+                        <NudgeCard key={nudge.id} nudge={nudge} />
+                      ))}
+                    </div>
                   ) : (
-                    <div className="text-center text-muted-foreground py-8">
+                    <div className="text-center text-muted-foreground py-8 px-4">
                       <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
                       <p className="text-sm">No nudges at this time.</p>
                       <p className="text-xs mt-1">
