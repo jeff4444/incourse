@@ -9,9 +9,8 @@ import {
   CardFooter,
   CardHeader,
 } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, FileText, Layers } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
+import { BookOpen, Clock } from "lucide-react";
 import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
@@ -121,8 +120,8 @@ function DashboardPage() {
   return (
     <SidebarLayout>
       {/* Header Section */}
-      <div className="container mx-auto px-4 md:px-6 py-6">
-        <div className="mb-8">
+      <div className="container mx-auto px-4 md:px-6 h-full flex flex-col -mt-2">
+        <div className="mb-4 flex-shrink-0">
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Good morning, {getUserName()}!
           </h1>
@@ -132,10 +131,10 @@ function DashboardPage() {
         </div>
 
         {/* Main Content - Side by Side Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-screen-3xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-screen-3xl mx-auto flex-1 min-h-0">
           {/* Recent Activity */}
-          <div className="w-full">
-            <Card className="shadow-sm border-border/50 pb-0">
+          <div className="w-full h-full">
+            <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
@@ -143,21 +142,54 @@ function DashboardPage() {
                     View All
                   </Button>
                 </div>
-                <Tabs
-                  value={activityFilter}
-                  onValueChange={setActivityFilter}
-                  className="mt-4"
-                >
-                  <TabsList>
-                    <TabsTrigger value="all">All</TabsTrigger>
-                    <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
-                    <TabsTrigger value="summaries">Summaries</TabsTrigger>
-                    <TabsTrigger value="flashcards">Flashcards</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                <div className="flex items-center gap-3 text-sm mt-4">
+                  <button
+                    onClick={() => setActivityFilter("all")}
+                    className={`px-2 py-1 rounded transition-colors ${
+                      activityFilter === "all"
+                        ? "font-semibold text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    All
+                  </button>
+                  <Separator orientation="vertical" className="h-5" />
+                  <button
+                    onClick={() => setActivityFilter("quizzes")}
+                    className={`px-2 py-1 rounded transition-colors ${
+                      activityFilter === "quizzes"
+                        ? "font-semibold text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Quizzes
+                  </button>
+                  <Separator orientation="vertical" className="h-5" />
+                  <button
+                    onClick={() => setActivityFilter("summaries")}
+                    className={`px-2 py-1 rounded transition-colors ${
+                      activityFilter === "summaries"
+                        ? "font-semibold text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Summaries
+                  </button>
+                  <Separator orientation="vertical" className="h-5" />
+                  <button
+                    onClick={() => setActivityFilter("flashcards")}
+                    className={`px-2 py-1 rounded transition-colors ${
+                      activityFilter === "flashcards"
+                        ? "font-semibold text-foreground"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    Flashcards
+                  </button>
+                </div>
               </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y max-h-[60vh] overflow-y-auto">
+              <CardContent className="p-0 flex-1 flex flex-col">
+                <div className="divide-y flex-1 overflow-y-auto">
                   {activitiesLoading ? (
                     <div className="p-4 text-center text-muted-foreground">
                       Loading activities...
@@ -173,7 +205,12 @@ function DashboardPage() {
                   ) : (
                     activities.map((activity) => {
                       const Icon = getActivityIcon(
-                        activity.activity_type as any
+                        activity.activity_type as
+                          | "quiz_completion"
+                          | "quiz_generation"
+                          | "flashcard_generation"
+                          | "flashcard_study"
+                          | "reading"
                       );
                       const colors = getActivityColor(activity.feedback);
 
@@ -232,8 +269,8 @@ function DashboardPage() {
           </div>
 
           {/* Smart Nudges */}
-          <div className="w-full">
-            <Card className="shadow-sm border-border/50 h-fit">
+          <div className="w-full h-full">
+            <Card className="shadow-sm border-border/50 h-full flex flex-col">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Smart Nudges</h2>
@@ -245,20 +282,22 @@ function DashboardPage() {
                   Your personalized learning recommendations
                 </p>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {nudges.length > 0 ? (
-                  nudges.map((nudge) => (
-                    <NudgeCard key={nudge.id} nudge={nudge} />
-                  ))
-                ) : (
-                  <div className="text-center text-muted-foreground py-8">
-                    <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                    <p className="text-sm">No nudges at this time.</p>
-                    <p className="text-xs mt-1">
-                      Keep learning to get personalized recommendations!
-                    </p>
-                  </div>
-                )}
+              <CardContent className="space-y-4 flex-1 flex flex-col">
+                <div className="flex-1">
+                  {nudges.length > 0 ? (
+                    nudges.map((nudge) => (
+                      <NudgeCard key={nudge.id} nudge={nudge} />
+                    ))
+                  ) : (
+                    <div className="text-center text-muted-foreground py-8">
+                      <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                      <p className="text-sm">No nudges at this time.</p>
+                      <p className="text-xs mt-1">
+                        Keep learning to get personalized recommendations!
+                      </p>
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </div>
