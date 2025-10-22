@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
 import { createClient } from "@/lib/utils/supabase/client";
 import { encryptApiKey } from "@/lib/utils/encryption";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,6 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
-  Sparkles,
   Lock,
   Loader2,
 } from "lucide-react";
@@ -405,7 +405,13 @@ export default function OnboardingPage() {
               <div className="flex flex-col items-center mb-6">
                 <div className="relative">
                   <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
-                  <Sparkles className="h-6 w-6 text-pink-500 absolute -top-1 -right-1" />
+                  <Image
+                    src="/incourse_logo.png"
+                    alt="InCourse Logo"
+                    width={32}
+                    height={32}
+                    className="h-8 w-8 absolute -top-1 -right-1"
+                  />
                 </div>
                 <h2 className="text-2xl font-bold mt-4 bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
                   Setting up your account
@@ -558,12 +564,16 @@ export default function OnboardingPage() {
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-2 mb-8"
+          className="flex items-center mb-8"
         >
-          <Sparkles className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
-            InCourse
-          </h1>
+          <Image
+            src="/incourse_logo.png"
+            alt="InCourse Logo"
+            width={40}
+            height={40}
+            className="h-10 w-10"
+          />
+          <h1 className="text-3xl font-bold -ml-1">InCourse</h1>
         </motion.div>
 
         {/* Progress Tracker */}

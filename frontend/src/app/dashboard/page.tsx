@@ -119,7 +119,7 @@ function DashboardPage() {
   ];
 
   return (
-    <SidebarLayout breadcrumbs={[{ label: "Dashboard" }]}>
+    <SidebarLayout>
       {/* Header Section */}
       <div className="container mx-auto px-4 md:px-6 py-6">
         <div className="mb-8">
@@ -127,7 +127,7 @@ function DashboardPage() {
             Good morning, {getUserName()}!
           </h1>
           <p className="text-lg text-muted-foreground">
-            Here&apos;s what&apos;s happening with your learning today
+            Here&apos;s what&apos;s happening with your classes today
           </p>
         </div>
 

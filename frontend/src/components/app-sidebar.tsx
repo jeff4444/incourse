@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, BookOpen, Calendar, Sparkles } from "lucide-react";
+import { Home, BookOpen, Calendar } from "lucide-react";
 
 import { NavMain } from "@/components/nav-main";
 import { NavUser } from "@/components/nav-user";
@@ -65,8 +65,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const teamData = [
     {
       name: "InCourse",
-      logo: Sparkles,
-      plan: "Learning Platform",
     },
   ];
 

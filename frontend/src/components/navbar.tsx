@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,7 +24,6 @@ import {
   Menu,
   Search,
   Settings,
-  Sparkles,
   User,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -54,9 +54,15 @@ export function Navbar() {
               </Button>
             </SheetTrigger>
           </Sheet>
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-pink-500" />
-            <span className="text-xl font-bold hidden md:inline-block bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              src="/incourse_logo.png"
+              alt="InCourse Logo"
+              width={32}
+              height={32}
+              className="h-8 w-8"
+            />
+            <span className="text-2xl font-bold hidden md:inline-block -ml-1">
               InCourse
             </span>
           </Link>
