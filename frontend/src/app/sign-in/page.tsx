@@ -211,7 +211,7 @@ function SignInContent() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Column - Simplified Dashboard Preview */}
-      <div className="flex-1 bg-gradient-to-br from-orange-50 to-pink-50 p-8 flex items-center justify-center">
+      <div className="flex-1 bg-white p-8 flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}

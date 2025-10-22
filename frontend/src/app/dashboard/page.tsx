@@ -119,7 +119,7 @@ function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen w-full flex flex-col bg-white">
       <Navbar />
 
       {/* Header Section */}
