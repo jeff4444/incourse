@@ -12,7 +12,7 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Clock, FileText, Layers } from "lucide-react";
-import { Navbar } from "@/components/navbar";
+import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
 import { useAllActivitiesByType } from "@/lib/hooks/useActivities";
@@ -119,9 +119,7 @@ function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-white">
-      <Navbar />
-
+    <SidebarLayout breadcrumbs={[{ label: "Dashboard" }]}>
       {/* Header Section */}
       <div className="container mx-auto px-4 md:px-6 py-6">
         <div className="mb-8">
@@ -266,7 +264,7 @@ function DashboardPage() {
           </div>
         </div>
       </div>
-    </div>
+    </SidebarLayout>
   );
 }
 

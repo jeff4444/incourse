@@ -29,7 +29,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <QueryProvider>
-            <main className="min-h-screen bg-background">{children}</main>
+            <div className="min-h-screen bg-background">{children}</div>
           </QueryProvider>
         </ThemeProvider>
         <Toaster />

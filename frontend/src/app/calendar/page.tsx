@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Plus } from "lucide-react";
-import { Navbar } from "@/components/navbar";
+import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import { CalendarHeader } from "@/components/calendar-header";
 import { CalendarMonth } from "@/components/calendar-month";
 import { CalendarWeek } from "@/components/calendar-week";
@@ -221,9 +221,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <Navbar />
-
+    <SidebarLayout breadcrumbs={[{ label: "Calendar" }]}>
       <main className="container mx-auto py-6 px-4 md:px-6">
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">
           <div>
@@ -352,7 +350,7 @@ const CalendarPage = () => {
           )}
         </div>
       </main>
-    </div>
+    </SidebarLayout>
   );
 };
 
