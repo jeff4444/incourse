@@ -54,7 +54,7 @@
 
 :root {
   --radius: 0.625rem;
-  --background: 0 0% 98%;
+  --background: 0 0% 100%;
   --foreground: 0 0% 9%;
   --card: 0 0% 100%;
   --card-foreground: 0 0% 9%;
@@ -78,7 +78,7 @@
   --chart-3: 197 37% 24%;
   --chart-4: 43 74% 66%;
   --chart-5: 27 87% 67%;
-  --sidebar: 0 0% 98%;
+  --sidebar: 0 0% 97%;
   --sidebar-foreground: 0 0% 9%;
   --sidebar-primary: 0 0% 9%;
   --sidebar-primary-foreground: 0 0% 98%;
@@ -129,11 +129,16 @@
   }
   body {
     @apply bg-background text-foreground;
-    background-color: #fafafa;
+    background-color: #ffffff;
   }
   html {
-    background-color: #fafafa;
+    background-color: #ffffff;
   }
+}
+
+/* Override sidebar background to match cards */
+[data-sidebar="sidebar"] {
+  background-color: #f8f8f8 !important;
 }
 
 .gradient-bg {
@@ -174,7 +179,7 @@
 
 body {
   margin: 0;
-  background-color: #fafafa;
+  background-color: #ffffff;
   font-family: Segoe UI, Tahoma, sans-serif;
 }
 
