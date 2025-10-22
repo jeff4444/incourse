@@ -242,7 +242,7 @@ export function AutograderPanel({
 
             {/* File Upload Area */}
             <div className="flex-1 flex flex-col">
-              <Card className="border-2 border-dashed border-gray-300 hover:border-blue-400 transition-colors">
+              <Card className="border-2 border-dashed border-border hover:border-blue-400 transition-colors">
                 <CardContent className="flex flex-col items-center justify-center p-8 text-center">
                   <Upload className="h-12 w-12 text-gray-400 mb-4" />
                   <h4 className="text-lg font-medium text-foreground mb-2">

@@ -11,10 +11,10 @@ export function NoteSkeleton() {
       <Navbar />
       <div className="flex h-[calc(100vh-4rem)] p-4 gap-4">
         {/* Sidebar Skeleton */}
-        <div className="w-80 bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm flex-shrink-0">
+        <div className="w-80 bg-slate-50/80 backdrop-blur-sm border border-border/60 rounded-2xl shadow-sm flex-shrink-0">
           <div className="h-full flex flex-col">
             {/* Sidebar Header Skeleton */}
-            <div className="p-4 border-b border-slate-200/60 flex items-center justify-between">
+            <div className="p-4 border-b border-border/60 flex items-center justify-between">
               <Skeleton className="h-6 w-16" />
               <Skeleton className="h-8 w-8" />
             </div>
@@ -59,9 +59,9 @@ export function NoteSkeleton() {
         <div className="flex-1 flex flex-col min-w-0">
           {/* Floating Editor Container Skeleton */}
           <div className="flex-1 overflow-hidden">
-            <div className="h-full bg-white/90 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-lg shadow-slate-200/50">
+            <div className="h-full bg-white/90 backdrop-blur-sm border border-border/60 rounded-2xl shadow-lg shadow-slate-200/50">
               {/* Editor Header Skeleton */}
-              <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200/60 bg-white/80 backdrop-blur-sm">
+              <div className="flex items-center justify-between px-6 py-4 border-b border-border/60 bg-white/80 backdrop-blur-sm">
                 {/* Left side - Back button and sidebar toggle */}
                 <div className="flex items-center gap-2">
                   <Skeleton className="h-8 w-16" />

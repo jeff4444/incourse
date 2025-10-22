@@ -134,7 +134,7 @@ function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-screen-3xl mx-auto flex-1 min-h-0">
           {/* Recent Activity */}
           <div className="w-full h-full">
-            <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col !bg-[#F0F0F0]">
+            <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col !bg-[#FAFAFA]">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
@@ -270,7 +270,7 @@ function DashboardPage() {
 
           {/* Smart Nudges */}
           <div className="w-full h-full">
-            <Card className="shadow-sm border-border/50 h-full flex flex-col !bg-[#F0F0F0]">
+            <Card className="shadow-sm border-border/50 h-full flex flex-col !bg-[#FAFAFA]">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Smart Nudges</h2>
