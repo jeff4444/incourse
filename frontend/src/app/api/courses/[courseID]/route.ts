@@ -31,7 +31,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     instructor,
                     description,
                     semester,
-                    year
+                    year,
+                    calendar
                 `)
                 .eq('id', courseID)
                 .single();
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                     description: dbCourse.description,
                     semester: dbCourse.semester,
                     year: dbCourse.year,
+                    calendar: dbCourse.calendar,
                 };
 
                 console.log('Fetched course from database');
