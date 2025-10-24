@@ -169,7 +169,7 @@ function DashboardPage() {
           <div className="w-full md:flex-1 md:min-h-0 flex flex-col">
             <div className="flex flex-col h-full">
               {/* Header with underline */}
-              <div className="pb-3 shrink-0 border-b border-gray-200">
+              <div className="shrink-0">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
                   <Button variant="ghost" size="sm">
@@ -221,6 +221,10 @@ function DashboardPage() {
                     Flashcards
                   </button>
                 </div>
+                <Separator
+                  orientation="horizontal"
+                  className="w-full mt-2 bg-gray-200"
+                />
               </div>
 
               {/* Content */}
@@ -255,6 +259,7 @@ function DashboardPage() {
                           <AccordionItem
                             key={activity.id}
                             value={`item-${activity.id}`}
+                            className="border-b border-gray-200"
                           >
                             <AccordionTrigger className="hover:bg-accent/50 transition-colors px-4 py-3">
                               <div className="flex items-center gap-3 text-left">
@@ -538,16 +543,16 @@ function DashboardPage() {
           {/* Separator - Only on desktop */}
           <Separator
             orientation="vertical"
-            className="hidden md:block mx-4 h-auto bg-[#fbfcf8]"
+            className="hidden md:block mx-4 h-auto bg-gray-200"
           />
 
           {/* Smart Nudges */}
           <div className="w-full md:flex-1 flex flex-col mt-8 md:mt-0">
             <div className="flex flex-col h-full">
               {/* Header with underline */}
-              <div className="pb-3 shrink-0 border-b border-gray-200">
+              <div className="pb-3 shrink-0">
                 <div className="flex justify-between items-center mb-2">
-                  <h2 className="text-xl font-semibold">Smart Nudges</h2>
+                  <h2 className="text-xl font-semibold mb-4">Smart Nudges</h2>
                   <Button variant="ghost" size="sm">
                     Mark All Read
                   </Button>
@@ -555,6 +560,10 @@ function DashboardPage() {
                 <p className="text-sm text-muted-foreground">
                   Your personalized learning recommendations
                 </p>
+                <Separator
+                  orientation="horizontal"
+                  className="w-full mt-3 bg-gray-200"
+                />
               </div>
 
               {/* Content */}
