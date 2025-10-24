@@ -152,6 +152,7 @@ function DashboardPage() {
 
   return (
     <SidebarLayout breadcrumbs={[{ label: "Home" }]}>
+      <Separator orientation="horizontal" className="w-full mb-1 -mt-2 bg-gray-200" />
       {/* Header Section */}
       <div className="container mx-auto px-4 md:px-6 flex flex-col -mt-2 min-h-0 flex-1">
         <div className="mb-4 shrink-0">
