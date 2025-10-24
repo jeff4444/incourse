@@ -5,14 +5,14 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ZoomIn, ZoomOut, Download, Image as ImageIcon, Loader2, Maximize2, Minimize2, RotateCw, Move, MessageSquare, Play, Square, Clock } from "lucide-react"
-import { FileDetails } from "@/lib/types/course"
+import { File } from "@/lib/types/course"
 import { useReadingTracker } from "@/lib/hooks/useActivities"
 
 const maxZoom = 5
 const minZoom = 0.1
 const zoomStep = 0.1
 
-export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
+export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: File, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,8 +28,8 @@ export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibi
 
   // Track reading time with manual control
   const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
-    fileDetails.id || fileDetails.canvasId || '',
-    fileDetails.name,
+    fileDetails.id || '',
+    fileDetails.displayName,
     courseId || '',
     !!courseId
   );
@@ -43,8 +43,8 @@ export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibi
 
   const handleDownload = () => {
     const link = document.createElement("a")
-    link.href = fileDetails.url
-    link.download = fileDetails.name
+    link.href = fileDetails.url || ''
+    link.download = fileDetails.displayName || ''
     link.click()
   }
 
@@ -167,13 +167,13 @@ export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibi
 
   return (
     <div
-      className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-gradient-to-br from-orange-50 to-pink-50"}`}
+      className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-linear-to-br from-orange-50 to-pink-50"}`}
     >
       <div className={`flex ${zenMode ? "h-screen" : ""}`}>
         {/* Image Viewer */}
         <div className={`transition-all duration-300 ${zenMode ? "w-full h-full" : "max-w-6xl mx-auto flex-1"}`}>
           {/* Header */}
-          <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} flex-shrink-0 py-1`}>
+          <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} shrink-0 py-1`}>
             <CardContent className="flex items-center justify-between py-0">
               {/* Controls */}
               <div className="flex flex-wrap items-center gap-4">
@@ -253,7 +253,7 @@ export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibi
                         onClick={startTracking}
                         className="flex items-center gap-2 overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-36"
                       >
-                        <Play className="h-4 w-4 flex-shrink-0" />
+                        <Play className="h-4 w-4 shrink-0" />
                         <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
                           Enter Zen Mode
                         </span>
@@ -267,7 +267,7 @@ export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibi
                         onClick={stopTracking}
                         className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-36"
                       >
-                        <Square className="h-4 w-4 flex-shrink-0" />
+                        <Square className="h-4 w-4 shrink-0" />
                         <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
                           End Zen Mode
                         </span>
@@ -335,7 +335,7 @@ export default function ImageViewer({ fileDetails, courseId, onTogglePanelVisibi
                     <img
                       ref={imageRef}
                       src={imageUrl}
-                      alt={fileDetails.name}
+                      alt={fileDetails.displayName || ''}
                       className="max-w-full max-h-full object-contain select-none"
                       style={{
                         transform: `translate(${position.x}px, ${position.y}px) scale(${zoom}) rotate(${rotation}deg)`,
