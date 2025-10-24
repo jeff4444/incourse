@@ -8,6 +8,7 @@ export interface Course {
   description: string | null;
   semester: string | null;
   year: string | null;
+  calendar: string | null;
 }
 
 export interface Module {
