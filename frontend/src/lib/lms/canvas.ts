@@ -1,5 +1,4 @@
 import { Course, File, Module, ModuleItem, DiscussionTopic, Page, Assignment } from "../types/course";
-import { validateFileForProcessing } from "../utils/fileValidation";
 import LMSProvider from "./lms-provider";
 
 
@@ -325,7 +324,7 @@ class CanvasProvider extends LMSProvider {
     return discussionData;
   }
 
-  async getCourseFiles(courseId: string): Promise<any[]> {
+  async getCourseFiles(courseId: string): Promise<File[]> {
     const filesResponse = await fetch(
       `${this.apiBaseUrl}/courses/${courseId}/files?per_page=100`,
       {
