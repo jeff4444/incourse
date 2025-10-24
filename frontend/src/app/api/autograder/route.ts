@@ -45,6 +45,9 @@ export async function POST(request: NextRequest) {
     const backendUrl = process.env.NEXT_PUBLIC_AGENTS_BACKEND_URL || 'http://localhost:8000';
     const response = await fetch(`${backendUrl}/grade-assignment`, {
       method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${userCredentials.accessToken}`,
+      },
       body: backendFormData,
     });
 

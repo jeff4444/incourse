@@ -8,6 +8,7 @@ import { Loader2, FileText, AlertCircle, Download, Maximize2, Minimize2 } from "
 import { File } from "@/lib/types/course"
 import PDFViewer from "./pdf-viewer"
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer"
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
@@ -35,11 +36,8 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
         const format = fileName.endsWith('.doc') ? 'doc' : 'docx'
 
         // Call backend conversion endpoint
-        const response = await fetch(`${BACKEND_URL}/convert-office-to-pdf`, {
+        const response = await authenticatedFetch(`${BACKEND_URL}/convert-office-to-pdf`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({
             url: fileDetails.url,
             format: format
@@ -137,7 +135,7 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
             <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} shrink-0 py-1`}>
               <CardContent className="flex items-center justify-between py-0">
                 <div className="flex items-center gap-2">
-                  <span className={`text-sm ${zenMode ? "text-gray-300" : "text-gray-600"}`}>Word Document (Fallback Viewer)</span>
+                  <p className={`text-sm ${zenMode ? "text-gray-300" : "text-gray-600"}`}>Word Document (Fallback Viewer)</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -216,7 +214,7 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
       <Card className="my-2 shrink-0 py-1">
         <CardContent className="flex items-center justify-between py-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Word Document</span>
+            <p className="text-sm text-gray-600">Word Document</p>
           </div>
           <Button
             variant="outline"

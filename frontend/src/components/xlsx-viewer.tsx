@@ -8,6 +8,7 @@ import { Loader2, FileSpreadsheet, AlertCircle, Download, Maximize2, Minimize2 }
 import { File } from "@/lib/types/course"
 import PDFViewer from "./pdf-viewer"
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer"
+import { authenticatedFetch } from '@/lib/utils/apiClient'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
@@ -35,11 +36,8 @@ export default function XLSXViewer({ fileDetails, courseId, onTogglePanelVisibil
         const format = fileName.endsWith('.xls') ? 'xls' : 'xlsx'
 
         // Call backend conversion endpoint
-        const response = await fetch(`${BACKEND_URL}/convert-office-to-pdf`, {
+        const response = await authenticatedFetch(`${BACKEND_URL}/convert-office-to-pdf`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
           body: JSON.stringify({
             url: fileDetails.url,
             format: format
