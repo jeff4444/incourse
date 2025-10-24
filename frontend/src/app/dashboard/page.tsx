@@ -158,7 +158,7 @@ function DashboardPage() {
           <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
             Good morning, {getUserName()}!
           </h1>
-          <p className="text-lg text-muted-foreground">
+          <p className="text-lg text-gray-600">
             Here&apos;s what&apos;s happening with your classes today
           </p>
         </div>
