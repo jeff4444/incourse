@@ -6,11 +6,11 @@ import { ArrowLeft, Menu, X } from "lucide-react";
 
 export function NoteSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="flex h-[calc(100vh-4rem)] p-4 gap-4">
         {/* Sidebar Skeleton */}
-        <div className="w-80 bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm flex-shrink-0">
+        <div className="w-80 bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm shrink-0">
           <div className="h-full flex flex-col">
             {/* Sidebar Header Skeleton */}
             <div className="p-4 border-b border-slate-200/60 flex items-center justify-between">
@@ -49,7 +49,7 @@ export function NoteSkeleton() {
         </div>
 
         {/* Draggable Resize Handle Skeleton */}
-        <div className="w-1 bg-slate-300/50 flex-shrink-0 rounded-full"></div>
+        <div className="w-1 bg-slate-300/50 shrink-0 rounded-full"></div>
 
         {/* Main Editor Area Skeleton */}
         <div className="flex-1 flex flex-col min-w-0">
