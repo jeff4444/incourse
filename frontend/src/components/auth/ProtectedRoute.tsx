@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/hooks/useAuth";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 
 interface ProtectedRouteProps {
@@ -11,6 +11,7 @@ interface ProtectedRouteProps {
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -19,12 +20,16 @@ const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
       // Check if user has completed onboarding
       const passedOnboarding = user.user_metadata?.passed_onboarding;
       
-      // Only redirect to onboarding if they haven't completed it and we're not already on onboarding
-      if (passedOnboarding === false && !window.location.pathname.includes('/onboarding')) {
+      // If user hasn't completed onboarding and is not on onboarding page, redirect to onboarding
+      if (passedOnboarding !== true && pathname !== '/onboarding') {
         router.push("/onboarding");
       }
+      // If user has completed onboarding and is on onboarding page, redirect to dashboard
+      else if (passedOnboarding === true && pathname === '/onboarding') {
+        router.push("/dashboard");
+      }
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, pathname]);
 
   if (loading) {
     return <div>Loading...</div>; // Or a spinner component

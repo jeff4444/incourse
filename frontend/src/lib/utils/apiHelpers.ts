@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LMSFactory } from "@/lib/api";
-import { getUserCredentials, getUserFromRequest } from "./userCredentials";
+import { getUserFromRequest } from "./userCredentials";
 
 export interface ApiErrorResponse {
   error: string;
@@ -26,23 +26,11 @@ export async function createLMSProviderWithUserCredentials(
       );
     }
 
-    // Get user's LMS credentials with proper RLS context
-    const credentials = await getUserCredentials(userData.userId, userData.accessToken);
-    if (!credentials) {
-      return NextResponse.json(
-        { error: "No LMS credentials found. Please complete onboarding." },
-        { status: 400 }
-      );
-    }
-
-    // Use provided LMS provider or default to user's stored provider
-    const lms = lmsProviderOverride ?? credentials.lmsProvider;
-    
-    // Create LMS provider with user's specific credentials
-    const lmsFactory = new LMSFactory(credentials.apiBaseUrl, credentials.apiKey);
-    const lmsProvider = lmsFactory.createLMSProvider(lms);
-
-    return { lmsProvider };
+    // TODO: Need to implement credential retrieval or pass credentials differently
+    return NextResponse.json(
+      { error: "User credentials functionality needs to be implemented" },
+      { status: 501 }
+    );
   } catch (error) {
     console.error('Error creating LMS provider:', error);
     return NextResponse.json(

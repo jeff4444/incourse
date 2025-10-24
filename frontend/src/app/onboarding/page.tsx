@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/utils/supabase/client";
-import { encryptApiKey } from "@/lib/utils/encryption";
+import { validateCanvasToken } from "@/lib/utils/validateCanvasToken";
+import { downloadTokenFile } from "@/lib/utils/downloadTokenFile";
 import { Button } from "@/components/ui/button";
 import { SUPPORTED_SCHOOLS } from "@/constants/supported_schools";
 import {
@@ -30,6 +32,7 @@ import {
 const supabase = createClient();
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(0); // -1 for back, 1 for forward
   const totalSteps = 2;
@@ -55,6 +58,17 @@ export default function OnboardingPage() {
   
   // Ref for auto-scrolling sync progress
   const syncProgressRef = useRef<HTMLDivElement>(null);
+
+  // Check if user has already completed onboarding and redirect if necessary
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.passed_onboarding === true) {
+        router.push("/dashboard");
+      }
+    };
+    checkOnboardingStatus();
+  }, [router]);
 
   // Fetch user's school on mount
   useEffect(() => {
@@ -96,47 +110,6 @@ export default function OnboardingPage() {
       }
       return [...prev, { stage, status, detail }];
     });
-  };
-
-  // Store Canvas credentials to database
-  const storeCanvasCredentials = async (key: string) => {
-    try {
-      updateSyncProgress('Saving credentials', 'loading');
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
-      // Get the Canvas URL from the school configuration
-      const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
-      if (!schoolConfig) {
-        throw new Error("School not supported");
-      }
-
-      const encryptedApiKey = encryptApiKey(key);
-
-      const { error } = await supabase
-        .from('user_api_keys')
-        .upsert({
-          user_id: user.id,
-          lms_provider: 'canvas',
-          encrypted_api_key: encryptedApiKey,
-          api_base_url: schoolConfig.api_url,
-          is_active: true
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      updateSyncProgress('Saving credentials', 'complete');
-      return { success: true };
-    } catch (error) {
-      console.error('Error storing Canvas credentials:', error);
-      updateSyncProgress('Saving credentials', 'error', error instanceof Error ? error.message : 'Unknown error');
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
-    }
   };
 
   // Fetch and sync courses to database with streaming
@@ -228,6 +201,11 @@ export default function OnboardingPage() {
               finalResults = event.data;
               console.log('Sync completed successfully:', finalResults);
             } else if (event.type === 'error') {
+              // Handle token validation errors specifically
+              if (event.stage === 'Token validation failed') {
+                setIsSyncing(false);
+                return { success: false, error: event.detail || 'Invalid Canvas API token' };
+              }
               throw new Error(event.detail || 'Sync failed');
             }
           } catch (parseError) {
@@ -265,20 +243,26 @@ export default function OnboardingPage() {
       setSyncProgress([]);
       setCourseProgress({ current: 0, total: 0 });
 
-      // Store credentials to database
-      const storeResult = await storeCanvasCredentials(apiKey);
-      if (!storeResult.success) {
-        setApiKeyError(`Failed to save credentials: ${storeResult.error}`);
-        setIsSyncing(false);
-        return;
-      }
-
-      // Sync courses to database after storing credentials
+      // Sync courses to database
       const syncResult = await syncCoursesToDatabase(apiKey);
       if (!syncResult.success) {
-        // Log the error but don't block onboarding
+        // If token validation failed, show error and stay on current step
+        if (syncResult.error && syncResult.error.includes('Invalid Canvas API token')) {
+          setApiKeyError(syncResult.error);
+          setIsSyncing(false);
+          return; // Don't proceed to next step
+        }
+        // Log other errors but don't block onboarding
         console.error('Failed to sync courses during onboarding:', syncResult.error);
         // Continue with onboarding even if course sync fails
+      }
+
+      // Download token file after successful sync
+      if (syncResult.success) {
+        const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
+        if (schoolConfig) {
+          downloadTokenFile(apiKey, `${schoolConfig.api_url}/api/v1`, schoolName);
+        }
       }
       
       // Wait a moment to show completion state
@@ -638,7 +622,9 @@ export default function OnboardingPage() {
                               <p className="text-sm text-muted-foreground">
                                 We only access the course materials you
                                 explicitly share. Your data is encrypted and
-                                never shared with third parties.
+                                never shared with third parties. After syncing,
+                                we'll download your Canvas token file - keep it
+                                safe for future resyncing.
                               </p>
                             </div>
                           </div>

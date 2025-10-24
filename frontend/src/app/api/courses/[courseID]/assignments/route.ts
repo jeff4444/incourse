@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LMSFactory } from "@/lib/api";
-import { getUserCredentials, getUserFromRequest } from "@/lib/utils/userCredentials";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from "@/lib/utils/supabase/server";
 import { Assignment } from "@/lib/types/course";
 
@@ -32,23 +32,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    // Get user credentials
-    const credentials = await getUserCredentials(userData.userId, userData.accessToken);
-
-    if (!credentials) {
-      return NextResponse.json(
-        { error: "User credentials not found" },
-        { status: 404 }
-      );
-    }
-
-    // Create LMS provider and fetch assignments
-    const lmsFactory = new LMSFactory(credentials.apiBaseUrl, credentials.apiKey);
-    const lmsProvider = lmsFactory.createLMSProvider(courseInfo.lms_provider);
-    
-    const assignments: Assignment[] = await lmsProvider.getCourseAssignments(courseInfo.lms_id);
-
-    return NextResponse.json(assignments);
+    // TODO: Need to implement credential retrieval or pass credentials differently
+    return NextResponse.json(
+      { error: "User credentials functionality needs to be implemented" },
+      { status: 501 }
+    );
   } catch (error) {
     console.error('Error fetching assignments:', error);
     return NextResponse.json(

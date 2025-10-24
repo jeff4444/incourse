@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { LMSFactory } from "@/lib/api";
-import { getUserCredentials, getUserFromRequest } from "@/lib/utils/userCredentials";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from "@/lib/utils/supabase/server";
 import { Course } from "@/lib/types/course";
 
@@ -69,25 +69,11 @@ export async function GET(request: NextRequest) {
             console.error('Database query error, falling back to LMS provider:', dbError);
         }
 
-        // Fallback: Fetch from LMS provider
-        const credentials = await getUserCredentials(userData.userId, userData.accessToken);
-        if (!credentials) {
-            return NextResponse.json(
-                { error: "No LMS credentials found. Please complete onboarding." },
-                { status: 400 }
-            );
-        }
-
-        const { searchParams } = new URL(request.url);
-        const lms = searchParams.get('lms') ?? credentials.lmsProvider;
-        
-        // Create LMS provider with user's specific credentials
-        const lmsFactory = new LMSFactory(credentials.apiBaseUrl, credentials.apiKey);
-        const lmsProvider = lmsFactory.createLMSProvider(lms);
-
-        console.log('Fetching courses from LMS provider');
-        const courses = await lmsProvider.getCourses();
-        return NextResponse.json(courses);
+        // Fallback: LMS provider functionality needs to be implemented
+        return NextResponse.json(
+            { error: "User credentials functionality needs to be implemented" },
+            { status: 501 }
+        );
     } catch (error) {
         console.error('Error in courses API:', error);
         return NextResponse.json(

@@ -5,17 +5,17 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Loader2, FileSliders, AlertCircle, Download, Maximize2, Minimize2 } from "lucide-react"
-import { FileDetails } from "@/lib/types/course"
+import { File } from "@/lib/types/course"
 import PDFViewer from "./pdf-viewer"
 import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer"
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'
 
-export default function PPTXViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
+export default function PPTXViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions }: { fileDetails: File, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [isConverting, setIsConverting] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [convertedPdfUrl, setConvertedPdfUrl] = useState<string | null>(null)
-  const [pdfFileDetails, setPdfFileDetails] = useState<FileDetails | null>(null)
+  const [pdfFileDetails, setPdfFileDetails] = useState<File | null>(null)
   const [showFallback, setShowFallback] = useState(false)
   const [zenMode, setZenMode] = useState(false)
 
@@ -62,11 +62,11 @@ export default function PPTXViewer({ fileDetails, courseId, onTogglePanelVisibil
         setConvertedPdfUrl(pdfUrl)
 
         // Create FileDetails for the PDF viewer
-        const pdfDetails: FileDetails = {
+        const pdfDetails: File = {
           ...fileDetails,
-          name: fileDetails.name.replace(/\.pptx?$/i, '.pdf'),
+          displayName: fileDetails.displayName.replace(/\.pptx?$/i, '.pdf'),
           url: pdfUrl,
-          type: 'application/pdf'
+          contentType: 'application/pdf'
         }
         setPdfFileDetails(pdfDetails)
 
@@ -103,8 +103,8 @@ export default function PPTXViewer({ fileDetails, courseId, onTogglePanelVisibil
 
   const handleDownload = () => {
     const link = document.createElement("a")
-    link.href = fileDetails.url
-    link.download = fileDetails.name
+    link.href = fileDetails.url || ''
+    link.download = fileDetails.displayName
     link.click()
   }
 
@@ -174,9 +174,9 @@ export default function PPTXViewer({ fileDetails, courseId, onTogglePanelVisibil
                   <DocViewer
                     key={`pptx-fallback-${fileDetails.url}`}
                     documents={[{
-                      uri: fileDetails.url,
-                      fileName: fileDetails.name,
-                      fileType: fileDetails.name.split('.').pop()?.toLowerCase() || 'pptx'
+                      uri: fileDetails.url || '',
+                      fileName: fileDetails.displayName,
+                      fileType: fileDetails.displayName.split('.').pop()?.toLowerCase() || 'pptx'
                     }]}
                     pluginRenderers={DocViewerRenderers}
                     config={{

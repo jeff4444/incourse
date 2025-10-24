@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromRequest, getUserCredentials } from "@/lib/utils/userCredentials";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from "@/lib/utils/supabase/server";
 import { LMSFactory } from "@/lib/api";
 import LMSProvider from "@/lib/lms/lms-provider";
 
 const supabase = await createClient();
+
+interface ResyncRequest {
+  apiKey: string;
+  apiBaseUrl: string;
+}
 
 interface SyncEvent {
   type: 'progress' | 'error' | 'done';
@@ -331,11 +336,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user credentials
-    const credentials = await getUserCredentials(userData.userId, userData.accessToken);
-    if (!credentials) {
+    // Get credentials from request body
+    const body: ResyncRequest = await request.json();
+    const { apiKey, apiBaseUrl } = body;
+
+    if (!apiKey || !apiBaseUrl) {
       return NextResponse.json(
-        { error: "No LMS credentials found. Please add your LMS token first." },
+        { error: "apiKey and apiBaseUrl are required" },
         { status: 400 }
       );
     }
@@ -418,8 +425,8 @@ export async function POST(request: NextRequest) {
             status: 'loading'
           })));
 
-          const lmsFactory = new LMSFactory(credentials.apiBaseUrl, credentials.apiKey);
-          const lmsProvider = lmsFactory.createLMSProvider(credentials.lmsProvider);
+          const lmsFactory = new LMSFactory(apiBaseUrl, apiKey);
+          const lmsProvider = lmsFactory.createLMSProvider('canvas');
           
           let courses;
           try {

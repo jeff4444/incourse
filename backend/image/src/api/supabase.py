@@ -7,7 +7,6 @@ import os
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from shared.utils.supabase_utils import decrypt_api_key
 
 load_dotenv()
 

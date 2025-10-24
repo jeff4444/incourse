@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 import { createClient } from "@/lib/utils/supabase/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
@@ -32,13 +31,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             );
         }
 
-        // Create LMS provider with user credentials
-        const result = await createLMSProviderWithUserCredentials(request, course.lms_provider);
-        if (result instanceof NextResponse) {
-            return result; // Return error response
-        }
-
-        const { lmsProvider } = result;
 
         // Query by database ID
         const { data: dbDiscussion, error: dbError } = await supabase

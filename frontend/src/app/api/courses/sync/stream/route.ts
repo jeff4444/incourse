@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { LMSFactory } from "@/lib/api";
 import { createClient } from "@/lib/utils/supabase/server";
-import { Course, Module, ModuleItem } from "@/lib/types/course";
 import LMSProvider from "@/lib/lms/lms-provider";
+import { validateCanvasToken } from "@/lib/utils/validateCanvasToken";
 
 // Server-side Supabase client with service role for bypassing RLS when needed
 const supabase = await createClient();
@@ -409,14 +409,38 @@ export async function POST(request: NextRequest) {
           // Emit initial progress
           controller.enqueue(encoder.encode(createSSEEvent({
             type: 'progress',
-            stage: 'Connecting to Canvas',
+            stage: 'Validating token',
             status: 'loading'
+          })));
+
+          // Validate token first
+          const isValid = await validateCanvasToken(apiKey, apiBaseUrl);
+          if (!isValid) {
+            controller.enqueue(encoder.encode(createSSEEvent({
+              type: 'error',
+              stage: 'Token validation failed',
+              status: 'error',
+              detail: 'Invalid Canvas API token'
+            })));
+            return;
+          }
+
+          controller.enqueue(encoder.encode(createSSEEvent({
+            type: 'progress',
+            stage: 'Validating token',
+            status: 'complete'
           })));
 
           // Create LMS provider and fetch courses
           const lmsFactory = new LMSFactory(apiBaseUrl, apiKey);
           const lmsProvider = lmsFactory.createLMSProvider('canvas');
           
+          controller.enqueue(encoder.encode(createSSEEvent({
+            type: 'progress',
+            stage: 'Connecting to Canvas',
+            status: 'loading'
+          })));
+
           controller.enqueue(encoder.encode(createSSEEvent({
             type: 'progress',
             stage: 'Connecting to Canvas',

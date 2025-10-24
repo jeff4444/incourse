@@ -39,7 +39,7 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
     if (!searchQuery.trim()) return fileItems;
     const query = searchQuery.toLowerCase();
     return fileItems.filter((file) =>
-      file.displayName.toLowerCase().includes(query) || file.moduleItemId ? modules.find((module) => module.id === file.moduleItemId)?.name.toLowerCase().includes(query) : false
+      file.displayName.toLowerCase().includes(query)
     );
   }, [fileItems, searchQuery]);
 
@@ -115,19 +115,19 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          {selectedFileIds.length} of {allFiles.length} selected
+          {selectedFileIds.length} of {filteredFiles.length} selected
         </p>
       </div>
 
       {/* File List */}
       <div className="border rounded-lg max-h-[400px] overflow-y-auto">
-        {allFiles.length === 0 ? (
+        {filteredFiles.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <p>No files match your search.</p>
           </div>
         ) : (
           <div className="divide-y">
-            {allFiles.map((file) => {
+            {filteredFiles.map((file) => {
               const fileId = file.id;
               const isSelected = fileId ? selectedFileIds.includes(fileId) : false;
               

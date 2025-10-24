@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 import { createClient } from "@/lib/utils/supabase/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { Module } from "@/lib/types/course";
@@ -97,16 +96,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             );
         }
 
-        // Create LMS provider with user credentials
-        const result = await createLMSProviderWithUserCredentials(request, course.lms_provider);
-        if (result instanceof NextResponse) {
-            return result; // Return error response
-        }
-
-        const { lmsProvider } = result;
-        console.log('Fetching modules from LMS provider');
-        const modules = await lmsProvider.getCourseModules(course.lms_id);
-        return NextResponse.json(modules);
+        // LMS provider fallback functionality needs to be implemented
+        return NextResponse.json(
+            { error: "LMS provider functionality needs to be implemented" },
+            { status: 501 }
+        );
     } catch (error) {
         console.error('Error in modules API:', error);
         return NextResponse.json(

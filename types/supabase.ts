@@ -686,47 +686,6 @@ export type Database = {
           },
         ]
       }
-      user_api_keys: {
-        Row: {
-          api_base_url: string | null
-          created_at: string
-          encrypted_api_key: string
-          id: string
-          is_active: boolean | null
-          lms_provider: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          api_base_url?: string | null
-          created_at?: string
-          encrypted_api_key: string
-          id?: string
-          is_active?: boolean | null
-          lms_provider: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          api_base_url?: string | null
-          created_at?: string
-          encrypted_api_key?: string
-          id?: string
-          is_active?: boolean | null
-          lms_provider?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_api_keys_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       users: {
         Row: {
           created_at: string
