@@ -261,7 +261,7 @@ function DashboardPage() {
                             value={`item-${activity.id}`}
                             className="border-b border-gray-200"
                           >
-                            <AccordionTrigger className="hover:bg-accent/50 transition-colors px-4 py-3">
+                            <AccordionTrigger className="hover:bg-accent/50 transition-colors py-3">
                               <div className="flex items-center gap-3 text-left">
                                 <div
                                   className={`rounded-full p-2 ${colors.bg} ${colors.text}`}
@@ -278,7 +278,7 @@ function DashboardPage() {
                                 </div>
                               </div>
                             </AccordionTrigger>
-                            <AccordionContent className="px-4 pb-4">
+                            <AccordionContent className="pb-4 pl-12">
                               <div className="space-y-3 text-sm">
                                 {activity.type === "quiz_completion" && (
                                   <>
