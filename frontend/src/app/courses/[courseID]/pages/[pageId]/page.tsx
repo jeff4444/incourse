@@ -7,9 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BackButtonClient } from "@/components/back-button-client";
 import { ExternalLink, FileText, Calendar } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { usePage } from "@/lib/hooks/usePages";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
-import { DiscussionTopic, File, Page } from "@/lib/types/course";
+import { File, Page } from "@/lib/types/course";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
 async function transformCanvasFileUrls(html: string, courseID: string): Promise<string> {

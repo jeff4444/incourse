@@ -9,17 +9,38 @@ import { BackButtonClient } from "@/components/back-button-client";
 import { Calendar, ExternalLink, FileText, Lock, CheckCircle, Clock } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
-import { Assignment } from "@/lib/types/course";
+import { Assignment, File } from "@/lib/types/course";
 
 // Utility function to transform Canvas file URLs to our autograder URLs
-function transformCanvasFileUrls(html: string, courseID: string): string {
+async function transformCanvasFileUrls(html: string, courseID: string): Promise<string> {
   if (!html) return html;
   
   // Regex to match Canvas file URLs: https://{domain}/courses/{courseId}/files/{fileId}
   const canvasFileUrlRegex = /https:\/\/[^\/]+\/courses\/\d+\/files\/(\d+)/g;
   
-  let transformedHtml = html.replace(canvasFileUrlRegex, (match, fileId) => {
-    return `/courses/${courseID}/autograder/${fileId}`;
+  // Find all file IDs in the HTML
+  const fileIds = Array.from(html.matchAll(canvasFileUrlRegex)).map(match => match[1]);
+  
+  // Create a map of lmsId -> databaseId
+  const fileIdMap = new Map<string, string>();
+  
+  // Fetch file data for each lmsId
+  for (const lmsId of fileIds) {
+    try {
+      const response = await authenticatedFetchJson<File>(`/api/courses/${courseID}/files/by-lms-id/${lmsId}`);
+      fileIdMap.set(lmsId, response.id || '');
+    } catch (error) {
+      console.error(`Failed to fetch file data for lmsId ${lmsId}:`, error);
+    }
+  }
+  
+  let transformedHtml = html.replace(canvasFileUrlRegex, (match, lmsId) => {
+    const databaseId = fileIdMap.get(lmsId);
+    if (databaseId) {
+      return `/courses/${courseID}/autograder/${databaseId}`;
+    }
+    // Fallback to original URL if we couldn't find the database ID
+    return match;
   });
   
   // Remove target="_blank" from all links to make them open in current tab
@@ -38,6 +59,7 @@ function AssignmentDetailPage({
   const [error, setError] = useState<string | null>(null);
   const [courseID, setCourseID] = useState<string>("");
   const [assignmentID, setAssignmentID] = useState<string>("");
+  const [transformedDescription, setTransformedDescription] = useState<string>("");
 
   useEffect(() => {
     const getParams = async () => {
@@ -47,6 +69,17 @@ function AssignmentDetailPage({
     };
     getParams();
   }, [params]);
+
+  useEffect(() => {
+    if (assignment?.description && courseID) {
+      transformCanvasFileUrls(assignment.description, courseID)
+        .then(setTransformedDescription)
+        .catch(error => {
+          console.error('Error transforming assignment description:', error);
+          setTransformedDescription(assignment.description || "");
+        });
+    }
+  }, [assignment, courseID]);
 
   useEffect(() => {
     if (!courseID || !assignmentID) return;
@@ -117,7 +150,7 @@ function AssignmentDetailPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
         <div className="container mx-auto py-6 px-4 md:px-6">
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
@@ -130,7 +163,7 @@ function AssignmentDetailPage({
 
   if (error || !assignment) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
         <div className="container mx-auto py-6 px-4 md:px-6">
           <BackButtonClient />
           <div className="text-center text-red-500 mt-8">
@@ -144,10 +177,9 @@ function AssignmentDetailPage({
 
   const assignmentStatus = getAssignmentStatus();
   const submissionStatus = getSubmissionStatus();
-  const transformedDescription = transformCanvasFileUrls(assignment.description || "", courseID);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <div className="container mx-auto py-6 px-4 md:px-6">
         <BackButtonClient />
         
@@ -216,7 +248,7 @@ function AssignmentDetailPage({
                 <div 
                   className="prose prose-gray max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground [&_a]:text-blue-600 [&_a]:underline hover:[&_a]:text-blue-800"
                   dangerouslySetInnerHTML={{ 
-                    __html: transformedDescription 
+                    __html: transformedDescription || assignment.description
                   }}
                 />
               ) : (

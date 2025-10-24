@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LMSFactory } from "@/lib/api";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from "@/lib/utils/supabase/server";
-import { Assignment } from "@/lib/types/course";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ courseID: string }> }) {
   try {
@@ -32,11 +30,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    // TODO: Need to implement credential retrieval or pass credentials differently
-    return NextResponse.json(
-      { error: "User credentials functionality needs to be implemented" },
-      { status: 501 }
-    );
+    // Fetch assignments from database
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('course_id', courseID)
+      .order('due_at', { ascending: true, nullsFirst: false });
+
+    if (assignmentsError) {
+      return NextResponse.json(
+        { error: "Failed to fetch assignments", details: assignmentsError.message },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json(assignments || []);
   } catch (error) {
     console.error('Error fetching assignments:', error);
     return NextResponse.json(
