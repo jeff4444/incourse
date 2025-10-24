@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
+import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as dotenv from 'dotenv';
 
 // Load environment variables from .env file
@@ -66,21 +67,118 @@ export class BackendStack extends cdk.Stack {
         NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
         NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
         SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+        SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
       },
-    });
-  
-    const funcUrl = dockerFunc.addFunctionUrl({
-      authType: lambda.FunctionUrlAuthType.NONE,
-      cors: {
-        allowedOrigins: ['https://incourse-three.vercel.app'],
-        allowedMethods: [lambda.HttpMethod.ALL],
-        allowedHeaders: ['*'],
-      },
-      invokeMode: lambda.InvokeMode.RESPONSE_STREAM, // Enable streaming
     });
 
-    new cdk.CfnOutput(this, 'FuncUrlValue', {
-      value: funcUrl.url,
+    // Create Lambda authorizer for JWT validation
+    const authorizerFunc = new lambda.Function(this, 'AuthorizerFunc', {
+      runtime: lambda.Runtime.NODEJS_18_X,
+      handler: 'index.handler',
+      code: lambda.Code.fromAsset('./lib/authorizer'),
+      environment: {
+        SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET || '',
+      },
+    });
+
+    // Create API Gateway
+    const api = new apigateway.RestApi(this, 'InCourseApi', {
+      restApiName: 'InCourse API',
+      description: 'API for InCourse AI agents',
+      defaultCorsPreflightOptions: {
+        allowOrigins: ['https://incourse-three.vercel.app'],
+        allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowHeaders: ['Content-Type', 'Authorization'],
+        allowCredentials: true,
+      },
+    });
+
+    // Create Lambda authorizer
+    const authorizer = new apigateway.TokenAuthorizer(this, 'JwtAuthorizer', {
+      handler: authorizerFunc,
+      identitySource: 'method.request.header.Authorization',
+      authorizerName: 'JwtAuthorizer',
+    });
+
+    // Create Lambda integration
+    const lambdaIntegration = new apigateway.LambdaIntegration(dockerFunc, {
+      requestTemplates: { 'application/json': '{ "statusCode": "200" }' },
+    });
+
+    // Add API routes with authentication
+    const chatResource = api.root.addResource('chat');
+    chatResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const chatStreamResource = chatResource.addResource('stream');
+    chatStreamResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const generateFlashcardsResource = api.root.addResource('generate-flashcards');
+    generateFlashcardsResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const generateQuizResource = api.root.addResource('generate-quiz');
+    generateQuizResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const generateNudgesResource = api.root.addResource('generate-nudges');
+    generateNudgesResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const takeActionResource = api.root.addResource('take-action');
+    takeActionResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const gradeAssignmentResource = api.root.addResource('grade-assignment');
+    gradeAssignmentResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const agentsResource = api.root.addResource('agents');
+    const notesResource = agentsResource.addResource('notes');
+    const addChatMessageResource = notesResource.addResource('add-chat-message');
+    addChatMessageResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    const convertOfficeResource = api.root.addResource('convert-office-to-pdf');
+    convertOfficeResource.addMethod('POST', lambdaIntegration, {
+      authorizer: authorizer,
+    });
+
+    // Health endpoint without authentication
+    const healthResource = api.root.addResource('health');
+    healthResource.addMethod('GET', lambdaIntegration);
+
+    // Create usage plan for rate limiting
+    const usagePlan = api.addUsagePlan('UsagePlan', {
+      name: 'InCourse Usage Plan',
+      throttle: {
+        rateLimit: 100, // requests per second
+        burstLimit: 200, // burst capacity
+      },
+      quota: {
+        limit: 10000, // requests per day
+        period: apigateway.Period.DAY,
+      },
+    });
+
+    // Associate usage plan with the API stage
+    usagePlan.addApiStage({
+      stage: api.deploymentStage,
+    });
+
+    // Output the API Gateway URL
+    new cdk.CfnOutput(this, 'ApiGatewayUrl', {
+      value: api.url,
+      description: 'API Gateway URL for the InCourse backend',
     });
   }
 }

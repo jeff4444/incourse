@@ -12,3 +12,5 @@ pinecone
 supabase
 pycryptodomex
 openai
+PyJWT
+cryptography
