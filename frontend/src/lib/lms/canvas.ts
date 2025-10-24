@@ -79,6 +79,7 @@ class CanvasProvider extends LMSProvider {
       description: courseData.description || null,
       semester: courseSemester,
       year: courseYear,
+      calendar: courseData.calendar?.ics || null,
     };
     return course;
   }

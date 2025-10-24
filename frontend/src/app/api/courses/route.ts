@@ -33,7 +33,8 @@ export async function GET(request: NextRequest) {
                         instructor,
                         description,
                         semester,
-                        year
+                        year,
+                        calendar
                     )
                 `)
                 .eq('user_id', userData.userId);

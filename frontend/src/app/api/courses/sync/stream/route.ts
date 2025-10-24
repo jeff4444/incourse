@@ -613,6 +613,7 @@ export async function POST(request: NextRequest) {
                   description: course.description,
                   semester: course.semester,
                   year: course.year,
+                  calendar: course.calendar,
                 }, {
                   onConflict: 'lms_id,lms_provider',
                   ignoreDuplicates: false, // Update existing records
