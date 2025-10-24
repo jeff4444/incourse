@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -17,175 +17,69 @@ import { CalendarWeek } from "@/components/calendar-week";
 import { CalendarDay } from "@/components/calendar-day";
 import { CalendarEvent } from "@/components/calendar-event";
 import { CalendarSidebar } from "@/components/calendar-sidebar";
+import { EventPopup } from "@/components/event-popup";
+import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { Course } from "@/lib/types/course";
+import { getCourseColor } from "@/lib/utils/courseColors";
+import { authenticatedFetchJson } from "@/lib/utils/apiClient";
+
+interface CalendarEvent {
+  id: string;
+  title: string;
+  date: Date;
+  endDate: Date;
+  courseId: string;
+  type: string;
+  courseName?: string;
+  courseCode?: string;
+  description?: string;
+  location?: string;
+}
 
 const CalendarPage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [showSidebar, setShowSidebar] = useState(true);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Sample courses data
-  const courses = [
-    {
-      id: "cs101",
-      name: "CS 101: Introduction to Computer Science",
-      color: "bg-blue-500",
-    },
-    {
-      id: "econ201",
-      name: "ECON 201: Macroeconomics",
-      color: "bg-green-500",
-    },
-    {
-      id: "psych110",
-      name: "PSYCH 110: Introduction to Psychology",
-      color: "bg-purple-500",
-    },
-  ];
+  // Fetch courses and events data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
-  // Sample events data
-  const events = [
-    {
-      id: "1",
-      title: "CS 101 Lecture",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        15,
-        10,
-        0
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        15,
-        11,
-        30
-      ),
-      courseId: "cs101",
-      type: "lecture",
-    },
-    {
-      id: "2",
-      title: "ECON 201 Quiz",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        16,
-        14,
-        0
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        16,
-        15,
-        0
-      ),
-      courseId: "econ201",
-      type: "quiz",
-    },
-    {
-      id: "3",
-      title: "PSYCH 110 Study Session",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        17,
-        16,
-        0
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        17,
-        18,
-        0
-      ),
-      courseId: "psych110",
-      type: "study",
-    },
-    {
-      id: "4",
-      title: "CS 101 Assignment Due",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        18,
-        23,
-        59
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        18,
-        23,
-        59
-      ),
-      courseId: "cs101",
-      type: "assignment",
-    },
-    {
-      id: "5",
-      title: "ECON 201 Lecture",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        15,
-        13,
-        0
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        15,
-        14,
-        30
-      ),
-      courseId: "econ201",
-      type: "lecture",
-    },
-    {
-      id: "6",
-      title: "AI-Suggested Study Time",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        currentDate.getDate(),
-        15,
-        0
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        currentDate.getDate(),
-        17,
-        0
-      ),
-      courseId: "cs101",
-      type: "ai-suggestion",
-    },
-    {
-      id: "7",
-      title: "PSYCH 110 Reading",
-      date: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        currentDate.getDate() + 1,
-        10,
-        0
-      ),
-      endDate: new Date(
-        currentDate.getFullYear(),
-        currentDate.getMonth(),
-        currentDate.getDate() + 1,
-        11,
-        30
-      ),
-      courseId: "psych110",
-      type: "reading",
-    },
-  ];
+        // Fetch courses
+        const coursesData: Course[] = await authenticatedFetchJson<Course[]>('/api/courses');
+        setCourses(coursesData);
+
+        // Fetch events
+        const eventsData = await authenticatedFetchJson<{ events: any[]; errors?: string[] }>('/api/calendar/events');
+        
+        // Transform events to include proper Date objects
+        const transformedEvents: CalendarEvent[] = eventsData.events.map((event: any) => ({
+          ...event,
+          date: new Date(event.date),
+          endDate: new Date(event.endDate),
+        }));
+        
+        setEvents(transformedEvents);
+      } catch (err) {
+        console.error('Error fetching calendar data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load calendar data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handlePrevious = () => {
     const newDate = new Date(currentDate);
@@ -215,10 +109,42 @@ const CalendarPage = () => {
     setCurrentDate(new Date());
   };
 
-  const getCourseColor = (courseId: string) => {
-    const course = courses.find((c) => c.id === courseId);
-    return course ? course.color : "bg-gray-500";
+  const getCourseColorForEvent = (courseId: string) => {
+    return getCourseColor(courseId);
   };
+
+  const handleEventClick = (event: CalendarEvent, clickEvent: React.MouseEvent) => {
+    const rect = clickEvent.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top;
+    
+    setSelectedEvent(event);
+    setPopupPosition({ x, y });
+  };
+
+  const handleClosePopup = () => {
+    setSelectedEvent(null);
+  };
+
+  if (loading) {
+    return <CalendarSkeleton />;
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+        <Navbar />
+        <main className="container mx-auto py-6 px-4 md:px-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Calendar</h2>
+              <p className="text-muted-foreground">{error}</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
@@ -272,86 +198,49 @@ const CalendarPage = () => {
                   <CalendarMonth
                     currentDate={currentDate}
                     events={events}
-                    getCourseColor={getCourseColor}
+                    getCourseColor={getCourseColorForEvent}
+                    onEventClick={handleEventClick}
                   />
                 )}
                 {view === "week" && (
                   <CalendarWeek
                     currentDate={currentDate}
                     events={events}
-                    getCourseColor={getCourseColor}
+                    getCourseColor={getCourseColorForEvent}
+                    onEventClick={handleEventClick}
                   />
                 )}
                 {view === "day" && (
                   <CalendarDay
                     currentDate={currentDate}
                     events={events}
-                    getCourseColor={getCourseColor}
+                    getCourseColor={getCourseColorForEvent}
+                    onEventClick={handleEventClick}
                   />
                 )}
               </CardContent>
             </Card>
 
-            {/* Today's Schedule */}
-            <Card className="shadow-md border-border/50">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-xl">Today&apos;s Schedule</CardTitle>
-                <CardDescription className="text-base">
-                  {new Date().toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                  })}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {events
-                    .filter(
-                      (event) =>
-                        event.date.getDate() === new Date().getDate() &&
-                        event.date.getMonth() === new Date().getMonth() &&
-                        event.date.getFullYear() === new Date().getFullYear()
-                    )
-                    .sort((a, b) => a.date.getTime() - b.date.getTime())
-                    .map((event) => (
-                      <CalendarEvent
-                        key={event.id}
-                        event={event}
-                        getCourseColor={getCourseColor}
-                      />
-                    ))}
-                  {events.filter(
-                    (event) =>
-                      event.date.getDate() === new Date().getDate() &&
-                      event.date.getMonth() === new Date().getMonth() &&
-                      event.date.getFullYear() === new Date().getFullYear()
-                  ).length === 0 && (
-                    <div className="text-center py-12 text-muted-foreground">
-                      <div className="w-16 h-16 bg-muted rounded-full mx-auto mb-4 flex items-center justify-center">
-                        <span className="text-2xl">📅</span>
-                      </div>
-                      <p className="text-lg font-medium mb-2">
-                        No events scheduled for today
-                      </p>
-                      <p className="text-sm">
-                        Your day is free to plan as you wish
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
           </div>
 
           {/* Sidebar */}
           {showSidebar && (
             <div className="w-full lg:w-80">
-              <CalendarSidebar courses={courses} />
+              <CalendarSidebar events={events} />
             </div>
           )}
         </div>
       </main>
+
+      {/* Event Popup */}
+      {selectedEvent && (
+        <EventPopup
+          event={selectedEvent}
+          getCourseColor={getCourseColorForEvent}
+          position={popupPosition}
+          onClose={handleClosePopup}
+        />
+      )}
     </div>
   );
 };

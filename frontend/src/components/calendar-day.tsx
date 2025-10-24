@@ -11,12 +11,14 @@ interface CalendarDayProps {
     type: string;
   }>;
   getCourseColor: (courseId: string) => string;
+  onEventClick?: (event: any, clickEvent: React.MouseEvent) => void;
 }
 
 export function CalendarDay({
   currentDate,
   events,
   getCourseColor,
+  onEventClick,
 }: CalendarDayProps) {
   // Hours to display (7 AM to 9 PM)
   const hours = [];
@@ -111,6 +113,7 @@ export function CalendarDay({
                       className={`p-4 rounded-lg ${getCourseColor(
                         event.courseId
                       )} text-white shadow-md hover:shadow-lg transition-all cursor-pointer`}
+                      onClick={(e) => onEventClick?.(event, e)}
                     >
                       <div className="flex justify-between items-start mb-2">
                         <div className="font-semibold text-lg">
