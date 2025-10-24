@@ -170,7 +170,7 @@ function DashboardPage() {
             <div className="flex flex-col h-full">
               {/* Header with underline */}
               <div className="shrink-0">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-3">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
                   <Button variant="ghost" size="sm">
                     View All
