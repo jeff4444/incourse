@@ -13,7 +13,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
 import { createClient } from "@/lib/utils/supabase/client";
 import { SUPPORTED_SCHOOLS } from "@/constants/supported_schools";
-import { validateCanvasToken } from "@/lib/utils/validateCanvasToken";
 import {
   User,
   Key,
@@ -144,12 +143,6 @@ function ProfilePage() {
       const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
       if (!schoolConfig) {
         throw new Error("School not supported");
-      }
-
-      // Validate token first
-      const isValid = await validateCanvasToken(resyncApiKey, `${schoolConfig.api_url}/api/v1`);
-      if (!isValid) {
-        throw new Error("Invalid Canvas API token");
       }
 
       // Use streaming API endpoint with token

@@ -64,7 +64,7 @@ async function syncModuleItems(
     const newItemMap = new Map<string, typeof newModuleItems[0]>();
     for (const item of newModuleItems) {
       if (item.lmsId) {
-        newItemMap.set(item.lmsId, item);
+        newItemMap.set(String(item.lmsId), item);
       }
     }
 
@@ -204,12 +204,12 @@ async function syncModulesForCourse(
 
     // Fetch modules from LMS
     const modules = await lmsProvider.getCourseModules(courseLmsId);
-
+    
     // Create a map of new modules
     const newModuleMap = new Map<string, typeof modules[0]>();
     for (const module of modules) {
       if (module.lmsId) {
-        newModuleMap.set(module.lmsId, module);
+        newModuleMap.set(String(module.lmsId), module);
       }
     }
 
