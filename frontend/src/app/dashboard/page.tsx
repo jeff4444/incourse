@@ -179,10 +179,10 @@ function DashboardPage() {
                 <div className="flex items-center gap-3 text-sm">
                   <button
                     onClick={() => setActivityFilter("all")}
-                    className={`px-2 py-1 rounded transition-colors ${
+                    className={`px-3 py-1.5 rounded-md transition-colors ${
                       activityFilter === "all"
-                        ? "font-semibold text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "font-semibold text-foreground bg-gray-100"
+                        : "text-muted-foreground hover:bg-gray-100"
                     }`}
                   >
                     All
@@ -190,10 +190,10 @@ function DashboardPage() {
                   <Separator orientation="vertical" className="h-5" />
                   <button
                     onClick={() => setActivityFilter("quizzes")}
-                    className={`px-2 py-1 rounded transition-colors ${
+                    className={`px-3 py-1.5 rounded-md transition-colors ${
                       activityFilter === "quizzes"
-                        ? "font-semibold text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "font-semibold text-foreground bg-gray-100"
+                        : "text-muted-foreground hover:bg-gray-100"
                     }`}
                   >
                     Quizzes
@@ -201,10 +201,10 @@ function DashboardPage() {
                   <Separator orientation="vertical" className="h-5" />
                   <button
                     onClick={() => setActivityFilter("summaries")}
-                    className={`px-2 py-1 rounded transition-colors ${
+                    className={`px-3 py-1.5 rounded-md transition-colors ${
                       activityFilter === "summaries"
-                        ? "font-semibold text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "font-semibold text-foreground bg-gray-100"
+                        : "text-muted-foreground hover:bg-gray-100"
                     }`}
                   >
                     Summaries
@@ -212,10 +212,10 @@ function DashboardPage() {
                   <Separator orientation="vertical" className="h-5" />
                   <button
                     onClick={() => setActivityFilter("flashcards")}
-                    className={`px-2 py-1 rounded transition-colors ${
+                    className={`px-3 py-1.5 rounded-md transition-colors ${
                       activityFilter === "flashcards"
-                        ? "font-semibold text-foreground"
-                        : "text-muted-foreground hover:text-foreground"
+                        ? "font-semibold text-foreground bg-gray-100"
+                        : "text-muted-foreground hover:bg-gray-100"
                     }`}
                   >
                     Flashcards
