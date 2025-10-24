@@ -3,12 +3,6 @@
 import { useState } from "react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-} from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import {
   Accordion,
@@ -170,18 +164,19 @@ function DashboardPage() {
         </div>
 
         {/* Main Content - Side by Side Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1 min-h-0">
+        <div className="flex flex-col md:flex-row gap-0 flex-1 min-h-0">
           {/* Recent Activity */}
-          <div className="w-full h-full">
-            <Card className="shadow-sm border-border/50 pb-0 h-full flex flex-col bg-[#F5F5F5]!">
-              <CardHeader className="pb-3 shrink-0">
-                <div className="flex justify-between items-center">
+          <div className="w-full md:flex-1 md:min-h-0 flex flex-col">
+            <div className="flex flex-col h-full">
+              {/* Header with underline */}
+              <div className="pb-3 shrink-0 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
                   <Button variant="ghost" size="sm">
                     View All
                   </Button>
                 </div>
-                <div className="flex items-center gap-3 text-sm mt-4">
+                <div className="flex items-center gap-3 text-sm">
                   <button
                     onClick={() => setActivityFilter("all")}
                     className={`px-2 py-1 rounded transition-colors ${
@@ -226,8 +221,10 @@ function DashboardPage() {
                     Flashcards
                   </button>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0 flex-1 flex flex-col">
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 flex flex-col mt-4">
                 <div className="flex-1 overflow-y-auto">
                   {activitiesLoading ? (
                     <div className="p-4 text-center text-muted-foreground">
@@ -507,8 +504,10 @@ function DashboardPage() {
                     </Accordion>
                   )}
                 </div>
-              </CardContent>
-              <CardFooter className="border-t bg-muted/50 p-3 [.border-t]:pt-3 shrink-0">
+              </div>
+
+              {/* Footer */}
+              <div className="border-t border-gray-200 pt-3 mt-4 shrink-0">
                 <div className="flex justify-between items-center w-full text-xs md:text-sm">
                   <div className="flex items-center">
                     <Clock className="mr-2 h-4 w-4 text-muted-foreground" />
@@ -532,25 +531,34 @@ function DashboardPage() {
                     />
                   </Button>
                 </div>
-              </CardFooter>
-            </Card>
+              </div>
+            </div>
           </div>
 
+          {/* Separator - Only on desktop */}
+          <Separator
+            orientation="vertical"
+            className="hidden md:block mx-4 h-auto bg-[#fbfcf8]"
+          />
+
           {/* Smart Nudges */}
-          <div className="w-full h-full">
-            <Card className="shadow-sm border-border/50 h-full flex flex-col bg-[#F5F5F5]!">
-              <CardHeader className="pb-3 shrink-0">
-                <div className="flex justify-between items-center">
+          <div className="w-full md:flex-1 flex flex-col mt-8 md:mt-0">
+            <div className="flex flex-col h-full">
+              {/* Header with underline */}
+              <div className="pb-3 shrink-0 border-b border-gray-200">
+                <div className="flex justify-between items-center mb-2">
                   <h2 className="text-xl font-semibold">Smart Nudges</h2>
                   <Button variant="ghost" size="sm">
                     Mark All Read
                   </Button>
                 </div>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-sm text-muted-foreground">
                   Your personalized learning recommendations
                 </p>
-              </CardHeader>
-              <CardContent className="flex-1 flex flex-col p-0">
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 flex flex-col mt-4">
                 <div className="flex-1 overflow-y-auto">
                   {nudges.length > 0 ? (
                     <div className="space-y-3 p-4">
@@ -568,8 +576,8 @@ function DashboardPage() {
                     </div>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </div>
         </div>
       </div>

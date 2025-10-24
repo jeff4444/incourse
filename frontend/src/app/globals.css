@@ -138,7 +138,7 @@
 
 /* Override sidebar background to match cards */
 [data-sidebar="sidebar"] {
-  background-color: #f5f5f5 !important;
+  background-color: #fbfcf8 !important;
 }
 
 /* Override border colors to #FAFAFA */
