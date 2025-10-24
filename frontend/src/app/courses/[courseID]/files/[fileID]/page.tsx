@@ -259,7 +259,7 @@ function FileViewPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen px-5 pt-5 bg-linear-to-br from-orange-50 to-pink-50">
         <div className="flex items-center gap-2 mb-6">
           <BackButtonClient />
           <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
@@ -276,7 +276,7 @@ function FileViewPage({
 
   if (error || !fileDetails) {
     return (
-      <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen px-5 pt-5 bg-linear-to-br from-orange-50 to-pink-50">
         <div className="flex items-center gap-2 mb-2">
           <BackButtonClient />
           <h1 className="text-xl font-semibold">Error</h1>
@@ -290,7 +290,7 @@ function FileViewPage({
   }
 
   return (
-    <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen px-5 pt-5 bg-linear-to-br from-orange-50 to-pink-50">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <BackButtonClient />
@@ -321,7 +321,7 @@ function FileViewPage({
                 onClick={stopTracking}
                 className="flex items-center gap-2 bg-red-600 hover:bg-red-700 text-white overflow-hidden transition-all duration-700 ease-out w-8 group-hover:w-36"
               >
-                <Square className="h-4 w-4 flex-shrink-0" />
+                <Square className="h-4 w-4 shrink-0" />
                 <span className="whitespace-nowrap hidden group-hover:inline-block transition-all duration-500 ease-out delay-200">
                   End Zen Mode
                 </span>

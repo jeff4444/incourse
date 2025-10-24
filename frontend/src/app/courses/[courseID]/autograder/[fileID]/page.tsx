@@ -8,44 +8,38 @@ import DOCXViewer from "@/components/docx-viewer";
 import ImageViewer from "@/components/image-viewer";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, FileCheck } from "lucide-react";
-import { FileDetails } from "@/lib/types/course";
+import { File } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { AutograderPanel } from "@/components/autograder-panel";
 
-function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean) {
+function getViewer(fileDetails: File, courseID?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean) {
   // PDF files
-  if (fileDetails.type === "application/pdf" || fileDetails.contentType === "application/pdf") {
+  if (fileDetails.contentType === "application/pdf") {
     return <PDFViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // PowerPoint files
-  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-      fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-      fileDetails.type === "application/vnd.ms-powerpoint" ||
+  if (fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       fileDetails.contentType === "application/vnd.ms-powerpoint") {
     return <PPTXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Excel files
-  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      fileDetails.type === "application/vnd.ms-excel" ||
+  if (fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
       fileDetails.contentType === "application/vnd.ms-excel") {
     return <XLSXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Word files
-  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      fileDetails.type === "application/msword" ||
+  if (fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       fileDetails.contentType === "application/msword") {
     return <DOCXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Image files
-  if (fileDetails.type.startsWith("image/") || fileDetails.contentType?.startsWith("image/")) {
+  if (fileDetails.contentType?.startsWith("image/")) {
     return <ImageViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
@@ -55,7 +49,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVis
       <div className="max-w-md mx-auto">
         <h2 className="text-xl font-semibold mb-2">Unsupported File Type</h2>
         <p className="text-gray-600 mb-4">
-          The file type "{fileDetails.type}" is not currently supported for viewing.
+          The file type "{fileDetails.contentType}" is not currently supported for viewing.
         </p>
         <p className="text-sm text-gray-500 mb-4">
           Supported formats: PDF, PowerPoint (PPTX/PPT), Excel (XLSX/XLS), Word (DOCX/DOC), Images (JPEG, PNG, GIF, WebP)
@@ -63,8 +57,8 @@ function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVis
         <Button 
           onClick={() => {
             const link = document.createElement("a");
-            link.href = fileDetails.url;
-            link.download = fileDetails.name;
+            link.href = fileDetails.url || '';
+            link.download = fileDetails.displayName || '';
             link.click();
           }}
           variant="outline"
@@ -83,7 +77,7 @@ function AutograderPage({
 }) {
   const [fileID, setFileID] = useState<string>("");
   const [courseID, setCourseID] = useState<string>("");
-  const [fileDetails, setFileDetails] = useState<FileDetails | null>(null);
+  const [fileDetails, setFileDetails] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showFeedbackPanel, setShowFeedbackPanel] = useState(true);
@@ -103,7 +97,7 @@ function AutograderPage({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await authenticatedFetchJson<FileDetails>(`/api/courses/${courseID}/files/${fileID}`);
+        const data = await authenticatedFetchJson<File>(`/api/courses/${courseID}/files/${fileID}`);
         setFileDetails(data);
       } catch (error) {
         console.error('Error fetching file details:', error);
@@ -118,7 +112,7 @@ function AutograderPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen px-5 pt-5 bg-linear-to-br from-orange-50 to-pink-50">
         <div className="flex items-center gap-2 mb-6">
           <BackButtonClient />
           <div className="h-6 w-48 bg-gray-200 rounded animate-pulse"></div>
@@ -135,7 +129,7 @@ function AutograderPage({
 
   if (error || !fileDetails) {
     return (
-      <div className="min-h-screen px-5 pt-5 bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen px-5 pt-5 bg-linear-to-br from-orange-50 to-pink-50">
         <div className="flex items-center gap-2 mb-2">
           <BackButtonClient />
           <h1 className="text-xl font-semibold">Error</h1>
@@ -149,11 +143,11 @@ function AutograderPage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <div className="flex items-center justify-between px-5 pt-5 mb-2">
         <div className="flex items-center gap-2">
           <BackButtonClient />
-          <h1 className="text-xl font-semibold">{fileDetails.name} - Autograder</h1>
+          <h1 className="text-xl font-semibold">{fileDetails.displayName} - Autograder</h1>
         </div>
         
         {/* Feedback Panel Toggle */}
@@ -183,7 +177,7 @@ function AutograderPage({
           <AutograderPanel 
             courseId={courseID}
             fileId={fileID}
-            assignmentName={fileDetails.name}
+            assignmentName={fileDetails.displayName || ''}
           />
         )}
       </div>

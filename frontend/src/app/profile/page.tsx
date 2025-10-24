@@ -283,7 +283,7 @@ function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
       <main className="container mx-auto py-6 px-4 md:px-6">
         <div className="max-w-4xl mx-auto">
@@ -311,9 +311,9 @@ function ProfilePage() {
               }`}
             >
               {message.type === "success" ? (
-                <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
               ) : (
-                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <AlertCircle className="h-5 w-5 shrink-0" />
               )}
               <p className="text-sm font-medium">{message.text}</p>
             </motion.div>
@@ -401,7 +401,7 @@ function ProfilePage() {
                       <Button
                         onClick={handleUpdateProfile}
                         disabled={isLoading}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
                         {isLoading ? (
                           <>
@@ -503,7 +503,7 @@ function ProfilePage() {
                       <Button
                         onClick={handleResyncEnrollments}
                         disabled={isSyncing || !resyncApiKey.trim()}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
                         {isSyncing ? (
                           <>
@@ -536,7 +536,7 @@ function ProfilePage() {
                         
                         {/* Course Progress Counter */}
                         {courseProgress.total > 0 && (
-                          <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
+                          <div className="mt-4 p-3 bg-linear-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-gray-700">Course Progress</span>
                               <span className="text-sm text-gray-600">
@@ -545,7 +545,7 @@ function ProfilePage() {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <motion.div
-                                className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
+                                className="bg-linear-to-r from-orange-500 to-pink-500 h-2 rounded-full"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
                                 transition={{ duration: 0.5 }}
@@ -628,7 +628,7 @@ function ProfilePage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="mt-6"
                           >
-                            <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                            <div className="bg-linear-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
                               <div className="flex items-center gap-2 mb-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
                                 <p className="font-medium text-green-800">Resync Complete!</p>
@@ -758,7 +758,7 @@ function ProfilePage() {
                     <div className="pt-6 border-t mt-6">
                       <Button
                         onClick={() => setMessage({ type: "success", text: "Preferences saved!" })}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
                         Save Preferences
                       </Button>

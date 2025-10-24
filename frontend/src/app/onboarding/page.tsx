@@ -338,7 +338,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-linear-to-br from-orange-50 to-pink-50">
       {/* Syncing Modal Overlay */}
       <AnimatePresence>
         {isSyncing && (
@@ -359,7 +359,7 @@ export default function OnboardingPage() {
                   <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
                   <Sparkles className="h-6 w-6 text-pink-500 absolute -top-1 -right-1" />
                 </div>
-                <h2 className="text-2xl font-bold mt-4 bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+                <h2 className="text-2xl font-bold mt-4 bg-linear-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
                   Setting up your account
                 </h2>
                 <p className="text-gray-600 text-center mt-2">
@@ -368,7 +368,7 @@ export default function OnboardingPage() {
                 
                 {/* Course Progress Counter */}
                 {courseProgress.total > 0 && (
-                  <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-linear-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">Course Progress</span>
                       <span className="text-sm text-gray-600">
@@ -377,7 +377,7 @@ export default function OnboardingPage() {
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <motion.div
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 h-2 rounded-full"
                         initial={{ width: 0 }}
                         animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
                         transition={{ duration: 0.5 }}
@@ -459,7 +459,7 @@ export default function OnboardingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="mt-6"
                 >
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                  <div className="bg-linear-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
                       <p className="font-medium text-green-800">Sync Complete!</p>
@@ -487,7 +487,7 @@ export default function OnboardingPage() {
           className="flex items-center gap-2 mb-8"
         >
           <Sparkles className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-linear-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
             InCourse
           </h1>
         </motion.div>
@@ -506,9 +506,9 @@ export default function OnboardingPage() {
                   animate={{ scale: 1 }}
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     step > index + 1
-                      ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white"
+                      ? "bg-linear-to-r from-orange-500 to-pink-500 text-white"
                       : step === index + 1
-                      ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white"
+                      ? "bg-linear-to-r from-orange-500 to-pink-500 text-white"
                       : "bg-gray-100 text-gray-400"
                   }`}
                 >
@@ -532,7 +532,7 @@ export default function OnboardingPage() {
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
             <motion.div
-              className="h-full bg-gradient-to-r from-orange-500 to-pink-500 rounded-full"
+              className="h-full bg-linear-to-r from-orange-500 to-pink-500 rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }}
               transition={{ duration: 0.5 }}
@@ -751,7 +751,7 @@ export default function OnboardingPage() {
                   <Button
                     onClick={nextStep}
                     disabled={isSyncing}
-                    className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                    className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                   >
                     {isSyncing ? (
                       <>

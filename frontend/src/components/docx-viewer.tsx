@@ -131,10 +131,10 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
   // If conversion failed, show fallback viewer
   if (showFallback && !isConverting) {
     return (
-      <div className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-gradient-to-br from-blue-50 to-indigo-50"}`}>
+      <div className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-linear-to-br from-blue-50 to-indigo-50"}`}>
         <div className={`flex ${zenMode ? "h-screen" : ""}`}>
           <div className={`transition-all duration-300 ${zenMode ? "w-full h-full" : "max-w-6xl mx-auto flex-1"}`}>
-            <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} flex-shrink-0 py-1`}>
+            <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} shrink-0 py-1`}>
               <CardContent className="flex items-center justify-between py-0">
                 <div className="flex items-center gap-2">
                   <span className={`text-sm ${zenMode ? "text-gray-300" : "text-gray-600"}`}>Word Document (Fallback Viewer)</span>
@@ -212,8 +212,8 @@ export default function DOCXViewer({ fileDetails, courseId, onTogglePanelVisibil
 
   // Otherwise render the conversion UI (loading or error)
   return (
-    <div className="max-h-screen bg-gradient-to-br from-blue-50 to-indigo-50">
-      <Card className="my-2 flex-shrink-0 py-1">
+    <div className="max-h-screen bg-linear-to-br from-blue-50 to-indigo-50">
+      <Card className="my-2 shrink-0 py-1">
         <CardContent className="flex items-center justify-between py-0">
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-600">Word Document</span>

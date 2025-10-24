@@ -103,7 +103,7 @@ function DiscussionTopicPage({
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
         <div className="container mx-auto py-6 px-4 md:px-6">
           <BackButtonClient />
           <div className="text-center py-8">
@@ -117,7 +117,7 @@ function DiscussionTopicPage({
 
   if (error || !discussionTopic) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
         <div className="container mx-auto py-6 px-4 md:px-6">
           <BackButtonClient />
           <div className="text-center text-red-500 mt-8">
@@ -142,7 +142,7 @@ function DiscussionTopicPage({
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <div className="container mx-auto py-6 px-4 md:px-6">
         <BackButtonClient />
         
