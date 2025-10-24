@@ -57,10 +57,9 @@ function ProfilePage() {
   const [email, setEmail] = useState("");
   const [schoolName, setSchoolName] = useState("");
 
-  // LMS Token data
-  const [newApiKey, setNewApiKey] = useState("");
-  const [hasExistingToken, setHasExistingToken] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  // Token input for resyncing
+  const [resyncApiKey, setResyncApiKey] = useState("");
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
 
   // Learning preferences
   const [learningMode, setLearningMode] = useState("balanced");
@@ -75,7 +74,6 @@ function ProfilePage() {
       setFullName(user.user_metadata?.full_name || "");
       setEmail(user.email || "");
       setSchoolName(user.user_metadata?.school_name || "");
-      fetchLMSTokenStatus();
     }
   }, [user]);
 
@@ -92,28 +90,6 @@ function ProfilePage() {
     }
   }, [syncProgress]);
 
-  const fetchLMSTokenStatus = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const response = await fetch('/api/user/lms-token', {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.apiKeys && data.apiKeys.length > 0) {
-          setHasExistingToken(true);
-          setLastUpdated(data.apiKeys[0].updated_at);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching LMS token status:', error);
-    }
-  };
 
   const updateSyncProgress = (stage: string, status: 'pending' | 'loading' | 'complete' | 'error', detail?: string) => {
     setSyncProgress(prev => {
@@ -127,13 +103,34 @@ function ProfilePage() {
     });
   };
 
-  const handleUpdateLMSToken = async () => {
-    if (!newApiKey.trim()) {
-      setMessage({ type: "error", text: "Please enter a valid API token" });
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadedFile(file);
+      // Read the file content to extract the token
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        // Extract token from the file content
+        const tokenMatch = content.match(/Token: (.+)/);
+        if (tokenMatch) {
+          setResyncApiKey(tokenMatch[1]);
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const handleResyncEnrollments = async () => {
+    // Validate token input
+    if (!resyncApiKey.trim()) {
+      setMessage({ type: "error", text: "Please enter your Canvas API token or upload the token file" });
       return;
     }
 
-    setIsLoading(true);
+    setIsSyncing(true);
+    setSyncProgress([]);
+    setCourseProgress({ current: 0, total: 0 });
     setMessage(null);
 
     try {
@@ -148,61 +145,17 @@ function ProfilePage() {
         throw new Error("School not supported");
       }
 
-      // Update LMS token
-      const response = await fetch('/api/user/lms-token', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          apiKey: newApiKey,
-          apiBaseUrl: `${schoolConfig.api_url}/api/v1`,
-          lmsProvider: 'canvas',
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update LMS token');
-      }
-
-      setMessage({ type: "success", text: "LMS token updated successfully! Starting resync..." });
-      setNewApiKey("");
-      setHasExistingToken(true);
-
-      // Start resync process
-      await handleResyncEnrollments();
-    } catch (error) {
-      console.error('Error updating LMS token:', error);
-      setMessage({
-        type: "error",
-        text: error instanceof Error ? error.message : 'Failed to update LMS token'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleResyncEnrollments = async () => {
-    setIsSyncing(true);
-    setSyncProgress([]);
-    setCourseProgress({ current: 0, total: 0 });
-    setMessage(null);
-
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("No active session");
-      }
-
-      // Use streaming API endpoint
+      // Use streaming API endpoint with token
       const response = await fetch('/api/user/enrollments/resync/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
+        body: JSON.stringify({
+          apiKey: resyncApiKey,
+          apiBaseUrl: `${schoolConfig.api_url}/api/v1`
+        }),
       });
 
       if (!response.ok) {
@@ -323,7 +276,7 @@ function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
       <main className="container mx-auto py-6 px-4 md:px-6">
         <div className="max-w-4xl mx-auto">
@@ -351,9 +304,9 @@ function ProfilePage() {
               }`}
             >
               {message.type === "success" ? (
-                <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                <CheckCircle2 className="h-5 w-5 shrink-0" />
               ) : (
-                <AlertCircle className="h-5 w-5 flex-shrink-0" />
+                <AlertCircle className="h-5 w-5 shrink-0" />
               )}
               <p className="text-sm font-medium">{message.text}</p>
             </motion.div>
@@ -441,7 +394,7 @@ function ProfilePage() {
                       <Button
                         onClick={handleUpdateProfile}
                         disabled={isLoading}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
                         {isLoading ? (
                           <>
@@ -468,29 +421,12 @@ function ProfilePage() {
               >
                 <Card>
                   <CardHeader>
-                    <CardTitle>Canvas LMS Token</CardTitle>
+                    <CardTitle>Resync Courses</CardTitle>
                     <CardDescription>
-                      Update your Canvas API token to sync your courses and materials
+                      Provide your Canvas API token to resync your courses and materials
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {hasExistingToken && (
-                      <div className="p-4 bg-muted rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <CheckCircle2 className="h-5 w-5 text-green-600" />
-                            <div>
-                              <p className="font-medium text-sm">Token Active</p>
-                              {lastUpdated && (
-                                <p className="text-xs text-muted-foreground">
-                                  Last updated: {new Date(lastUpdated).toLocaleDateString()}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
 
                     <div className="grid gap-4">
                       <div className="grid gap-2">
@@ -508,19 +444,39 @@ function ProfilePage() {
                       </div>
 
                       <div className="grid gap-2">
-                        <Label htmlFor="new-api-token">
-                          {hasExistingToken ? "Update Canvas API Token" : "Canvas API Token"}
-                        </Label>
+                        <Label htmlFor="resync-api-token">Canvas API Token</Label>
                         <Input
-                          id="new-api-token"
+                          id="resync-api-token"
                           type="password"
                           placeholder="Enter your Canvas API token"
-                          value={newApiKey}
-                          onChange={(e) => setNewApiKey(e.target.value)}
+                          value={resyncApiKey}
+                          onChange={(e) => setResyncApiKey(e.target.value)}
                         />
                         <p className="text-sm text-muted-foreground">
                           You can find your API token in Canvas under Account &gt; Settings
                           &gt; Approved Integrations
+                        </p>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label htmlFor="token-file-upload">Or Upload Token File</Label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            id="token-file-upload"
+                            type="file"
+                            accept=".txt"
+                            onChange={handleFileUpload}
+                            className="flex-1"
+                          />
+                          {uploadedFile && (
+                            <div className="flex items-center gap-2 text-sm text-green-600">
+                              <CheckCircle2 className="h-4 w-4" />
+                              {uploadedFile.name}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground">
+                          Upload the incourse-canvas-token.txt file you downloaded during onboarding
                         </p>
                       </div>
                     </div>
@@ -530,27 +486,27 @@ function ProfilePage() {
                       <div className="space-y-1">
                         <p className="text-sm font-medium">Privacy & Security</p>
                         <p className="text-sm text-muted-foreground">
-                          Your API token is encrypted and stored securely. Updating your
-                          token will automatically resync your enrollments.
+                          Your API token is not stored in our database. We only use it temporarily
+                          to sync your courses and then discard it.
                         </p>
                       </div>
                     </div>
 
                     <div className="pt-4 border-t">
                       <Button
-                        onClick={handleUpdateLMSToken}
-                        disabled={isLoading || isSyncing || !newApiKey.trim()}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        onClick={handleResyncEnrollments}
+                        disabled={isSyncing || !resyncApiKey.trim()}
+                        className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
-                        {isLoading || isSyncing ? (
+                        {isSyncing ? (
                           <>
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {isSyncing ? "Syncing..." : "Updating..."}
+                            Syncing...
                           </>
                         ) : (
                           <>
                             <RefreshCw className="mr-2 h-4 w-4" />
-                            Update Token & Resync
+                            Resync Enrollments
                           </>
                         )}
                       </Button>
@@ -573,7 +529,7 @@ function ProfilePage() {
                         
                         {/* Course Progress Counter */}
                         {courseProgress.total > 0 && (
-                          <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
+                          <div className="mt-4 p-3 bg-linear-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <span className="text-sm font-medium text-gray-700">Course Progress</span>
                               <span className="text-sm text-gray-600">
@@ -582,7 +538,7 @@ function ProfilePage() {
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2">
                               <motion.div
-                                className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
+                                className="bg-linear-to-r from-orange-500 to-pink-500 h-2 rounded-full"
                                 initial={{ width: 0 }}
                                 animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
                                 transition={{ duration: 0.5 }}
@@ -665,7 +621,7 @@ function ProfilePage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="mt-6"
                           >
-                            <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                            <div className="bg-linear-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
                               <div className="flex items-center gap-2 mb-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
                                 <p className="font-medium text-green-800">Resync Complete!</p>
@@ -681,59 +637,6 @@ function ProfilePage() {
                   </motion.div>
                 )}
 
-                {/* Manual Resync Option */}
-                {hasExistingToken && !isSyncing && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Manual Resync</CardTitle>
-                      <CardDescription>
-                        Resync your enrollments without updating your token
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
-                        <p className="text-sm text-muted-foreground">
-                          This will intelligently sync your Canvas data:
-                        </p>
-                        <ul className="text-sm text-muted-foreground space-y-2 ml-4 list-disc">
-                          <li>
-                            <strong>Compare enrollments:</strong> Check your current enrollments against Canvas
-                          </li>
-                          <li>
-                            <strong>Remove dropped courses:</strong> Delete courses you&apos;re no longer enrolled in
-                          </li>
-                          <li>
-                            <strong>Add new courses:</strong> Add any new courses from Canvas
-                          </li>
-                          <li>
-                            <strong>Keep existing enrollments:</strong> Preserve enrollments that haven&apos;t changed
-                          </li>
-                          <li>
-                            <strong>Smart module sync:</strong> For each course, compare modules and items - add new ones, update existing ones, and remove obsolete ones
-                          </li>
-                        </ul>
-                      </div>
-                      <Button
-                        onClick={handleResyncEnrollments}
-                        disabled={isSyncing}
-                        variant="outline"
-                        className="mt-4"
-                      >
-                        {isSyncing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Syncing...
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            Resync Enrollments
-                          </>
-                        )}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                )}
               </motion.div>
             </TabsContent>
 
@@ -848,7 +751,7 @@ function ProfilePage() {
                     <div className="pt-6 border-t mt-6">
                       <Button
                         onClick={() => setMessage({ type: "success", text: "Preferences saved!" })}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                       >
                         Save Preferences
                       </Button>

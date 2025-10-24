@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { LMSFactory } from "@/lib/api";
-import { getUserCredentials, getUserFromRequest } from "@/lib/utils/userCredentials";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from "@/lib/utils/supabase/server";
-import { Assignment } from "@/lib/types/course";
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ courseID: string }> }) {
   try {
@@ -32,23 +30,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       );
     }
 
-    // Get user credentials
-    const credentials = await getUserCredentials(userData.userId, userData.accessToken);
+    // Fetch assignments from database
+    const { data: assignments, error: assignmentsError } = await supabase
+      .from('assignments')
+      .select('*')
+      .eq('course_id', courseID)
+      .order('due_at', { ascending: true, nullsFirst: false });
 
-    if (!credentials) {
+    if (assignmentsError) {
       return NextResponse.json(
-        { error: "User credentials not found" },
-        { status: 404 }
+        { error: "Failed to fetch assignments", details: assignmentsError.message },
+        { status: 500 }
       );
     }
 
-    // Create LMS provider and fetch assignments
-    const lmsFactory = new LMSFactory(credentials.apiBaseUrl, credentials.apiKey);
-    const lmsProvider = lmsFactory.createLMSProvider(courseInfo.lms_provider);
-    
-    const assignments: Assignment[] = await lmsProvider.getCourseAssignments(courseInfo.lms_id);
-
-    return NextResponse.json(assignments);
+    return NextResponse.json(assignments || []);
   } catch (error) {
     console.error('Error fetching assignments:', error);
     return NextResponse.json(

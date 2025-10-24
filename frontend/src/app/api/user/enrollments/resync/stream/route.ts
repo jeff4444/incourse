@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUserFromRequest, getUserCredentials } from "@/lib/utils/userCredentials";
+import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { createClient } from "@/lib/utils/supabase/server";
 import { LMSFactory } from "@/lib/api";
 import LMSProvider from "@/lib/lms/lms-provider";
 
 const supabase = await createClient();
+
+interface ResyncRequest {
+  apiKey: string;
+  apiBaseUrl: string;
+}
 
 interface SyncEvent {
   type: 'progress' | 'error' | 'done';
@@ -59,7 +64,7 @@ async function syncModuleItems(
     const newItemMap = new Map<string, typeof newModuleItems[0]>();
     for (const item of newModuleItems) {
       if (item.lmsId) {
-        newItemMap.set(item.lmsId, item);
+        newItemMap.set(String(item.lmsId), item);
       }
     }
 
@@ -199,12 +204,12 @@ async function syncModulesForCourse(
 
     // Fetch modules from LMS
     const modules = await lmsProvider.getCourseModules(courseLmsId);
-
+    
     // Create a map of new modules
     const newModuleMap = new Map<string, typeof modules[0]>();
     for (const module of modules) {
       if (module.lmsId) {
-        newModuleMap.set(module.lmsId, module);
+        newModuleMap.set(String(module.lmsId), module);
       }
     }
 
@@ -320,6 +325,119 @@ async function syncModulesForCourse(
   return result;
 }
 
+async function syncCourseAssignments(
+  courseId: string,
+  courseLmsId: string,
+  courseName: string,
+  lmsProvider: LMSProvider,
+  controller: ReadableStreamDefaultController
+): Promise<{ assignmentsCreated: number; errors: string[] }> {
+  const result = {
+    assignmentsCreated: 0,
+    errors: [] as string[],
+  };
+
+  try {
+    // Emit progress event
+    controller.enqueue(new TextEncoder().encode(createSSEEvent({
+      type: 'progress',
+      stage: `Syncing course assignments for ${courseName}`,
+      status: 'loading'
+    })));
+
+    // Fetch all course assignments
+    const courseAssignments = await lmsProvider.getCourseAssignments(courseLmsId);
+    
+    if (courseAssignments.length === 0) {
+      controller.enqueue(new TextEncoder().encode(createSSEEvent({
+        type: 'progress',
+        stage: `Syncing course assignments for ${courseName}`,
+        status: 'complete',
+        detail: 'No assignments found'
+      })));
+      return result;
+    }
+
+    // Get existing assignments from database to avoid duplicates
+    const { data: existingAssignments, error: existingError } = await supabase
+      .from("assignments")
+      .select("lms_id")
+      .eq("course_id", courseId);
+
+    if (existingError) {
+      result.errors.push(`Failed to check existing assignments: ${existingError.message}`);
+      return result;
+    }
+
+    const existingAssignmentIds = new Set(existingAssignments?.map(a => a.lms_id) || []);
+
+    // Filter out assignments that already exist
+    const newAssignments = courseAssignments.filter((assignment: any) => !existingAssignmentIds.has(assignment.lms_id));
+
+    if (newAssignments.length === 0) {
+      controller.enqueue(new TextEncoder().encode(createSSEEvent({
+        type: 'progress',
+        stage: `Syncing course assignments for ${courseName}`,
+        status: 'complete',
+        detail: 'All assignments already synced'
+      })));
+      return result;
+    }
+
+    // Process each new assignment
+    for (const assignmentData of newAssignments) {
+      try {
+        await supabase
+          .from("assignments")
+          .upsert({
+            lms_id: assignmentData.lms_id,
+            course_id: courseId,
+            name: assignmentData.name,
+            description: assignmentData.description,
+            due_at: assignmentData.due_at,
+            lock_at: assignmentData.lock_at,
+            locked_for_user: assignmentData.locked_for_user,
+            points_possible: assignmentData.points_possible,
+            html_url: assignmentData.html_url,
+            submission_types: assignmentData.submission_types,
+            has_submitted_submissions: assignmentData.has_submitted_submissions,
+          }, {
+            onConflict: 'lms_id,course_id',
+            ignoreDuplicates: false,
+          });
+
+        result.assignmentsCreated++;
+      } catch (assignmentError) {
+        result.errors.push(
+          `Error processing assignment ${assignmentData.name}: ${assignmentError instanceof Error ? assignmentError.message : 'Unknown error'}`
+        );
+      }
+    }
+
+    // Mark course assignments as complete
+    controller.enqueue(new TextEncoder().encode(createSSEEvent({
+      type: 'progress',
+      stage: `Syncing course assignments for ${courseName}`,
+      status: 'complete',
+      detail: `${result.assignmentsCreated} assignments synced`
+    })));
+
+  } catch (error) {
+    result.errors.push(
+      `Error syncing course assignments: ${error instanceof Error ? error.message : 'Unknown error'}`
+    );
+    
+    controller.enqueue(new TextEncoder().encode(createSSEEvent({
+      type: 'progress',
+      stage: `Syncing course assignments for ${courseName}`,
+      status: 'error',
+      detail: error instanceof Error ? error.message : 'Unknown error'
+    })));
+  }
+
+  return result;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Get user from request
@@ -331,11 +449,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get user credentials
-    const credentials = await getUserCredentials(userData.userId, userData.accessToken);
-    if (!credentials) {
+    // Get credentials from request body
+    const body: ResyncRequest = await request.json();
+    const { apiKey, apiBaseUrl } = body;
+
+    if (!apiKey || !apiBaseUrl) {
       return NextResponse.json(
-        { error: "No LMS credentials found. Please add your LMS token first." },
+        { error: "apiKey and apiBaseUrl are required" },
         { status: 400 }
       );
     }
@@ -356,6 +476,7 @@ export async function POST(request: NextRequest) {
             modulesDeleted: 0,
             moduleItemsCreated: 0,
             moduleItemsDeleted: 0,
+            assignmentsCreated: 0,
             errors: [] as string[],
           };
 
@@ -418,8 +539,8 @@ export async function POST(request: NextRequest) {
             status: 'loading'
           })));
 
-          const lmsFactory = new LMSFactory(credentials.apiBaseUrl, credentials.apiKey);
-          const lmsProvider = lmsFactory.createLMSProvider(credentials.lmsProvider);
+          const lmsFactory = new LMSFactory(apiBaseUrl, apiKey);
+          const lmsProvider = lmsFactory.createLMSProvider('canvas');
           
           let courses;
           try {
@@ -592,6 +713,17 @@ export async function POST(request: NextRequest) {
                 results.moduleItemsCreated += moduleResults.moduleItemsCreated;
                 results.moduleItemsDeleted += moduleResults.moduleItemsDeleted;
                 results.errors.push(...moduleResults.errors);
+
+                // Sync course assignments
+                const assignmentResults = await syncCourseAssignments(
+                  upsertedCourse.id,
+                  course.lmsId,
+                  course.name,
+                  lmsProvider,
+                  controller
+                );
+                results.assignmentsCreated += assignmentResults.assignmentsCreated;
+                results.errors.push(...assignmentResults.errors);
               }
             } catch (error) {
               console.error(`Error processing course ${course.name}:`, error);

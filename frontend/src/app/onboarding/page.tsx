@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/utils/supabase/client";
-import { encryptApiKey } from "@/lib/utils/encryption";
+import { validateCanvasToken } from "@/lib/utils/validateCanvasToken";
+import { downloadTokenFile } from "@/lib/utils/downloadTokenFile";
 import { Button } from "@/components/ui/button";
 import { SUPPORTED_SCHOOLS } from "@/constants/supported_schools";
 import {
@@ -30,6 +32,7 @@ import {
 const supabase = createClient();
 
 export default function OnboardingPage() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(0); // -1 for back, 1 for forward
   const totalSteps = 2;
@@ -55,6 +58,17 @@ export default function OnboardingPage() {
   
   // Ref for auto-scrolling sync progress
   const syncProgressRef = useRef<HTMLDivElement>(null);
+
+  // Check if user has already completed onboarding and redirect if necessary
+  useEffect(() => {
+    const checkOnboardingStatus = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user?.user_metadata?.passed_onboarding === true) {
+        router.push("/dashboard");
+      }
+    };
+    checkOnboardingStatus();
+  }, [router]);
 
   // Fetch user's school on mount
   useEffect(() => {
@@ -96,47 +110,6 @@ export default function OnboardingPage() {
       }
       return [...prev, { stage, status, detail }];
     });
-  };
-
-  // Store Canvas credentials to database
-  const storeCanvasCredentials = async (key: string) => {
-    try {
-      updateSyncProgress('Saving credentials', 'loading');
-      
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-
-      // Get the Canvas URL from the school configuration
-      const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
-      if (!schoolConfig) {
-        throw new Error("School not supported");
-      }
-
-      const encryptedApiKey = encryptApiKey(key);
-
-      const { error } = await supabase
-        .from('user_api_keys')
-        .upsert({
-          user_id: user.id,
-          lms_provider: 'canvas',
-          encrypted_api_key: encryptedApiKey,
-          api_base_url: schoolConfig.api_url,
-          is_active: true
-        });
-
-      if (error) {
-        throw error;
-      }
-
-      updateSyncProgress('Saving credentials', 'complete');
-      return { success: true };
-    } catch (error) {
-      console.error('Error storing Canvas credentials:', error);
-      updateSyncProgress('Saving credentials', 'error', error instanceof Error ? error.message : 'Unknown error');
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error occurred' };
-    }
   };
 
   // Fetch and sync courses to database with streaming
@@ -228,6 +201,11 @@ export default function OnboardingPage() {
               finalResults = event.data;
               console.log('Sync completed successfully:', finalResults);
             } else if (event.type === 'error') {
+              // Handle token validation errors specifically
+              if (event.stage === 'Token validation failed') {
+                setIsSyncing(false);
+                return { success: false, error: event.detail || 'Invalid Canvas API token' };
+              }
               throw new Error(event.detail || 'Sync failed');
             }
           } catch (parseError) {
@@ -265,20 +243,26 @@ export default function OnboardingPage() {
       setSyncProgress([]);
       setCourseProgress({ current: 0, total: 0 });
 
-      // Store credentials to database
-      const storeResult = await storeCanvasCredentials(apiKey);
-      if (!storeResult.success) {
-        setApiKeyError(`Failed to save credentials: ${storeResult.error}`);
-        setIsSyncing(false);
-        return;
-      }
-
-      // Sync courses to database after storing credentials
+      // Sync courses to database
       const syncResult = await syncCoursesToDatabase(apiKey);
       if (!syncResult.success) {
-        // Log the error but don't block onboarding
+        // If token validation failed, show error and stay on current step
+        if (syncResult.error && syncResult.error.includes('Invalid Canvas API token')) {
+          setApiKeyError(syncResult.error);
+          setIsSyncing(false);
+          return; // Don't proceed to next step
+        }
+        // Log other errors but don't block onboarding
         console.error('Failed to sync courses during onboarding:', syncResult.error);
         // Continue with onboarding even if course sync fails
+      }
+
+      // Download token file after successful sync
+      if (syncResult.success) {
+        const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
+        if (schoolConfig) {
+          downloadTokenFile(apiKey, `${schoolConfig.api_url}/api/v1`, schoolName);
+        }
       }
       
       // Wait a moment to show completion state
@@ -354,7 +338,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-linear-to-br from-orange-50 to-pink-50">
       {/* Syncing Modal Overlay */}
       <AnimatePresence>
         {isSyncing && (
@@ -375,7 +359,7 @@ export default function OnboardingPage() {
                   <Loader2 className="h-12 w-12 text-orange-500 animate-spin" />
                   <Sparkles className="h-6 w-6 text-pink-500 absolute -top-1 -right-1" />
                 </div>
-                <h2 className="text-2xl font-bold mt-4 bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+                <h2 className="text-2xl font-bold mt-4 bg-linear-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
                   Setting up your account
                 </h2>
                 <p className="text-gray-600 text-center mt-2">
@@ -384,7 +368,7 @@ export default function OnboardingPage() {
                 
                 {/* Course Progress Counter */}
                 {courseProgress.total > 0 && (
-                  <div className="mt-4 p-3 bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
+                  <div className="mt-4 p-3 bg-linear-to-r from-orange-50 to-pink-50 border border-orange-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">Course Progress</span>
                       <span className="text-sm text-gray-600">
@@ -393,7 +377,7 @@ export default function OnboardingPage() {
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <motion.div
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 h-2 rounded-full"
+                        className="bg-linear-to-r from-orange-500 to-pink-500 h-2 rounded-full"
                         initial={{ width: 0 }}
                         animate={{ width: `${(courseProgress.current / courseProgress.total) * 100}%` }}
                         transition={{ duration: 0.5 }}
@@ -475,7 +459,7 @@ export default function OnboardingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   className="mt-6"
                 >
-                  <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
+                  <div className="bg-linear-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle2 className="h-5 w-5 text-green-500" />
                       <p className="font-medium text-green-800">Sync Complete!</p>
@@ -503,7 +487,7 @@ export default function OnboardingPage() {
           className="flex items-center gap-2 mb-8"
         >
           <Sparkles className="h-8 w-8 text-primary" />
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl font-bold bg-linear-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
             InCourse
           </h1>
         </motion.div>
@@ -522,9 +506,9 @@ export default function OnboardingPage() {
                   animate={{ scale: 1 }}
                   className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     step > index + 1
-                      ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white"
+                      ? "bg-linear-to-r from-orange-500 to-pink-500 text-white"
                       : step === index + 1
-                      ? "bg-gradient-to-r from-orange-500 to-pink-500 text-white"
+                      ? "bg-linear-to-r from-orange-500 to-pink-500 text-white"
                       : "bg-gray-100 text-gray-400"
                   }`}
                 >
@@ -548,7 +532,7 @@ export default function OnboardingPage() {
           </div>
           <div className="w-full bg-gray-100 rounded-full h-2 mb-4">
             <motion.div
-              className="h-full bg-gradient-to-r from-orange-500 to-pink-500 rounded-full"
+              className="h-full bg-linear-to-r from-orange-500 to-pink-500 rounded-full"
               initial={{ width: 0 }}
               animate={{ width: `${((step - 1) / (totalSteps - 1)) * 100}%` }}
               transition={{ duration: 0.5 }}
@@ -638,7 +622,9 @@ export default function OnboardingPage() {
                               <p className="text-sm text-muted-foreground">
                                 We only access the course materials you
                                 explicitly share. Your data is encrypted and
-                                never shared with third parties.
+                                never shared with third parties. After syncing,
+                                we'll download your Canvas token file - keep it
+                                safe for future resyncing.
                               </p>
                             </div>
                           </div>
@@ -765,7 +751,7 @@ export default function OnboardingPage() {
                   <Button
                     onClick={nextStep}
                     disabled={isSyncing}
-                    className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                    className="bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
                   >
                     {isSyncing ? (
                       <>

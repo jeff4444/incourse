@@ -208,7 +208,7 @@ function SignInContent() {
   return (
     <div className="min-h-screen flex flex-col lg:flex-row">
       {/* Left Column - Simplified Dashboard Preview */}
-      <div className="flex-1 bg-gradient-to-br from-orange-50 to-pink-50 p-8 flex items-center justify-center">
+      <div className="flex-1 bg-linear-to-br from-orange-50 to-pink-50 p-8 flex items-center justify-center">
         <motion.div
           initial={{ opacity: 0, x: 50 }}
           animate={{ opacity: 1, x: 0 }}
@@ -329,7 +329,7 @@ function SignInContent() {
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: 1.2 + index * 0.1, duration: 0.3 }}
-                        className="bg-gradient-to-r from-orange-50 to-pink-50 border border-orange-100 rounded-lg p-3"
+                        className="bg-linear-to-r from-orange-50 to-pink-50 border border-orange-100 rounded-lg p-3"
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div className="flex-1">
@@ -389,7 +389,7 @@ function SignInContent() {
                   className="bg-blue-50 text-blue-700 p-4 rounded-lg border border-blue-200 text-sm"
                 >
                   <div className="flex items-start space-x-2">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <svg className="h-5 w-5 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                       </svg>

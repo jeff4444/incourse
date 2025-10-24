@@ -35,8 +35,6 @@ class Nudge(BaseModel):
 @dataclass
 class Deps:
     user_id: str
-    lms_api_key: str
-    lms_base_url: str
     
     
 def get_nudge_agent(**kwargs) -> Agent[Deps, List[Nudge]]:

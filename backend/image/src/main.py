@@ -8,7 +8,7 @@ import aiohttp
 import json
 from pathlib import Path
 from typing import List, Dict, Optional, Any
-from fastapi import FastAPI, HTTPException, Depends, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, validator
@@ -24,11 +24,9 @@ from agents.note_update_agent.agent import NoteUpdate, Deps as NoteUpdateDeps
 
 # Import managers and tools
 from shared.managers import ChatSessionManager
-from tools.supabase_tools import get_user_api_keys, get_module_items_by_course_id
-from api.canvas import get_course_details, get_file_details_with_content, get_file_details_with_temp_file
-from shared.utils.supabase_utils import decrypt_api_key
+from tools.supabase_tools import get_module_items_by_course_id
+from api.canvas import get_course_details
 from api.supabase import (
-    get_user_lms_info,
     get_course,
     create_flashcard_deck,
     create_flashcards,
@@ -37,7 +35,9 @@ from api.supabase import (
     create_quiz_questions,
     get_quiz,
     create_activity,
-    create_autograder_feedback
+    create_autograder_feedback,
+    get_file_details_with_content_from_db,
+    get_file_details_with_temp_file_from_db
 )
 
 
@@ -222,15 +222,12 @@ async def generate_flashcards(request: FlashcardRequest):
     """
     try:
         # Pre-load dependencies to avoid refetching on every tool call
-        lms_info = await get_user_lms_info(request.user_id)
         course_info = await get_course(request.course_id)
         
         deps = FlashcardDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
-            lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"],
             course_info=course_info,
             note_ids=request.note_ids,
             notes_info=[]  # Will be fetched by tools if needed
@@ -307,15 +304,12 @@ async def generate_quiz(request: QuizRequest):
     """
     try:
         # Pre-load dependencies to avoid refetching on every tool call
-        lms_info = await get_user_lms_info(request.user_id)
         course_info = await get_course(request.course_id)
         
         deps = QuizDeps(
             user_id=request.user_id,
             course_id=request.course_id,
             file_ids=request.file_ids,
-            lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"],
             course_info=course_info,
             note_ids=request.note_ids,
             notes_info=[]  # Will be fetched by tools if needed
@@ -391,14 +385,9 @@ async def generate_nudges(request: NudgeRequest):
     """
     Generate personalized nudges for the user.
     """
-    try:
-        # Create dependencies
-        lms_info = await get_user_lms_info(request.user_id)
-        
+    try:        
         deps = NudgeDeps(
             user_id=request.user_id,
-            lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"]
         )
         
         # Get the nudge agent
@@ -426,13 +415,8 @@ async def take_action(request: TakeActionRequest):
     Process user input and determine the appropriate action to take.
     """
     try:
-        # Create dependencies
-        lms_info = await get_user_lms_info(request.user_id)
-        
         deps = TakeActionDeps(
             user_id=request.user_id,
-            lms_api_key=lms_info["api_key"],
-            lms_base_url=lms_info["base_url"]
         )
         
         # Get the take action agent
@@ -528,27 +512,12 @@ async def chat(request: ChatRequest):
             deps.course_info = await get_course(course_id=request.course_id)
         
         if not deps.file_info:
-            # Try Supabase first (faster), then fallback to LMS
-            try:
-                deps.file_info = await get_module_items_by_course_id(
-                    course_id=deps.course_info["id"],
-                    lms_id=request.file_ids[0]
-                )
-                deps.is_file_from_lms = False
-            except Exception:
-                # Need LMS credentials
-                if not deps.lms_api_key:
-                    lms_info = await get_user_lms_info(request.user_id)
-                    deps.lms_api_key = lms_info["api_key"]
-                    deps.lms_base_url = lms_info["base_url"]
-                
-                deps.file_info = await get_file_details_with_content(
-                    api_key=deps.lms_api_key,
-                    api_base_url=deps.lms_base_url,
-                    course_id=deps.course_info["lms_id"],
-                    file_id=request.file_ids[0]
-                )
-                deps.is_file_from_lms = True
+            # Query database for file info
+            deps.file_info = await get_file_details_with_content_from_db(
+                file_id=request.file_ids[0],
+                course_id=deps.course_info["id"]
+            )
+            deps.is_file_from_lms = False
         
         # 3. Initialize session manager and save messages
         session_manager = ChatSessionManager(
@@ -676,25 +645,12 @@ async def chat_stream(request: ChatRequest):
                         deps.course_info = await get_course(course_id=request.course_id)
                     
                     if not deps.file_info:
-                        try:
-                            deps.file_info = await get_module_items_by_course_id(
-                                course_id=deps.course_info["id"],
-                                lms_id=request.file_ids[0]
-                            )
-                            deps.is_file_from_lms = False
-                        except Exception:
-                            if not deps.lms_api_key:
-                                lms_info = await get_user_lms_info(request.user_id)
-                                deps.lms_api_key = lms_info["api_key"]
-                                deps.lms_base_url = lms_info["base_url"]
-                            
-                            deps.file_info = await get_file_details_with_content(
-                                api_key=deps.lms_api_key,
-                                api_base_url=deps.lms_base_url,
-                                course_id=deps.course_info["lms_id"],
-                                file_id=request.file_ids[0]
-                            )
-                            deps.is_file_from_lms = True
+                        # Query database for file info
+                        deps.file_info = await get_file_details_with_content_from_db(
+                            file_id=request.file_ids[0],
+                            course_id=deps.course_info["id"]
+                        )
+                        deps.is_file_from_lms = False
                     
                     # 3. Initialize session manager and save messages
                     session_manager = ChatSessionManager(
@@ -944,16 +900,13 @@ async def grade_assignment(
         # Save uploaded files to temporary directory
         temp_file_paths = await save_uploaded_files_to_temp(files)
         
-        # Get Canvas assignment file
-        lms_info = await get_user_lms_info(user_id)
+        # Get course info
         course_info = await get_course(course_id)
         
         # Download assignment file to temporary location (preserves original format)
-        assignment_file_details, assignment_temp_path = await get_file_details_with_temp_file(
-            api_key=lms_info["api_key"],
-            api_base_url=lms_info["base_url"],
-            course_id=course_info["lms_id"],
-            file_id=assignment_id
+        assignment_file_details, assignment_temp_path = await get_file_details_with_temp_file_from_db(
+            file_id=assignment_id,
+            course_id=course_id
         )
         temp_file_paths.append(assignment_temp_path)
         
@@ -964,7 +917,7 @@ async def grade_assignment(
         
         # Create grading assistant
         assistant_id = await create_grading_assistant(
-            name=f"Autograder for {assignment_file_details.get('filename', 'Assignment')}"
+            name=f"Autograder for {assignment_file_details.get('display_name', 'Assignment')}"
         )
         
         # Run grading
@@ -974,7 +927,7 @@ async def grade_assignment(
             message=f"""
             Please analyze the attached assignment and student solution files.
             
-            Assignment: {assignment_file_details.get('filename', 'Unknown')}
+            Assignment: {assignment_file_details.get('display_name', 'Unknown')}
             Student submitted {len(files)} file(s): {[f.filename for f in files]}
             
             Provide detailed feedback following the grading instructions.

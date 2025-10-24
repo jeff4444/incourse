@@ -13,13 +13,6 @@ from api import pinecone as pinecone_api
 # Helper Functions (DRY - Don't Repeat Yourself)
 # =====================================================
 
-async def _ensure_lms_credentials(ctx: RunContext) -> None:
-    """Ensure LMS credentials are loaded in context."""
-    if not ctx.deps.lms_api_key or not ctx.deps.lms_base_url:
-        from api.supabase import get_user_lms_info
-        lms_info = await get_user_lms_info(user_id=ctx.deps.user_id)
-        ctx.deps.lms_api_key = lms_info["api_key"]
-        ctx.deps.lms_base_url = lms_info["base_url"]
 
 
 async def _ensure_course_info(ctx: RunContext) -> None:
@@ -29,38 +22,24 @@ async def _ensure_course_info(ctx: RunContext) -> None:
         ctx.deps.course_info = await get_course(course_id=ctx.deps.course_id)
 
 
-async def _get_file_info(ctx: RunContext, file_id: str) -> Tuple[Dict[str, Any], bool, str, str]:
+async def _get_file_info(ctx: RunContext, file_id: str) -> Tuple[Dict[str, Any], str, str]:
     """
-    Fetch file info from database or LMS and return normalized data.
+    Fetch file info from database and return normalized data.
     
     Returns:
-        Tuple of (file_info, is_file_from_lms, actual_file_id, filename)
+        Tuple of (file_info, actual_file_id, filename)
     """
-    from api.supabase import get_module_items_by_course_id
-    from api.canvas import get_file_details_with_content
+    from api.supabase import get_file_details_with_content_from_db
     
-    try:
-        # Try database first
-        file_info = await get_module_items_by_course_id(
-            course_id=ctx.deps.course_info["id"],
-            lms_id=file_id
-        )
-        is_file_from_lms = False
-        actual_file_id = file_info["lms_content_id"]
-        filename = file_info["name"]
-    except Exception:
-        # Fall back to LMS
-        file_info = await get_file_details_with_content(
-            api_key=ctx.deps.lms_api_key,
-            api_base_url=ctx.deps.lms_base_url,
-            course_id=ctx.deps.course_info["lms_id"],
-            file_id=file_id
-        )
-        is_file_from_lms = True
-        actual_file_id = file_info["id"]
-        filename = file_info["display_name"]
+    # Query database for file info
+    file_info = await get_file_details_with_content_from_db(
+        file_id=file_id,
+        course_id=ctx.deps.course_info["id"]
+    )
+    actual_file_id = file_info["id"]
+    filename = file_info["display_name"]
     
-    return file_info, is_file_from_lms, actual_file_id, filename
+    return file_info, actual_file_id, filename
 
 
 # =====================================================
@@ -94,33 +73,23 @@ async def search_file_with_query(
         - created_new_namespace: Whether a new namespace was created
     """
     # Ensure dependencies are loaded
-    await _ensure_lms_credentials(ctx)
     await _ensure_course_info(ctx)
     
     # Load file info if not cached
     if not ctx.deps.file_info:
-        file_info, is_file_from_lms, file_id, filename = await _get_file_info(ctx, ctx.deps.file_id)
+        file_info, file_id, filename = await _get_file_info(ctx, ctx.deps.file_id)
         ctx.deps.file_info = file_info
-        ctx.deps.is_file_from_lms = is_file_from_lms
     else:
         # Extract from cached info
-        is_file_from_lms = ctx.deps.is_file_from_lms
-        if is_file_from_lms:
-            file_id = ctx.deps.file_info["id"]
-            filename = ctx.deps.file_info["display_name"]
-        else:
-            file_id = ctx.deps.file_info["lms_content_id"]
-            filename = ctx.deps.file_info["name"]
+        file_id = ctx.deps.file_info["id"]
+        filename = ctx.deps.file_info["display_name"]
     
     return await pinecone_api.search_file_with_query(
-        api_key=ctx.deps.lms_api_key,
-        api_base_url=ctx.deps.lms_base_url,
-        course_id=ctx.deps.course_info["lms_id"],
+        course_id=ctx.deps.course_info["id"],
         course_name=ctx.deps.course_info["name"],
         file_id=file_id,
         filename=filename,
         query=query,
-        is_file_from_lms=ctx.deps.is_file_from_lms,
         file_info=ctx.deps.file_info
     )
 
@@ -152,33 +121,23 @@ async def search_file_with_chunk_index(
         - created_new_namespace: Whether a new namespace was created
     """
     # Ensure dependencies are loaded
-    await _ensure_lms_credentials(ctx)
     await _ensure_course_info(ctx)
     
     # Load file info if not cached
     if not ctx.deps.file_info:
-        file_info, is_file_from_lms, file_id, filename = await _get_file_info(ctx, ctx.deps.file_id)
+        file_info, file_id, filename = await _get_file_info(ctx, ctx.deps.file_id)
         ctx.deps.file_info = file_info
-        ctx.deps.is_file_from_lms = is_file_from_lms
     else:
         # Extract from cached info
-        is_file_from_lms = ctx.deps.is_file_from_lms
-        if is_file_from_lms:
-            file_id = ctx.deps.file_info["id"]
-            filename = ctx.deps.file_info["display_name"]
-        else:
-            file_id = ctx.deps.file_info["lms_content_id"]
-            filename = ctx.deps.file_info["name"]
+        file_id = ctx.deps.file_info["id"]
+        filename = ctx.deps.file_info["display_name"]
     
     return await pinecone_api.search_file_with_chunk_index(
-        api_key=ctx.deps.lms_api_key,
-        api_base_url=ctx.deps.lms_base_url,
-        course_id=ctx.deps.course_info["lms_id"],
+        course_id=ctx.deps.course_info["id"],
         course_name=ctx.deps.course_info["name"],
         file_id=file_id,
         filename=filename,
         chunk_index=chunk_index,
-        is_file_from_lms=ctx.deps.is_file_from_lms,
         file_info=ctx.deps.file_info
     )
 
@@ -210,23 +169,19 @@ async def search_single_file_with_query(
     print(f"Searching file {file_id} with query: {query}")
     
     # Ensure dependencies are loaded
-    await _ensure_lms_credentials(ctx)
     await _ensure_course_info(ctx)
     
     try:
         # Get file info using helper
-        file_info, is_file_from_lms, actual_file_id, filename = await _get_file_info(ctx, file_id)
+        file_info, actual_file_id, filename = await _get_file_info(ctx, file_id)
         
         # Search this file
         result = await pinecone_api.search_file_with_query(
-            api_key=ctx.deps.lms_api_key,
-            api_base_url=ctx.deps.lms_base_url,
-            course_id=ctx.deps.course_info["lms_id"],
+            course_id=ctx.deps.course_info["id"],
             course_name=ctx.deps.course_info["name"],
             file_id=actual_file_id,
             filename=filename,
             query=query,
-            is_file_from_lms=is_file_from_lms,
             file_info=file_info,
             top_k=num_results
         )
@@ -275,23 +230,19 @@ async def search_single_file_with_chunk_index(
     
     print(f"Searching file {file_id} with chunk index {chunk_index}")
     # Ensure dependencies are loaded
-    await _ensure_lms_credentials(ctx)
     await _ensure_course_info(ctx)
     
     try:
         # Get file info using helper
-        file_info, is_file_from_lms, actual_file_id, filename = await _get_file_info(ctx, file_id)
+        file_info, actual_file_id, filename = await _get_file_info(ctx, file_id)
         
         # Search by chunk index
         result = await pinecone_api.search_file_with_chunk_index(
-            api_key=ctx.deps.lms_api_key,
-            api_base_url=ctx.deps.lms_base_url,
-            course_id=ctx.deps.course_info["lms_id"],
+            course_id=ctx.deps.course_info["id"],
             course_name=ctx.deps.course_info["name"],
             file_id=actual_file_id,
             filename=filename,
             chunk_index=chunk_index,
-            is_file_from_lms=is_file_from_lms,
             file_info=file_info
         )
         
@@ -338,7 +289,6 @@ async def search_multiple_files_with_query(
     print(f"Searching {len(ctx.deps.file_ids)} files for query: {query}")
     
     # Ensure dependencies are loaded
-    await _ensure_lms_credentials(ctx)
     await _ensure_course_info(ctx)
     
     # Get file_ids from context
@@ -349,18 +299,15 @@ async def search_multiple_files_with_query(
     for file_id in file_ids:
         try:
             # Get file info using helper
-            file_info, is_file_from_lms, actual_file_id, filename = await _get_file_info(ctx, file_id)
+            file_info, actual_file_id, filename = await _get_file_info(ctx, file_id)
             
             # Search this file
             result = await pinecone_api.search_file_with_query(
-                api_key=ctx.deps.lms_api_key,
-                api_base_url=ctx.deps.lms_base_url,
-                course_id=ctx.deps.course_info["lms_id"],
+                course_id=ctx.deps.course_info["id"],
                 course_name=ctx.deps.course_info["name"],
                 file_id=actual_file_id,
                 filename=filename,
                 query=query,
-                is_file_from_lms=is_file_from_lms,
                 file_info=file_info,
                 top_k=num_results_per_file
             )

@@ -118,13 +118,13 @@ function NoteEditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="flex h-[calc(100vh-4rem)] p-4 gap-4">
         {/* Sidebar */}
         <div 
           className={cn(
-            "sidebar bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm transition-all duration-300 ease-in-out flex-shrink-0",
+            "sidebar bg-slate-50/80 backdrop-blur-sm border border-slate-200/60 rounded-2xl shadow-sm transition-all duration-300 ease-in-out shrink-0",
             sidebarOpen ? "" : "w-0 overflow-hidden"
           )}
           style={{ 
@@ -162,7 +162,7 @@ function NoteEditorPage() {
         {/* Draggable Resize Handle */}
         {sidebarOpen && (
           <div
-            className="w-1 bg-slate-300/50 hover:bg-slate-400/70 cursor-col-resize flex-shrink-0 transition-colors rounded-full"
+            className="w-1 bg-slate-300/50 hover:bg-slate-400/70 cursor-col-resize shrink-0 transition-colors rounded-full"
             onMouseDown={() => setIsResizing(true)}
           />
         )}

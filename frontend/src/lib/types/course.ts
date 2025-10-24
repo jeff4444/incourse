@@ -29,7 +29,6 @@ export interface ModuleItem {
   moduleId: string;
   courseId: string;
   type: string;
-  contentType: string | null;
   url: string | null;
   position: number | null;
 }
@@ -70,58 +69,54 @@ export interface Question {
   explanation: string | null;
 }
 
-export interface FileDetails {
+export interface File {
   id: string | null;
-  canvasId: string | null;
-  name: string;
-  size: number;
-  type: string;
+  lmsId: string | null;
+  moduleItemId: string | null;
+  courseId: string;
+  displayName: string;
   contentType: string | null;
-  url: string;
-  isValidForProcessing?: boolean;
-  validationError?: string | null;
-  fileTypeName?: string | null;
-}
-
-export interface DiscussionTopic {
-  id: number;
-  title: string;
-  created_at: string;
-  last_reply_at: string;
-  message: string;
-  discussion_subentry_count: number;
-  subscribed: boolean;
-  read_state: string;
-  html_url: string;
-  permissions: {
-    attach: boolean;
-    reply: boolean;
-  };
+  url: string | null;
+  uuid: string | null;
+  size: number | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Page {
+  id: string | null;
+  lmsId: string | null;
+  moduleItemId: string;
+  courseId: string;
   title: string;
-  created_at: string;
-  url: string;
-  editing_roles: string;
-  page_id: number;
-  last_edited_by: {
-    id: number;
-    anonymous_id: string;
-    display_name: string;
-    avatar_image_url: string;
-    html_url: string;
-    pronouns: string;
-  };
-  published: boolean;
-  hide_from_students: boolean;
-  front_page: boolean;
-  html_url: string;
-  todo_date: string | null;
-  publish_at: string | null;
-  updated_at: string;
-  locked_for_user: boolean;
-  body: string;
+  url: string | null;
+  createdAt: string | null;
+  htmlUrl: string | null;
+  body: string | null;
+  createdAtDb: string;
+  updatedAt: string;
+}
+
+export interface DiscussionTopic {
+  id: string | null;
+  lmsId: string | null;
+  moduleItemId: string;
+  courseId: string;
+  title: string;
+  createdAt: string | null;
+  lastReplyAt: string | null;
+  postedAt: string | null;
+  message: string | null;
+  htmlUrl: string | null;
+  discussionSubentryCount: number;
+  subscribed: boolean;
+  readState: string | null;
+  permissions: {
+    attach: boolean;
+    reply: boolean;
+  } | null;
+  createdAtDb: string;
+  updatedAt: string;
 }
 
 export interface Assignment {

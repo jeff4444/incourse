@@ -16,7 +16,7 @@ import { ZoomIn, ZoomOut, Download, FileText, Loader2, Maximize2, Minimize2, Mes
 import { AnnotationPopup } from "./annotation-popup"
 import { AnnotationDisplay } from "./annotation-display"
 import { nanoid } from "@/lib/utils"
-import { FileDetails } from "@/lib/types/course"
+import { File as CourseFile } from "@/lib/types/course"
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString()
 
@@ -52,7 +52,7 @@ export type ContextItem = {
   pageNumber: number
 }
 
-export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions = true }: { fileDetails: FileDetails, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
+export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibility, onShowPanel, onAddToContext, showContextOptions = true }: { fileDetails: CourseFile, courseId?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean }) {
   const [file, setFile] = useState<PDFFile>(null)
   const [numPages, setNumPages] = useState<number>()
   const [containerRef, setContainerRef] = useState<HTMLElement | null>(null)
@@ -380,13 +380,13 @@ export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibili
     
     const fetchPDF = async () => {
       try {
-        const response = await fetch(fileDetails.url)
+        const response = await fetch(fileDetails.url || '')
         if (!response.ok) {
           throw new Error('Failed to fetch PDF')
         }
         const blob = await response.blob()
         // Convert blob to File object
-        const file = new File([blob], fileDetails.name, { type: 'application/pdf' })
+        const file = new File([blob], fileDetails.displayName || '', { type: 'application/pdf' })
         setFile(file)
         // Short delay to ensure component has reset before showing PDF
         setTimeout(() => {
@@ -399,17 +399,17 @@ export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibili
     }
 
     fetchPDF()
-  }, [fileDetails.url, fileDetails.name])
+  }, [fileDetails.url, fileDetails.displayName])
 
   return (
     <div
-      className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-gradient-to-br from-orange-50 to-pink-50"}`}
+      className={`max-h-screen transition-all duration-300 ${zenMode ? "bg-gray-900" : "bg-linear-to-br from-orange-50 to-pink-50"}`}
     >
       <div className={`flex ${zenMode ? "h-screen" : ""}`}>
         {/* PDF Viewer */}
         <div className={`transition-all duration-300 ${zenMode ? "w-full h-full" : "max-w-6xl mx-auto flex-1"}`}>
           {/* Header */}
-          <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} flex-shrink-0 py-1`}>
+          <Card className={`${zenMode ? "bg-gray-800 border-gray-700" : "my-2"} shrink-0 py-1`}>
             <CardContent className="flex items-center justify-between py-0">
               {/* Controls */}
               {numPages && (
@@ -516,7 +516,7 @@ export default function PDFViewer({ fileDetails, courseId, onTogglePanelVisibili
                           Loading document...
                         </div>
                       }
-                      key={fileDetails.canvasId || fileDetails.id || 'a'}
+                      key={fileDetails.id || ''}
                     >
                       {numPages &&
                         Array.from({ length: numPages }, (_, index) => {

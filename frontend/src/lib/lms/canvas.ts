@@ -1,5 +1,4 @@
-import { Course, FileDetails, Module, ModuleItem, DiscussionTopic, Page, Assignment } from "../types/course";
-import { validateFileForProcessing } from "../utils/fileValidation";
+import { Course, File, Module, ModuleItem, DiscussionTopic, Page, Assignment } from "../types/course";
 import LMSProvider from "./lms-provider";
 
 
@@ -125,7 +124,6 @@ class CanvasProvider extends LMSProvider {
       moduleId: moduleId,
       courseId: courseId,
       type: type || '',
-      contentType: moduleItemData["content-type"],
       url: moduleItemData.url,
       lmsContentId: lmsContentId,
       position: moduleItemData.position || null,
@@ -133,40 +131,26 @@ class CanvasProvider extends LMSProvider {
     return moduleItem;
   }
 
-  convertCanvasFileDetails(fileDetailsData: any): FileDetails {
+  convertCanvasFileDetails(fileDetailsData: any, moduleItemId: string, courseId: string): File {
     const contentType = fileDetailsData["content-type"];
-    const fileName = fileDetailsData.filename;
+    const displayName = fileDetailsData.display_name || fileDetailsData.filename;
     const fileSize = fileDetailsData.size;
+    const uuid = fileDetailsData.uuid;
 
-    // Validate file for processing
-    const validation = validateFileForProcessing(
-      contentType,
-      fileName,
-      fileSize
-    );
-
-    let type: string | null = null;
-    if (!fileDetailsData.type && ALLOWED_FILE_CONTENT_TYPES.includes(contentType)) {
-      type = 'File';
-    } else if (!fileDetailsData.type) {
-      type = contentType;
-    } else {
-      type = fileDetailsData.type;
-    }
-
-    const fileDetails: FileDetails = {
+    const file: File = {
       id: fileDetailsData.id,
-      canvasId: fileDetailsData.id,
-      name: fileName,
-      url: fileDetailsData.url,
-      size: fileSize,
-      type: type || '',
+      lmsId: fileDetailsData.id,
+      moduleItemId: moduleItemId,
+      courseId: courseId,
+      displayName: displayName,
       contentType: contentType,
-      isValidForProcessing: validation.isValid,
-      validationError: validation.error || null,
-      fileTypeName: validation.fileTypeName || null,
+      url: fileDetailsData.url,
+      uuid: uuid,
+      size: fileSize,
+      createdAt: fileDetailsData.created_at,
+      updatedAt: fileDetailsData.updated_at,
     };
-    return fileDetails;
+    return file;
   }
 
   async getCourses(): Promise<Course[]> {
@@ -233,42 +217,6 @@ class CanvasProvider extends LMSProvider {
       module.moduleItems = moduleItems;
     }
 
-    // Fetch all course files and create "All files" module
-    try {
-      const courseFiles = await this.getCourseFiles(courseId);
-      if (courseFiles.length > 0) {
-        const allFilesModule: Module = {
-          id: "all-files",
-          lmsId: "all-files",
-          courseId: courseId,
-          name: "All files",
-          description: "All course files",
-          itemsCount: courseFiles.length,
-          moduleItems: [],
-          prerequisites: null,
-        };
-
-        // Convert files to module items
-        const fileModuleItems: ModuleItem[] = courseFiles.map((file, index) => ({
-          id: `file-${file.id}`,
-          lmsId: `file-${file.id}`,
-          lmsContentId: file.id,
-          name: file.name,
-          moduleId: "all-files",
-          courseId: courseId,
-          type: file.type,
-          contentType: file.contentType,  
-          url: file.url,
-          position: index + 1,
-        }));
-
-        allFilesModule.moduleItems = fileModuleItems;
-        modules.push(allFilesModule);
-      }
-    } catch (error) {
-      console.error("Failed to fetch course files:", error);
-      // Continue without the "All files" module if file fetching fails
-    }
 
     return modules;
   }
@@ -302,7 +250,49 @@ class CanvasProvider extends LMSProvider {
     return moduleItems;
   }
 
-  async getFileDetails(fileId: string, courseId: string): Promise<FileDetails> {
+  convertCanvasPage(pageData: any, moduleItemId: string, courseId: string): Page {
+    const page: Page = {
+      id: pageData.page_id?.toString(),
+      lmsId: pageData.page_id?.toString(),
+      moduleItemId: moduleItemId,
+      courseId: courseId,
+      title: pageData.title,
+      url: pageData.url,
+      createdAt: pageData.created_at,
+      htmlUrl: pageData.html_url,
+      body: pageData.body,
+      createdAtDb: new Date().toISOString(),
+      updatedAt: pageData.updated_at,
+    };
+    return page;
+  }
+
+  convertCanvasDiscussionTopic(discussionData: any, moduleItemId: string, courseId: string): DiscussionTopic {
+    const discussion: DiscussionTopic = {
+      id: discussionData.id?.toString(),
+      lmsId: discussionData.id?.toString(),
+      moduleItemId: moduleItemId,
+      courseId: courseId,
+      title: discussionData.title,
+      createdAt: discussionData.created_at,
+      lastReplyAt: discussionData.last_reply_at,
+      postedAt: discussionData.posted_at,
+      message: discussionData.message,
+      htmlUrl: discussionData.html_url,
+      discussionSubentryCount: discussionData.discussion_subentry_count || 0,
+      subscribed: discussionData.subscribed || false,
+      readState: discussionData.read_state,
+      permissions: discussionData.permissions ? {
+        attach: discussionData.permissions.attach || false,
+        reply: discussionData.permissions.reply || false,
+      } : null,
+      createdAtDb: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    return discussion;
+  }
+
+  async getFileDetails(fileId: string, courseId: string): Promise<any> {
     const url = `${this.apiBaseUrl}/courses/${courseId}/files/${fileId}`;
 
     const fileDetailsResponse = await fetch(url, {
@@ -315,10 +305,10 @@ class CanvasProvider extends LMSProvider {
       await this.handleFetchError(fileDetailsResponse, `Failed to fetch file details for ${url}`);
     }
     const fileDetailsData = await fileDetailsResponse.json();
-    return this.convertCanvasFileDetails(fileDetailsData);
+    return fileDetailsData;
   }
 
-  async getDiscussionTopic(topicId: string, courseId: string): Promise<DiscussionTopic> {
+  async getDiscussionTopic(topicId: string, courseId: string): Promise<any> {
     const url = `${this.apiBaseUrl}/courses/${courseId}/discussion_topics/${topicId}`;
 
     const response = await fetch(url, {
@@ -331,10 +321,10 @@ class CanvasProvider extends LMSProvider {
       await this.handleFetchError(response, `Failed to fetch discussion topic ${url}`);
     }
     const discussionData = await response.json();
-    return discussionData as DiscussionTopic;
+    return discussionData;
   }
 
-  async getCourseFiles(courseId: string): Promise<FileDetails[]> {
+  async getCourseFiles(courseId: string): Promise<File[]> {
     const filesResponse = await fetch(
       `${this.apiBaseUrl}/courses/${courseId}/files?per_page=100`,
       {
@@ -348,7 +338,7 @@ class CanvasProvider extends LMSProvider {
       return [];
     }
     const filesData = await filesResponse.json();
-    const fileDetailsList: FileDetails[] = [];
+    const fileDetailsList: any[] = [];
     for (const fileData of filesData) {
       const fileDetails = await this.getFileDetails(fileData.id, courseId);
       fileDetailsList.push(fileDetails);
@@ -356,7 +346,7 @@ class CanvasProvider extends LMSProvider {
     return fileDetailsList;
   }
 
-  async getPage(pageUrl: string, courseId: string): Promise<Page> {
+  async getPage(pageUrl: string, courseId: string): Promise<any> {
     const url = `${this.apiBaseUrl}/courses/${courseId}/pages/${pageUrl}`;
 
     const response = await fetch(url, {
@@ -369,7 +359,7 @@ class CanvasProvider extends LMSProvider {
       await this.handleFetchError(response, `Failed to fetch page ${url}`);
     }
     const pageData = await response.json();
-    return pageData as Page;
+    return pageData;
   }
 
   convertCanvasAssignment(assignmentData: any): Assignment {

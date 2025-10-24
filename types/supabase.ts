@@ -269,7 +269,7 @@ export type Database = {
             foreignKeyName: "document_chats_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
-            referencedRelation: "module_items"
+            referencedRelation: "files"
             referencedColumns: ["id"]
           },
           {
@@ -679,47 +679,6 @@ export type Database = {
           },
           {
             foreignKeyName: "quizzes_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      user_api_keys: {
-        Row: {
-          api_base_url: string | null
-          created_at: string
-          encrypted_api_key: string
-          id: string
-          is_active: boolean | null
-          lms_provider: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          api_base_url?: string | null
-          created_at?: string
-          encrypted_api_key: string
-          id?: string
-          is_active?: boolean | null
-          lms_provider: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          api_base_url?: string | null
-          created_at?: string
-          encrypted_api_key?: string
-          id?: string
-          is_active?: boolean | null
-          lms_provider?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_api_keys_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"

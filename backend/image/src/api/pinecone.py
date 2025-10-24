@@ -10,7 +10,7 @@ from typing import Dict, Any
 from pinecone import Pinecone
 from dotenv import load_dotenv
 from shared.utils.pinecone_utils import chunk_text, sanitize_index_name, sanitize_namespace_name, fix_canvas_file_url
-from api.canvas import get_file_details_with_content
+from api.supabase import get_file_details_with_content_from_db
 
 load_dotenv()
 
@@ -94,9 +94,6 @@ async def set_index_and_namespace(
     pc: Pinecone,
     index_name: str,
     namespace: str,
-    is_file_from_lms: bool = False,
-    api_key: str = None,
-    api_base_url: str = None,
     course_id: str = None,
     file_id: str = None,
     file_info: Dict[str, Any] = None,
@@ -124,14 +121,12 @@ async def set_index_and_namespace(
     
     if not namespace_exists:
         print(f"Namespace '{namespace}' doesn't exist or is empty. Creating...")
-        if not is_file_from_lms:
-            try:
-                file_details = await get_file_details_with_content(api_key, api_base_url, course_id, file_id)
-            except Exception as e:
-                print(f"Error getting file details with content: {e}")
-                file_details = {}
-        else:
-            file_details = file_info if file_info else {}
+        # Query database for file info and content
+        try:
+            file_details = await get_file_details_with_content_from_db(file_id, course_id)
+        except Exception as e:
+            print(f"Error getting file details with content: {e}")
+            file_details = {}
         
         file_content = file_details.get('parsed_content', '')
         
@@ -161,14 +156,11 @@ async def set_index_and_namespace(
 
 
 async def search_file_with_chunk_index(
-    api_key: str,
-    api_base_url: str,
     course_id: str,
     course_name: str,
     file_id: str,
     filename: str,
     chunk_index: int,
-    is_file_from_lms: bool = False,
     file_info: Dict[str, Any] = None,
     top_k: int = 3
 ) -> Dict[str, Any]:
@@ -194,9 +186,6 @@ async def search_file_with_chunk_index(
         pc=pc,
         index_name=index_name,
         namespace=namespace,
-        is_file_from_lms=is_file_from_lms,
-        api_key=api_key,
-        api_base_url=api_base_url,
         course_id=course_id,
         file_id=file_id,
         file_info=file_info,
@@ -269,14 +258,11 @@ async def search_file_with_chunk_index(
         }
 
 async def search_file_with_query(
-    api_key: str,
-    api_base_url: str,
     course_id: str,
     course_name: str,
     file_id: str,
     filename: str,
     query: str,
-    is_file_from_lms: bool = False,
     file_info: Dict[str, Any] = None,
     top_k: int = 3
 ) -> Dict[str, Any]:
@@ -323,9 +309,6 @@ async def search_file_with_query(
         pc=pc,
         index_name=index_name,
         namespace=namespace,
-        is_file_from_lms=is_file_from_lms,
-        api_key=api_key,
-        api_base_url=api_base_url,
         course_id=course_id,
         file_id=file_id,
         file_info=file_info,

@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Search, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { File } from "@/lib/types/course";
+import { useAllFiles } from "@/lib/hooks/useAllFiles";
 
 interface FileSelectorProps {
   courseId: string;
@@ -17,37 +19,27 @@ interface FileSelectorProps {
   onSelectionChange: (fileIds: string[]) => void;
 }
 
-interface FileItemWithModule extends ModuleItem {
+interface FileItemWithModule extends File {
   moduleName: string;
 }
 
 export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: FileSelectorProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const { data: modules = [], isLoading } = useModules(courseId);
+  const { data: allFiles = [], isLoading: allFilesLoading } = useAllFiles(courseId);
+  const { data: modules = [], isLoading: modulesLoading } = useModules(courseId);
 
-  // Flatten all File-type module items with their module names
+  const isLoading = allFilesLoading || modulesLoading;
+
   const fileItems = useMemo(() => {
-    const items: FileItemWithModule[] = [];
-    modules.forEach((module) => {
-      module.moduleItems
-        .filter((item) => item.type === 'File')
-        .forEach((item) => {
-          items.push({
-            ...item,
-            moduleName: module.name,
-          });
-        });
-    });
-    return items;
-  }, [modules]);
+    return allFiles;
+  }, [allFiles]);
 
   // Filter files based on search query
   const filteredFiles = useMemo(() => {
     if (!searchQuery.trim()) return fileItems;
     const query = searchQuery.toLowerCase();
     return fileItems.filter((file) =>
-      file.name.toLowerCase().includes(query) ||
-      file.moduleName.toLowerCase().includes(query)
+      file.displayName.toLowerCase().includes(query)
     );
   }, [fileItems, searchQuery]);
 
@@ -60,7 +52,7 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
   };
 
   const handleSelectAll = () => {
-    const allFileIds = filteredFiles.map((file) => file.lmsContentId).filter((id): id is string => id !== null);
+    const allFileIds = filteredFiles.map((file) => file.id).filter((id): id is string => id !== null);
     onSelectionChange(allFileIds);
   };
 
@@ -77,7 +69,7 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
     );
   }
 
-  if (fileItems.length === 0) {
+  if (allFiles.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
@@ -123,7 +115,7 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
           </Button>
         </div>
         <p className="text-sm text-muted-foreground">
-          {selectedFileIds.length} of {fileItems.length} selected
+          {selectedFileIds.length} of {filteredFiles.length} selected
         </p>
       </div>
 
@@ -136,12 +128,12 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
         ) : (
           <div className="divide-y">
             {filteredFiles.map((file) => {
-              const fileId = file.lmsContentId;
+              const fileId = file.id;
               const isSelected = fileId ? selectedFileIds.includes(fileId) : false;
               
               return (
                 <div
-                  key={file.lmsId || file.id}
+                  key={file.id}
                   className={cn(
                     "flex items-start gap-3 p-4 hover:bg-muted/50 transition-colors cursor-pointer",
                     isSelected && "bg-muted/30"
@@ -156,18 +148,13 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
                   />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      <p className="font-medium text-sm truncate">{file.name}</p>
+                      <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <p className="font-medium text-sm truncate">{file.displayName}</p>
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <Badge variant="secondary" className="text-xs">
-                        {file.moduleName}
+                        {file.moduleItemId ? modules.find((module) => module.moduleItems.find((item) => item.id === file.moduleItemId))?.name : "All files"}
                       </Badge>
-                      {file.contentType && (
-                        <span className="text-xs text-muted-foreground">
-                          {file.contentType}
-                        </span>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -179,4 +166,3 @@ export function FileSelector({ courseId, selectedFileIds, onSelectionChange }: F
     </div>
   );
 }
-

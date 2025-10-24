@@ -44,22 +44,22 @@ function getButtonText(type: string) {
   }
 }
 
-function getHref(type: string, courseID: string, lmsContentId: string) {
+function getHref(type: string, courseID: string, itemId: string) {
   switch (type) {
     case 'File':
-      return `/courses/${courseID}/files/${lmsContentId}`;
+      return `/courses/${courseID}/files/${itemId}`;
     case 'Page':
-      return `/courses/${courseID}/pages/${lmsContentId}`;
+      return `/courses/${courseID}/pages/${itemId}`;
     case 'Discussion':
-      return `/courses/${courseID}/discussion_topics/${lmsContentId}`;
+      return `/courses/${courseID}/discussion_topics/${itemId}`;
     default:
-      return `/courses/${courseID}/files/${lmsContentId}`;
+      return `/courses/${courseID}/files/${itemId}`;
   }
 }
 
 export function ReadingTile({ reading, courseID, module }: { reading: ModuleItem, courseID: string, module: Module }) {
   // Only render supported types
-  if (!['File', 'Page', 'Discussion'].includes(reading.type) && reading.type !== reading.contentType) {
+  if (!['File', 'Page', 'Discussion'].includes(reading.type)) {
     return null;
   }
 
@@ -85,7 +85,7 @@ export function ReadingTile({ reading, courseID, module }: { reading: ModuleItem
       </div>
       <div className="flex items-center gap-2 justify-end">
         {/* <p className="text-sm text-muted-foreground mr-2">{reading.lastRead}</p> */}
-        <Link href={getHref(reading.type, courseID, reading.lmsContentId || '')}>
+        <Link href={getHref(reading.type, courseID, reading.id || '')}>
           <Button size="sm">
             {getButtonText(reading.type)}
           </Button>

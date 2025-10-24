@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 import { LMSFactory } from "@/lib/api";
 import { createClient } from "@/lib/utils/supabase/server";
-import { Course, Module, ModuleItem } from "@/lib/types/course";
+import { Course } from "@/lib/types/course";
 import LMSProvider from "@/lib/lms/lms-provider";
 
 // Server-side Supabase client with service role for bypassing RLS when needed
@@ -92,7 +92,6 @@ async function syncModulesForCourse(
                 course_id: courseId,
                 name: item.name,
                 type: item.type,
-                content_type: item.contentType,
                 url: item.url,
                 position: item.position,
               }, {

@@ -10,8 +10,7 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, FileText, Layers } from "lucide-react";
+import { BookOpen, Clock } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
@@ -108,7 +107,7 @@ function DashboardPage() {
   ];
 
   return (
-    <div className="min-h-screen w-full flex flex-col bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen w-full flex flex-col bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
 
       {/* Header Section */}

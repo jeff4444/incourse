@@ -8,6 +8,7 @@ from tools.supabase_tools import get_course_and_file_info, get_chat_context
 from tools.generation_tools import generate_quiz_from_chat, generate_flashcard_from_chat
 from shared.model import get_model
 from shared.managers import ChatSessionManager
+from api.supabase import get_file_details_with_content_from_db
 
 
 class ChatAnswer(BaseModel):
@@ -25,11 +26,8 @@ class Deps:
     session_id: Optional[str] = None  # Existing chat session ID
     
     # Lazy-loaded fields (fetched by agent tools when needed)
-    lms_api_key: Optional[str] = None
-    lms_base_url: Optional[str] = None
     course_info: Optional[Dict[str, Any]] = None
     file_info: Optional[Dict[str, Any]] = None
-    is_file_from_lms: Optional[bool] = None
     chat_id: Optional[str] = None
     chat_history: Optional[List[Dict[str, Any]]] = None
     context_summary: Optional[str] = None
@@ -43,32 +41,24 @@ class Deps:
             get_or_create_chat_session, 
             get_chat_messages, 
             get_latest_context_snapshot,
-            get_module_items_by_course_id
         )
         
         # 1. Get or create chat session
         if not self.chat_id:
             # Determine document_id for session lookup
             if self.file_info:
-                # File info is loaded, check if it's from LMS
-                if self.is_file_from_lms:
-                    document_id = self.file_id
-                else:
-                    document_id = self.file_info.get("id", self.file_id)
+                document_id = self.file_info.get("id")
             else:
                 # File info not loaded yet, try to determine from DB first
                 try:
-                    file_info = await get_module_items_by_course_id(
+                    file_info = await get_file_details_with_content_from_db(
                         course_id=self.course_id,
-                        lms_id=self.file_id
+                        file_id=self.file_id
                     )
                     document_id = file_info["id"]
                     self.file_info = file_info
-                    self.is_file_from_lms = False
                 except Exception:
-                    # Not in our DB, so it's from LMS
-                    document_id = self.file_id
-                    self.is_file_from_lms = True
+                    raise Exception(f"File not found in our DB: {self.file_id}")
             
             if self.session_id:
                 self.chat_id = self.session_id

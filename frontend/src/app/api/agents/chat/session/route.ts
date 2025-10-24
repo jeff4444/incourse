@@ -32,36 +32,37 @@ export async function POST(request: NextRequest) {
 
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get the lms_content_id (first file ID)
-    const lmsContentId = fileIds[0];
+    // Get the file ID
+    const fileId = fileIds[0];
+    console.log('fileId', fileId);
 
-    // First, find the module_item by lms_content_id and course_id to get the actual document ID
-    const { data: moduleItem, error: moduleItemError } = await supabase
-      .from('module_items')
+    // First, find the file by id or module_item_id and course_id to get the actual document ID
+    const { data: file, error: fileError } = await supabase
+      .from('files')
       .select('id')
-      .eq('lms_content_id', lmsContentId)
+      .or(`id.eq.${fileId},module_item_id.eq.${fileId}`)
       .eq('course_id', courseId)
       .single();
 
-    if (moduleItemError) {
+    if (fileError) {
       // Enhanced error logging with request context
       const errorDetails = {
         endpoint: '/api/agents/chat/session',
-        operation: 'find_module_item',
-        error: moduleItemError,
+        operation: 'find_file',
+        error: fileError,
         requestBody: {
           courseId,
           fileIds,
-          lmsContentId,
+          fileId,
         },
         timestamp: new Date().toISOString(),
       };
       
-      console.error('Error finding module item:', errorDetails);
+      console.error('Error finding file:', errorDetails);
       return NextResponse.json({ error: "Document not found" }, { status: 404 });
     }
 
-    const documentId = moduleItem.id;
+    const documentId = file.id;
 
     // Check if there's an existing chat session for this user-document pair
     const { data: existingSession, error } = await supabase

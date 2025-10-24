@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 import { createClient } from "@/lib/utils/supabase/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
@@ -32,15 +31,59 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             );
         }
 
-        // Create LMS provider with user credentials
-        const result = await createLMSProviderWithUserCredentials(request, course.lms_provider);
-        if (result instanceof NextResponse) {
-            return result; // Return error response
+
+        // Query by database ID
+        const { data: dbFile, error: dbError } = await supabase
+            .from('files')
+            .select('*')
+            .eq('id', fileID)
+            .eq('course_id', courseID)
+            .single();
+
+        if (dbError || !dbFile) {
+            // search by moduleItemId
+            const { data: dbFile, error: dbError } = await supabase
+                .from('files')
+                .select('*')
+                .eq('module_item_id', fileID)
+                .eq('course_id', courseID)
+                .single();
+
+            if (dbError || !dbFile) {
+                return NextResponse.json(
+                    { error: "File not found" },
+                    { status: 404 }
+                );
+            } 
+
+            return NextResponse.json({
+                id: dbFile.id,
+                lmsId: dbFile.lms_id,
+                moduleItemId: dbFile.module_item_id,
+                courseId: dbFile.course_id,
+                displayName: dbFile.display_name,
+                contentType: dbFile.content_type,
+                url: dbFile.url,
+                uuid: dbFile.uuid,
+                size: dbFile.size,
+                createdAt: dbFile.created_at,
+                updatedAt: dbFile.updated_at,
+            })
         }
 
-        const { lmsProvider } = result;
-        const fileDetails = await lmsProvider.getFileDetails(fileID, course.lms_id);
-        return NextResponse.json(fileDetails);
+        return NextResponse.json({
+            id: dbFile.id,
+            lmsId: dbFile.lms_id,
+            moduleItemId: dbFile.module_item_id,
+            courseId: dbFile.course_id,
+            displayName: dbFile.display_name,
+            contentType: dbFile.content_type,
+            url: dbFile.url,
+            uuid: dbFile.uuid,
+            size: dbFile.size,
+            createdAt: dbFile.created_at,
+            updatedAt: dbFile.updated_at,
+        })
     } catch (error) {
         console.error('Error in file details API:', error);
         return NextResponse.json(

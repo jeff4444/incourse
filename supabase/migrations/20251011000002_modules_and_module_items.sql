@@ -65,10 +65,118 @@ CREATE POLICY "Users can create module items" ON module_items
 CREATE POLICY "Users can update module items" ON module_items
     FOR UPDATE USING (true);
 
+-- Create files table
+CREATE TABLE IF NOT EXISTS files (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lms_id TEXT NOT NULL,
+    module_item_id UUID REFERENCES module_items(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    display_name TEXT NOT NULL,
+    content_type TEXT,
+    url TEXT,
+    uuid TEXT,
+    size BIGINT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT files_lms_id_course_id_key UNIQUE (lms_id, course_id)
+);
+
+-- Create pages table
+CREATE TABLE IF NOT EXISTS pages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lms_id TEXT NOT NULL,
+    module_item_id UUID NOT NULL REFERENCES module_items(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    url TEXT,
+    created_at TIMESTAMP WITH TIME ZONE,
+    html_url TEXT,
+    body TEXT,
+    created_at_db TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT pages_lms_id_course_id_key UNIQUE (lms_id, course_id)
+);
+
+-- Create discussion_topics table
+CREATE TABLE IF NOT EXISTS discussion_topics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lms_id TEXT NOT NULL,
+    module_item_id UUID NOT NULL REFERENCES module_items(id) ON DELETE CASCADE,
+    course_id UUID NOT NULL REFERENCES courses(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE,
+    last_reply_at TIMESTAMP WITH TIME ZONE,
+    posted_at TIMESTAMP WITH TIME ZONE,
+    message TEXT,
+    html_url TEXT,
+    discussion_subentry_count INTEGER DEFAULT 0,
+    subscribed BOOLEAN DEFAULT false,
+    read_state TEXT,
+    permissions JSONB,
+    created_at_db TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    CONSTRAINT discussion_topics_lms_id_course_id_key UNIQUE (lms_id, course_id)
+);
+
+-- Create indexes for new tables
+CREATE INDEX IF NOT EXISTS idx_files_lms_id ON files(lms_id);
+CREATE INDEX IF NOT EXISTS idx_files_module_item_id ON files(module_item_id);
+CREATE INDEX IF NOT EXISTS idx_files_course_id ON files(course_id);
+CREATE INDEX IF NOT EXISTS idx_pages_lms_id ON pages(lms_id);
+CREATE INDEX IF NOT EXISTS idx_pages_module_item_id ON pages(module_item_id);
+CREATE INDEX IF NOT EXISTS idx_pages_course_id ON pages(course_id);
+CREATE INDEX IF NOT EXISTS idx_discussion_topics_lms_id ON discussion_topics(lms_id);
+CREATE INDEX IF NOT EXISTS idx_discussion_topics_module_item_id ON discussion_topics(module_item_id);
+CREATE INDEX IF NOT EXISTS idx_discussion_topics_course_id ON discussion_topics(course_id);
+
+-- Enable RLS for new tables
+ALTER TABLE files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE discussion_topics ENABLE ROW LEVEL SECURITY;
+
+-- Files policies
+CREATE POLICY "Users can view files" ON files
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can create files" ON files
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update files" ON files
+    FOR UPDATE USING (true);
+
+-- Pages policies
+CREATE POLICY "Users can view pages" ON pages
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can create pages" ON pages
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update pages" ON pages
+    FOR UPDATE USING (true);
+
+-- Discussion topics policies
+CREATE POLICY "Users can view discussion topics" ON discussion_topics
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can create discussion topics" ON discussion_topics
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can update discussion topics" ON discussion_topics
+    FOR UPDATE USING (true);
+
 -- Triggers for timestamp updates
 CREATE TRIGGER update_modules_updated_at BEFORE UPDATE ON modules
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_module_items_updated_at BEFORE UPDATE ON module_items
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_files_updated_at BEFORE UPDATE ON files
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_pages_updated_at BEFORE UPDATE ON pages
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_discussion_topics_updated_at BEFORE UPDATE ON discussion_topics
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

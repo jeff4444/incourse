@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createLMSProviderWithUserCredentials } from "@/lib/utils/apiHelpers";
 import { createClient } from "@/lib/utils/supabase/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
-export async function GET(request: NextRequest, { params }: { params: Promise<{ courseID: string, pageUrl: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ courseID: string, pageId: string }> }) {
     try {
         const courseID = (await params).courseID;
-        const pageUrl = (await params).pageUrl;
+        const pageId = (await params).pageId;
+        console.log('pageId', pageId);
 
         // Get user from request
         const userData = await getUserFromRequest(request);
@@ -32,15 +32,35 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             );
         }
 
-        // Create LMS provider with user credentials
-        const result = await createLMSProviderWithUserCredentials(request, course.lms_provider);
-        if (result instanceof NextResponse) {
-            return result; // Return error response
+
+        // Query by database ID (treating pageUrl as pageID)
+        const { data: dbPage, error: dbError } = await supabase
+            .from('pages')
+            .select('*')
+            .eq('module_item_id', pageId)
+            .eq('course_id', courseID)
+            .single();
+
+        if (dbError || !dbPage) {
+            return NextResponse.json(
+                { error: "Page not found for page id: " + pageId },
+                { status: 404 }
+            );
         }
 
-        const { lmsProvider } = result;
-        const page = await lmsProvider.getPage(pageUrl, course.lms_id);
-        return NextResponse.json(page);
+        return NextResponse.json({
+            id: dbPage.id,
+            lmsId: dbPage.lms_id,
+            moduleItemId: dbPage.module_item_id,
+            courseId: dbPage.course_id,
+            title: dbPage.title,
+            url: dbPage.url,
+            createdAt: dbPage.created_at,
+            htmlUrl: dbPage.html_url,
+            body: dbPage.body,
+            createdAtDb: dbPage.created_at_db,
+            updatedAt: dbPage.updated_at,
+        });
     } catch (error) {
         console.error('Error in page API:', error);
         return NextResponse.json(

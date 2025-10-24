@@ -7,7 +7,7 @@ import { Navbar } from "@/components/navbar"
 
 export function CourseSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="container mx-auto py-6 px-4 md:px-6">
         {/* Course Header Skeleton */}
