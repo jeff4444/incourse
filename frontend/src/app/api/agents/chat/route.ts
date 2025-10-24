@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userData.accessToken}`,
       },
       body: JSON.stringify({
         user_id: userData.userId,
