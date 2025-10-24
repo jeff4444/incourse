@@ -86,55 +86,8 @@ async def get_user_by_email(
         raise Exception(f"User not found with email: {email}")
     
     return response.data[0]
-  
-async def get_user_lms_info(user_id: str) -> str:
-    """
-    Get the LMS API key for the user.
-    """
-    api_keys = await get_user_api_keys(user_id=user_id)
-    if not api_keys:
-        raise Exception(f"No API keys found for user: {user_id}. Please configure your LMS credentials.")
-    
-    api_key = api_keys[0]
-    encrypted_api_key = api_key["encrypted_api_key"]
-    api_base_url = f"{api_key['api_base_url']}/api/v1"
-    decrypted_api_key = decrypt_api_key(encrypted_api_key)
-    return {
-        "api_key": decrypted_api_key,
-        "base_url": api_base_url
-    }
-    
-async def get_user_api_keys(
-    user_id: str,
-    lms_provider: Optional[str] = None,
-    active_only: bool = True
-) -> List[Dict[str, Any]]:
-    """
-    Get user API keys from Supabase.
-    
-    Args:
-        user_id: User ID
-        lms_provider: Optional filter by LMS provider (canvas, blackboard, moodle, d2l)
-        active_only: If True, only return active API keys
-    
-    Returns:
-        List of user API key dictionaries
-    """
-    print(f"calling get_user_api_keys with user_id={user_id}, lms_provider={lms_provider}, active_only={active_only}")
-    
-    supabase = get_supabase_client()
-    
-    query = supabase.table("user_api_keys").select("*").eq("user_id", user_id)
-    
-    if lms_provider:
-        query = query.eq("lms_provider", lms_provider)
-    
-    if active_only:
-        query = query.eq("is_active", True)
-    
-    response = query.execute()
-    
-    return response.data
+
+
 
 
 async def get_courses(
@@ -1722,3 +1675,208 @@ async def update_note_content(
         raise Exception(f"Failed to update note content for note_id: {note_id}")
     
     return response.data[0]
+
+
+# =====================================================
+# File Functions
+# =====================================================
+
+async def get_file_by_id_or_module_item_id(
+    file_id: str,
+    course_id: str
+) -> Dict[str, Any]:
+    """
+    Get file by either files.id or module_items.id.
+    First tries files table by id, then by module_item_id.
+    
+    Args:
+        file_id: Either files.id (UUID) or module_items.id (UUID)
+        course_id: Course ID
+    
+    Returns:
+        File data dictionary
+    
+    Raises:
+        Exception: If file is not found or query fails
+    """
+    print(f"calling get_file_by_id_or_module_item_id with file_id={file_id}, course_id={course_id}")
+    
+    supabase = get_supabase_client()
+    
+    # First try: query files table by id
+    response = (
+        supabase.table("files")
+        .select("*")
+        .eq("id", file_id)
+        .eq("course_id", course_id)
+        .execute()
+    )
+    
+    if response.data:
+        return response.data[0]
+    
+    # Second try: query files table by module_item_id
+    response = (
+        supabase.table("files")
+        .select("*")
+        .eq("module_item_id", file_id)
+        .eq("course_id", course_id)
+        .execute()
+    )
+    
+    if response.data:
+        return response.data[0]
+    
+    raise Exception(f"File not found with id={file_id} in course_id={course_id}")
+
+
+async def get_file_content_from_url(
+    file_url: str,
+    content_type: str,
+    filename: str
+) -> str:
+    """
+    Download file from URL and parse content.
+    Returns parsed text content similar to Canvas flow.
+    
+    Args:
+        file_url: URL to download file from
+        content_type: MIME type of the file
+        filename: Name of the file
+    
+    Returns:
+        Parsed text content of the file
+    
+    Raises:
+        Exception: If download or parsing fails
+    """
+    print(f"calling get_file_content_from_url with filename={filename}, content_type={content_type}")
+    
+    import aiohttp
+    import tempfile
+    import os
+    from shared.utils.canvas_utils import parse_file_content
+    
+    if not file_url:
+        raise Exception("No file URL provided")
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(file_url) as response:
+            if not response.ok:
+                raise Exception(f"Failed to download file: HTTP {response.status}")
+            
+            file_content = await response.read()
+            
+            # Only parse if file is not too large (limit to 10MB)
+            if len(file_content) > 10 * 1024 * 1024:
+                return f"[File too large to parse ({len(file_content)} bytes)]"
+            
+            # Create a temporary local file
+            file_extension = filename.split('.')[-1] if '.' in filename else 'tmp'
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                temp_file.write(file_content)
+                temp_file_path = temp_file.name
+            
+            try:
+                parsed_content = await parse_file_content(temp_file_path, content_type, filename, file_extension)
+                return parsed_content
+            finally:
+                # Clean up the temporary file
+                os.unlink(temp_file_path)
+
+
+async def get_file_details_with_content_from_db(
+    file_id: str,
+    course_id: str
+) -> Dict[str, Any]:
+    """
+    Get file details and content from database.
+    Downloads file from database URL and parses content.
+    
+    Args:
+        file_id: Either files.id (UUID) or module_items.id (UUID)
+        course_id: Course ID
+    
+    Returns:
+        File details dictionary with parsed_content
+    
+    Raises:
+        Exception: If file is not found or content parsing fails
+    """
+    print(f"calling get_file_details_with_content_from_db with file_id={file_id}, course_id={course_id}")
+    
+    # Get file details from database
+    file_details = await get_file_by_id_or_module_item_id(file_id, course_id)
+    
+    # Extract file info
+    file_url = file_details.get('url')
+    content_type = file_details.get('content_type', '')
+    filename = file_details.get('display_name', '')
+    
+    if file_url and content_type:
+        try:
+            parsed_content = await get_file_content_from_url(file_url, content_type, filename)
+            file_details['parsed_content'] = parsed_content
+        except Exception as e:
+            file_details['parsed_content'] = f"[Error fetching file content: {str(e)}]"
+    else:
+        file_details['parsed_content'] = "[No file URL or content type available]"
+    
+    return file_details
+
+
+async def get_file_details_with_temp_file_from_db(
+    file_id: str,
+    course_id: str
+) -> tuple[Dict, str]:
+    """
+    Get file details and download the actual file to a temporary location from database.
+    Returns both the file details and the path to the temporary file.
+    
+    Args:
+        file_id: Either files.id (UUID) or module_items.id (UUID)
+        course_id: Course ID
+    
+    Returns:
+        tuple: (file_details_dict, temp_file_path)
+    
+    Raises:
+        Exception: If file is not found or download fails
+    """
+    print(f"calling get_file_details_with_temp_file_from_db with file_id={file_id}, course_id={course_id}")
+    
+    import aiohttp
+    import tempfile
+    import os
+    
+    # Get file details from database
+    file_details = await get_file_by_id_or_module_item_id(file_id, course_id)
+    
+    # Extract file info
+    file_url = file_details.get('url')
+    content_type = file_details.get('content_type', '')
+    filename = file_details.get('display_name', '')
+    
+    if not file_url:
+        raise Exception("No file URL available")
+    
+    async with aiohttp.ClientSession() as session:
+        async with session.get(file_url) as response:
+            if not response.ok:
+                raise Exception(f"Failed to download file: HTTP {response.status}")
+            
+            file_content = await response.read()
+            
+            # Only download if file is not too large (limit to 10MB)
+            if len(file_content) > 10 * 1024 * 1024:
+                raise Exception(f"File too large to download ({len(file_content)} bytes)")
+            
+            # Create a temporary local file and keep it
+            file_extension = filename.split('.')[-1] if '.' in filename else 'tmp'
+            with tempfile.NamedTemporaryFile(delete=False, suffix=f'.{file_extension}') as temp_file:
+                temp_file.write(file_content)
+                temp_file_path = temp_file.name
+            
+            # Add temp file path to the details
+            file_details['temp_file_path'] = temp_file_path
+            return file_details, temp_file_path

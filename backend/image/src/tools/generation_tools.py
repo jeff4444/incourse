@@ -6,7 +6,6 @@ import os
 from pydantic_ai import RunContext
 from typing import Dict, Any
 from api.supabase import (
-    get_user_lms_info,
     get_course,
     create_quiz,
     create_quiz_questions,
@@ -41,11 +40,6 @@ async def generate_quiz_from_chat(
     """
     try:
         # Ensure we have required dependencies
-        if not ctx.deps.lms_api_key or not ctx.deps.lms_base_url:
-            lms_info = await get_user_lms_info(user_id=ctx.deps.user_id)
-            ctx.deps.lms_api_key = lms_info["api_key"]
-            ctx.deps.lms_base_url = lms_info["base_url"]
-        
         if not ctx.deps.course_info:
             ctx.deps.course_info = await get_course(course_id=ctx.deps.course_id)
         
@@ -55,8 +49,6 @@ async def generate_quiz_from_chat(
             user_id=ctx.deps.user_id,
             course_id=ctx.deps.course_id,
             file_ids=[ctx.deps.file_id],  # Convert single file_id to list
-            lms_api_key=ctx.deps.lms_api_key,
-            lms_base_url=ctx.deps.lms_base_url,
             course_info=ctx.deps.course_info,
             files_info=[ctx.deps.file_info] if ctx.deps.file_info else None,  # Pass existing file_info if available
             note_ids=[],  # No notes for chat-based generation
@@ -153,11 +145,6 @@ async def generate_flashcard_from_chat(
     """
     try:
         # Ensure we have required dependencies
-        if not ctx.deps.lms_api_key or not ctx.deps.lms_base_url:
-            lms_info = await get_user_lms_info(user_id=ctx.deps.user_id)
-            ctx.deps.lms_api_key = lms_info["api_key"]
-            ctx.deps.lms_base_url = lms_info["base_url"]
-        
         if not ctx.deps.course_info:
             ctx.deps.course_info = await get_course(course_id=ctx.deps.course_id)
         
@@ -167,8 +154,6 @@ async def generate_flashcard_from_chat(
             user_id=ctx.deps.user_id,
             course_id=ctx.deps.course_id,
             file_ids=[ctx.deps.file_id],  # Convert single file_id to list
-            lms_api_key=ctx.deps.lms_api_key,
-            lms_base_url=ctx.deps.lms_base_url,
             course_info=ctx.deps.course_info,
             files_info=[ctx.deps.file_info] if ctx.deps.file_info else None,  # Pass existing file_info if available
             note_ids=[],  # No notes for chat-based generation

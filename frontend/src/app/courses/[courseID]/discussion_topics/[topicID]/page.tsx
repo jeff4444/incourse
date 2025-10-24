@@ -5,21 +5,42 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { DiscussionTopic } from "@/lib/types/course";
+import { DiscussionTopic, File } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import { ExternalLink, MessageSquare, Calendar, Users, Bell, Eye } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
-function transformCanvasFileUrls(html: string, courseID: string): string {
+async function transformCanvasFileUrls(html: string, courseID: string): Promise<string> {
   if (!html) return html;
   
   // Regex to match Canvas file URLs: https://{domain}/courses/{courseId}/files/{fileId}
   const canvasFileUrlRegex = /https:\/\/[^\/]+\/courses\/\d+\/files\/(\d+)/g;
   
-  let transformedHtml = html.replace(canvasFileUrlRegex, (match, fileId) => {
-    return `/courses/${courseID}/files/${fileId}`;
+  // Find all file IDs in the HTML
+  const fileIds = Array.from(html.matchAll(canvasFileUrlRegex)).map(match => match[1]);
+  
+  // Create a map of lmsId -> databaseId
+  const fileIdMap = new Map<string, string>();
+  
+  // Fetch file data for each lmsId
+  for (const lmsId of fileIds) {
+    try {
+      const response = await authenticatedFetchJson<File>(`/api/courses/${courseID}/files/by-lms-id/${lmsId}`);
+      fileIdMap.set(lmsId, response.id || '');
+    } catch (error) {
+      console.error(`Failed to fetch file data for lmsId ${lmsId}:`, error);
+    }
+  }
+  
+  let transformedHtml = html.replace(canvasFileUrlRegex, (match, lmsId) => {
+    const databaseId = fileIdMap.get(lmsId);
+    if (databaseId) {
+      return `/courses/${courseID}/files/${databaseId}`;
+    }
+    // Fallback to original URL if we couldn't find the database ID
+    return match;
   });
   
   // Remove target="_blank" from all links to make them open in current tab
@@ -38,6 +59,7 @@ function DiscussionTopicPage({
   const [discussionTopic, setDiscussionTopic] = useState<DiscussionTopic | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [transformedMessage, setTransformedMessage] = useState<string>("");
 
   useEffect(() => {
     const getParams = async () => {
@@ -66,6 +88,18 @@ function DiscussionTopicPage({
 
     fetchData();
   }, [topicID, courseID]);
+
+  // Transform message HTML when discussion topic changes
+  useEffect(() => {
+    if (discussionTopic?.message && courseID) {
+      transformCanvasFileUrls(discussionTopic.message, courseID)
+        .then(setTransformedMessage)
+        .catch(error => {
+          console.error('Error transforming message HTML:', error);
+          setTransformedMessage(discussionTopic.message || "");
+        });
+    }
+  }, [discussionTopic, courseID]);
 
   if (loading) {
     return (
@@ -121,12 +155,12 @@ function DiscussionTopicPage({
                 <div className="flex items-center gap-4 text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    <span>Created {formatDate(discussionTopic.created_at)}</span>
+                    <span>Created {formatDate(discussionTopic.createdAt || '')}</span>
                   </div>
-                  {discussionTopic.last_reply_at && (
+                  {discussionTopic.lastReplyAt && (
                     <div className="flex items-center gap-2">
                       <MessageSquare className="w-4 h-4" />
-                      <span>Last reply {formatDate(discussionTopic.last_reply_at)}</span>
+                      <span>Last reply {formatDate(discussionTopic.lastReplyAt || '')}</span>
                     </div>
                   )}
                 </div>
@@ -138,7 +172,7 @@ function DiscussionTopicPage({
                     Subscribed
                   </Badge>
                 )}
-                {discussionTopic.read_state === "unread" && (
+                {discussionTopic.readState === "unread" && (
                   <Badge className="bg-red-100 text-red-800 flex items-center gap-1">
                     <Eye className="w-4 h-4" />
                     Unread
@@ -151,19 +185,19 @@ function DiscussionTopicPage({
               <Card className="">
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Replies</div>
-                  <div className="font-medium">{discussionTopic.discussion_subentry_count}</div>
+                  <div className="font-medium">{discussionTopic.discussionSubentryCount}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Created</div>
-                  <div className="font-medium">{formatDate(discussionTopic.created_at)}</div>
+                  <div className="font-medium">{formatDate(discussionTopic.createdAt || '')}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Status</div>
-                  <div className="font-medium">{discussionTopic.read_state === "unread" ? "Unread" : "Read"}</div>
+                  <div className="font-medium">{discussionTopic.readState === "unread" ? "Unread" : "Read"}</div>
                 </CardContent>
               </Card>
             </div>
@@ -182,7 +216,7 @@ function DiscussionTopicPage({
                 <div 
                   className="prose prose-gray max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground [&_a]:text-blue-600 [&_a]:underline hover:[&_a]:text-blue-800"
                   dangerouslySetInnerHTML={{ 
-                    __html: transformCanvasFileUrls(discussionTopic.message, courseID) 
+                    __html: transformedMessage || discussionTopic.message
                   }}
                 />
               ) : (
@@ -194,13 +228,13 @@ function DiscussionTopicPage({
           {/* Action Buttons */}
           <div className="mt-6 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {discussionTopic.permissions.reply && (
+              {discussionTopic.permissions?.reply && (
                 <Button>
                   <MessageSquare className="w-4 h-4 mr-2" />
                   Reply
                 </Button>
               )}
-              {discussionTopic.permissions.attach && (
+              {discussionTopic.permissions?.attach && (
                 <Button variant="outline">
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Attach File
@@ -213,7 +247,7 @@ function DiscussionTopicPage({
                   Back to Course
                 </Button>
               </Link>
-              <Link href={discussionTopic.html_url} target="_blank">
+              <Link href={discussionTopic.htmlUrl || ''} target="_blank">
                 <Button>
                   <ExternalLink className="w-4 h-4 mr-2" />
                   Open in Canvas

@@ -4,21 +4,43 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { BackButtonClient } from "@/components/back-button-client";
-import { ExternalLink, FileText, Calendar, User, Eye } from "lucide-react";
+import { ExternalLink, FileText, Calendar } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { usePage } from "@/lib/hooks/usePages";
+import { authenticatedFetchJson } from "@/lib/utils/apiClient";
+import { DiscussionTopic, File, Page } from "@/lib/types/course";
 
 // Utility function to transform Canvas file URLs to our file viewing URLs
-function transformCanvasFileUrls(html: string, courseID: string): string {
+async function transformCanvasFileUrls(html: string, courseID: string): Promise<string> {
   if (!html) return html;
   
   // Regex to match Canvas file URLs: https://{domain}/courses/{courseId}/files/{fileId}
   const canvasFileUrlRegex = /https:\/\/[^\/]+\/courses\/\d+\/files\/(\d+)/g;
   
-  let transformedHtml = html.replace(canvasFileUrlRegex, (match, fileId) => {
-    return `/courses/${courseID}/files/${fileId}`;
+  // Find all file IDs in the HTML
+  const fileIds = Array.from(html.matchAll(canvasFileUrlRegex)).map(match => match[1]);
+  
+  // Create a map of lmsId -> databaseId
+  const fileIdMap = new Map<string, string>();
+  
+  // Fetch file data for each lmsId
+  for (const lmsId of fileIds) {
+    try {
+      const response = await authenticatedFetchJson<File>(`/api/courses/${courseID}/files/by-lms-id/${lmsId}`);
+      fileIdMap.set(lmsId, response.id || '');
+    } catch (error) {
+      console.error(`Failed to fetch file data for lmsId ${lmsId}:`, error);
+    }
+  }
+  
+  let transformedHtml = html.replace(canvasFileUrlRegex, (match, lmsId) => {
+    const databaseId = fileIdMap.get(lmsId);
+    if (databaseId) {
+      return `/courses/${courseID}/files/${databaseId}`;
+    }
+    // Fallback to original URL if we couldn't find the database ID
+    return match;
   });
   
   // Remove target="_blank" from all links to make them open in current tab
@@ -30,35 +52,52 @@ function transformCanvasFileUrls(html: string, courseID: string): string {
 function PageViewer({
   params,
 }: {
-  params: Promise<{ pageUrl: string, courseID: string }>;
+  params: Promise<{ pageId: string, courseID: string }>;
 }) {
-  const [pageUrl, setPageUrl] = useState<string>("");
+  const [pageId, setPageId] = useState<string>("");
   const [courseID, setCourseID] = useState<string>("");
-
+  const [page, setPage] = useState<Page | null>(null);
+  const [transformedBody, setTransformedBody] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const getParams = async () => {
       const resolvedParams = await params;
-      setPageUrl(resolvedParams.pageUrl);
+      setPageId(resolvedParams.pageId);
       setCourseID(resolvedParams.courseID);
     };
     getParams();
   }, [params]);
 
-  const { data: page, isLoading: loading, error } = usePage(courseID, pageUrl);
+  useEffect(() => {
+    if (page?.body && courseID) {
+      transformCanvasFileUrls(page.body, courseID)
+        .then(setTransformedBody)
+        .catch(error => {
+          console.error('Error transforming page body:', error);
+          setTransformedBody(page.body || "");
+        });
+    }
+  }, [page, courseID]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-        <div className="container mx-auto py-6 px-4 md:px-6">
-          <BackButtonClient />
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-500 mx-auto"></div>
-            <p className="text-muted-foreground mt-2">Loading page...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!pageId || !courseID) return;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const data = await authenticatedFetchJson<Page>(`/api/courses/${courseID}/pages/${pageId}`);
+        setPage(data);
+      } catch (error) {
+        console.error('Error fetching page:', error);
+        setError('Failed to load page');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [pageId, courseID]);
 
   if (error || !page) {
     return (
@@ -67,7 +106,7 @@ function PageViewer({
           <BackButtonClient />
           <div className="text-center text-red-500 mt-8">
             <h2 className="text-xl font-semibold mb-2">Failed to load page</h2>
-            <p>{error instanceof Error ? error.message : "The page you're looking for could not be found."}</p>
+            <p>{error || "The page you're looking for could not be found."}</p>
           </div>
         </div>
       </div>
@@ -100,28 +139,9 @@ function PageViewer({
                 <div className="flex items-center gap-4 text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
-                    <span>Updated {formatDate(page.updated_at)}</span>
+                    <span>Updated {formatDate(page.updatedAt)}</span>
                   </div>
-                  {page.last_edited_by && (
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span>by {page.last_edited_by.display_name}</span>
-                    </div>
-                  )}
                 </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {page.published && (
-                  <Badge className="bg-green-100 text-green-800 flex items-center gap-1">
-                    <Eye className="w-4 h-4" />
-                    Published
-                  </Badge>
-                )}
-                {page.front_page && (
-                  <Badge className="bg-blue-100 text-blue-800">
-                    Front Page
-                  </Badge>
-                )}
               </div>
             </div>
 
@@ -129,19 +149,19 @@ function PageViewer({
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Created</div>
-                  <div className="font-medium">{formatDate(page.created_at)}</div>
+                  <div className="font-medium">{formatDate(page.createdAt || '')}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Last Updated</div>
-                  <div className="font-medium">{formatDate(page.updated_at)}</div>
+                  <div className="font-medium">{formatDate(page.updatedAt)}</div>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="p-4">
                   <div className="text-sm text-muted-foreground">Status</div>
-                  <div className="font-medium">{page.published ? "Published" : "Draft"}</div>
+                  <div className="font-medium">Published</div>
                 </CardContent>
               </Card>
             </div>
@@ -160,7 +180,7 @@ function PageViewer({
                 <div 
                   className="prose prose-gray max-w-none prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground [&_a]:text-blue-600 [&_a]:underline hover:[&_a]:text-blue-800"
                   dangerouslySetInnerHTML={{ 
-                    __html: transformCanvasFileUrls(page.body, courseID) 
+                    __html: transformedBody
                   }}
                 />
               ) : (
@@ -176,7 +196,7 @@ function PageViewer({
                 Back to Course
               </Button>
             </Link>
-            <Link href={page.html_url} target="_blank">
+            <Link href={page.htmlUrl || ''} target="_blank">
               <Button>
                 <ExternalLink className="w-4 h-4 mr-2" />
                 Open in Canvas
@@ -192,7 +212,7 @@ function PageViewer({
 export default function WrappedPageViewer({
   params,
 }: {
-  params: Promise<{ pageUrl: string, courseID: string }>;
+  params: Promise<{ pageId: string, courseID: string }>;
 }) {
   return (
     <ProtectedRoute>

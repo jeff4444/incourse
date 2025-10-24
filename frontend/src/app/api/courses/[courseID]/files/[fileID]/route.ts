@@ -39,8 +39,59 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }
 
         const { lmsProvider } = result;
-        const fileDetails = await lmsProvider.getFileDetails(fileID, course.lms_id);
-        return NextResponse.json(fileDetails);
+
+        // Query by database ID
+        const { data: dbFile, error: dbError } = await supabase
+            .from('files')
+            .select('*')
+            .eq('id', fileID)
+            .eq('course_id', courseID)
+            .single();
+
+        if (dbError || !dbFile) {
+            // search by moduleItemId
+            const { data: dbFile, error: dbError } = await supabase
+                .from('files')
+                .select('*')
+                .eq('module_item_id', fileID)
+                .eq('course_id', courseID)
+                .single();
+
+            if (dbError || !dbFile) {
+                return NextResponse.json(
+                    { error: "File not found" },
+                    { status: 404 }
+                );
+            } 
+
+            return NextResponse.json({
+                id: dbFile.id,
+                lmsId: dbFile.lms_id,
+                moduleItemId: dbFile.module_item_id,
+                courseId: dbFile.course_id,
+                displayName: dbFile.display_name,
+                contentType: dbFile.content_type,
+                url: dbFile.url,
+                uuid: dbFile.uuid,
+                size: dbFile.size,
+                createdAt: dbFile.created_at,
+                updatedAt: dbFile.updated_at,
+            })
+        }
+
+        return NextResponse.json({
+            id: dbFile.id,
+            lmsId: dbFile.lms_id,
+            moduleItemId: dbFile.module_item_id,
+            courseId: dbFile.course_id,
+            displayName: dbFile.display_name,
+            contentType: dbFile.content_type,
+            url: dbFile.url,
+            uuid: dbFile.uuid,
+            size: dbFile.size,
+            createdAt: dbFile.created_at,
+            updatedAt: dbFile.updated_at,
+        })
     } catch (error) {
         console.error('Error in file details API:', error);
         return NextResponse.json(

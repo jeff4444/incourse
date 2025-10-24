@@ -39,8 +39,40 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         }
 
         const { lmsProvider } = result;
-        const discussionTopic = await lmsProvider.getDiscussionTopic(topicID, course.lms_id);
-        return NextResponse.json(discussionTopic);
+
+        // Query by database ID
+        const { data: dbDiscussion, error: dbError } = await supabase
+            .from('discussion_topics')
+            .select('*')
+            .eq('module_item_id', topicID)
+            .eq('course_id', courseID)
+            .single();
+
+        if (dbError || !dbDiscussion) {
+            return NextResponse.json(
+                { error: "Discussion not found" },
+                { status: 404 }
+            );
+        }
+
+        return NextResponse.json({
+            id: dbDiscussion.id,
+            lmsId: dbDiscussion.lms_id,
+            moduleItemId: dbDiscussion.module_item_id,
+            courseId: dbDiscussion.course_id,
+            title: dbDiscussion.title,
+            createdAt: dbDiscussion.created_at,
+            lastReplyAt: dbDiscussion.last_reply_at,
+            postedAt: dbDiscussion.posted_at,
+            message: dbDiscussion.message,
+            htmlUrl: dbDiscussion.html_url,
+            discussionSubentryCount: dbDiscussion.discussion_subentry_count,
+            subscribed: dbDiscussion.subscribed,
+            readState: dbDiscussion.read_state,
+            permissions: dbDiscussion.permissions,
+            createdAtDb: dbDiscussion.created_at_db,
+            updatedAt: dbDiscussion.updated_at,
+        });
     } catch (error) {
         console.error('Error in discussion topic API:', error);
         return NextResponse.json(

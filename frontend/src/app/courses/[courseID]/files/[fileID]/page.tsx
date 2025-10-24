@@ -8,7 +8,7 @@ import DOCXViewer from "@/components/docx-viewer";
 import ImageViewer from "@/components/image-viewer";
 import { ChatPanel } from "@/components/ai-chat-panel";
 import { Button } from "@/components/ui/button";
-import { FileDetails } from "@/lib/types/course";
+import { File } from "@/lib/types/course";
 import { BackButtonClient } from "@/components/back-button-client";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -17,38 +17,35 @@ import { Play, Square, Clock, FileCheck, MessageSquare } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { nanoid } from "@/lib/utils";
 
-function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean) {
+function getViewer(fileDetails: File, courseID?: string, onTogglePanelVisibility?: () => void, onShowPanel?: () => void, onAddToContext?: (text: string, pageNumber: number) => void, showContextOptions?: boolean) {
   // PDF files
-  if (fileDetails.type === "application/pdf" || fileDetails.contentType === "application/pdf") {
+  if (fileDetails.contentType === "application/pdf") {
     return <PDFViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // PowerPoint files
-  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+  if (fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
-      fileDetails.type === "application/vnd.ms-powerpoint" ||
       fileDetails.contentType === "application/vnd.ms-powerpoint") {
     return <PPTXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Excel files
-  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+  if (fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-      fileDetails.type === "application/vnd.ms-excel" ||
       fileDetails.contentType === "application/vnd.ms-excel") {
     return <XLSXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Word files
-  if (fileDetails.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+  if (fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       fileDetails.contentType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
-      fileDetails.type === "application/msword" ||
       fileDetails.contentType === "application/msword") {
     return <DOCXViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
   // Image files
-  if (fileDetails.type.startsWith("image/") || fileDetails.contentType?.startsWith("image/")) {
+  if (fileDetails.contentType?.startsWith("image/")) {
     return <ImageViewer fileDetails={fileDetails} courseId={courseID} onTogglePanelVisibility={onTogglePanelVisibility} onShowPanel={onShowPanel} onAddToContext={onAddToContext} showContextOptions={showContextOptions} />;
   }
   
@@ -58,7 +55,7 @@ function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVis
       <div className="max-w-md mx-auto">
         <h2 className="text-xl font-semibold mb-2">Unsupported File Type</h2>
         <p className="text-gray-600 mb-4">
-          The file type "{fileDetails.type}" is not currently supported for viewing.
+          The file type "{fileDetails.contentType}" is not currently supported for viewing.
         </p>
         <p className="text-sm text-gray-500 mb-4">
           Supported formats: PDF, PowerPoint (PPTX/PPT), Excel (XLSX/XLS), Word (DOCX/DOC), Images (JPEG, PNG, GIF, WebP)
@@ -66,8 +63,8 @@ function getViewer(fileDetails: FileDetails, courseID?: string, onTogglePanelVis
         <Button 
           onClick={() => {
             const link = document.createElement("a");
-            link.href = fileDetails.url;
-            link.download = fileDetails.name;
+            link.href = fileDetails.url || '';
+            link.download = fileDetails.displayName;
             link.click();
           }}
           variant="outline"
@@ -87,7 +84,7 @@ function FileViewPage({
 }) {
   const [fileID, setFileID] = useState<string>("");
   const [courseID, setCourseID] = useState<string>("");
-  const [fileDetails, setFileDetails] = useState<FileDetails | null>(null);
+  const [fileDetails, setFileDetails] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showChatPanel, setShowChatPanel] = useState(true);
@@ -106,12 +103,12 @@ function FileViewPage({
   const router = useRouter();
 
   // Check if filename contains "homework" or "assignment" (case insensitive)
-  const shouldShowAutogradeButton = fileDetails?.name && 
-    (fileDetails.name.toLowerCase().includes('homework') || 
-     fileDetails.name.toLowerCase().includes('assignment') ||
-     fileDetails.name.toLowerCase().includes('quiz') ||
-     fileDetails.name.toLowerCase().includes('test') ||
-     fileDetails.name.toLowerCase().includes('exam'));
+    const shouldShowAutogradeButton = fileDetails?.displayName && 
+    (fileDetails.displayName.toLowerCase().includes('homework') || 
+     fileDetails.displayName.toLowerCase().includes('assignment') ||
+     fileDetails.displayName.toLowerCase().includes('quiz') ||
+     fileDetails.displayName.toLowerCase().includes('test') ||
+     fileDetails.displayName.toLowerCase().includes('exam'));
 
   // Handle panel visibility toggle
   const handleTogglePanelVisibility = () => {
@@ -128,7 +125,7 @@ function FileViewPage({
     const newContextItem = {
       id: nanoid(),
       text,
-      source: fileDetails?.name || 'document',
+      source: fileDetails?.displayName || 'document',
       pageNumber
     };
     setContextItems([...contextItems, newContextItem]);
@@ -198,7 +195,7 @@ function FileViewPage({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 courseId: courseID,
-                fileIds: [fileDetails.canvasId || fileDetails.id || ''],
+                fileIds: [fileDetails.id || ''],
               }),
             }
           );
@@ -219,8 +216,8 @@ function FileViewPage({
 
   // Reading tracker - only enable when we have file details
   const { timeSpent, isTracking, startTracking, stopTracking, logActivity } = useReadingTracker(
-    fileDetails?.id || fileDetails?.canvasId || '',
-    fileDetails?.name || '',
+    fileDetails?.id || '',
+    fileDetails?.displayName || '',
     courseID,
     !!fileDetails
   );
@@ -247,7 +244,7 @@ function FileViewPage({
     const fetchData = async () => {
       try {
         setLoading(true);
-        const data = await authenticatedFetchJson<FileDetails>(`/api/courses/${courseID}/files/${fileID}`);
+        const data = await authenticatedFetchJson<File>(`/api/courses/${courseID}/files/${fileID}`);
         setFileDetails(data);
       } catch (error) {
         console.error('Error fetching file details:', error);
@@ -297,7 +294,7 @@ function FileViewPage({
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <BackButtonClient />
-          <h1 className="text-xl font-semibold">{fileDetails.name}</h1>
+          <h1 className="text-xl font-semibold">{fileDetails.displayName}</h1>
         </div>
         
         {/* Reading Tracker Controls */}
@@ -386,7 +383,7 @@ function FileViewPage({
             onRemoveContextItem={handleRemoveContextItem}
             onAddContextItem={handleAddContextItem}
             courseId={courseID}
-            fileIdList={[fileDetails.canvasId || fileDetails.id || '']}
+            fileIdList={[fileDetails.id || '']}
             initialSessionId={chatSessionId || undefined}
             messages={chatMessages}
             onUpdateMessages={handleUpdateChatMessages}

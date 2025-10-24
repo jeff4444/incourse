@@ -54,8 +54,6 @@ class Deps:
     file_ids: List[str]
     
     # Lazy-loaded fields (will be fetched by tools if needed, but can be pre-populated)
-    lms_api_key: Optional[str] = None
-    lms_base_url: Optional[str] = None
     course_info: Optional[Dict[str, Any]] = None
     files_info: Optional[List[Dict[str, Any]]] = None
     note_ids: Optional[List[str]] = None

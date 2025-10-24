@@ -8,13 +8,13 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { BookOpen, ChevronLeft, Clock, Download, Play, Plus, ThumbsUp, Brain, FlaskConical, ClipboardList, StickyNote } from "lucide-react"
 import { Navbar } from "@/components/navbar"
-import { SummaryViewer } from "@/components/summary-viewer"
 import { ModuleList } from "@/components/module-list"
 import { AssignmentList } from "@/components/assignment-list"
 import { CourseSkeleton } from "@/components/course-skeleton"
 import ProtectedRoute from "@/components/auth/ProtectedRoute"
 import { useCourse } from "@/lib/hooks/useCourses"
 import { useModules } from "@/lib/hooks/useModules"
+import { useAllFiles } from "@/lib/hooks/useAllFiles"
 import { useFlashcardDecks } from "@/lib/hooks/useFlashcards"
 import { useQuizzes } from "@/lib/hooks/useQuizzes"
 import { useAssignments } from "@/lib/hooks/useAssignments"
@@ -51,13 +51,38 @@ function CoursePage({
 
   const { data: course, isLoading: courseLoading, error: courseError } = useCourse(courseID);
   const { data: modules = [], isLoading: modulesLoading, error: modulesError } = useModules(courseID);
+  const { data: allFiles = [], isLoading: allFilesLoading } = useAllFiles(courseID, true);
   const { data: flashcardDecks = [], isLoading: flashcardsLoading } = useFlashcardDecks(courseID, userId);
   const { data: quizzes = [], isLoading: quizzesLoading } = useQuizzes(courseID, userId);
   const { data: assignments = [], isLoading: assignmentsLoading } = useAssignments(courseID);
   const { data: noteFolders = [], isLoading: noteFoldersLoading } = useNoteFolders(courseID, userId);
   const { data: notes = [], isLoading: notesLoading } = useNotes(courseID, userId);
 
-  const loading = courseLoading || modulesLoading;
+  // Create pseudo "All Files" module if files exist
+  const allFilesModule = allFiles.length > 0 ? {
+    id: "all-files",
+    lmsId: "all-files",
+    courseId: courseID,
+    name: "All Files",
+    description: "All course files",
+    itemsCount: allFiles.length,
+    moduleItems: allFiles.map((file, index) => ({
+      id: file.id,
+      lmsId: file.lmsId,
+      lmsContentId: file.lmsId,
+      name: file.displayName,
+      moduleId: "all-files",
+      courseId: courseID,
+      type: "File",
+      url: file.url,
+      position: index + 1,
+    })),
+    prerequisites: null,
+  } : null;
+
+  const allModules = allFilesModule ? [...modules, allFilesModule] : modules;
+
+  const loading = courseLoading || modulesLoading || allFilesLoading;
   const error = courseError || modulesError;
 
   if (loading) {
@@ -66,7 +91,7 @@ function CoursePage({
 
   if (error || !course) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
         <Navbar />
         <div className="container mx-auto py-6 px-4 md:px-6">
           <div className="text-center text-red-500 mt-8">
@@ -79,7 +104,7 @@ function CoursePage({
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
       <div className="container mx-auto py-6 px-4 md:px-6">
         {/* Course Header */}
@@ -122,7 +147,7 @@ function CoursePage({
                     <CardDescription>Access your course materials and resources</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ModuleList modules={modules} courseID={courseID} />
+                    <ModuleList modules={allModules} courseID={courseID} />
                   </CardContent>
                 </Card>
               </div>

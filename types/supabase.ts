@@ -269,7 +269,7 @@ export type Database = {
             foreignKeyName: "document_chats_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
-            referencedRelation: "module_items"
+            referencedRelation: "files"
             referencedColumns: ["id"]
           },
           {
