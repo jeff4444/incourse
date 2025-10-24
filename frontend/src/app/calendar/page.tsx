@@ -132,7 +132,7 @@ const CalendarPage = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+      <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
         <Navbar />
         <main className="container mx-auto py-6 px-4 md:px-6">
           <div className="flex items-center justify-center min-h-[400px]">
@@ -147,7 +147,7 @@ const CalendarPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
 
       <main className="container mx-auto py-6 px-4 md:px-6">

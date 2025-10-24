@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Skeleton } from "./ui/skeleton";
 
 export function CalendarSkeleton() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
+    <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       {/* Header Skeleton */}
       <div className="container mx-auto py-6 px-4 md:px-6">
         <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-8">

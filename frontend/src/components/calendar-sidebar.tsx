@@ -70,10 +70,10 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
               >
                 <div className="flex justify-between items-start mb-2 gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm break-words leading-tight">
+                    <p className="font-medium text-sm wrap-break-words leading-tight">
                       {event.title}
                     </p>
-                    <p className="text-xs text-muted-foreground break-words">
+                    <p className="text-xs text-muted-foreground wrap-break-words">
                       {event.courseCode || event.courseName || 'Course Event'}
                     </p>
                   </div>
@@ -83,7 +83,7 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
                     {formatTimeUntil(event.date)}
                   </Badge>
                 </div>
-                <div className="text-xs text-muted-foreground break-words">
+                <div className="text-xs text-muted-foreground wrap-break-words">
                   {event.date.toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
@@ -118,10 +118,10 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
               >
                 <div className="flex justify-between items-start mb-1 gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-sm break-words leading-tight">
+                    <p className="font-medium text-sm wrap-break-words leading-tight">
                       {event.title}
                     </p>
-                    <p className="text-xs text-muted-foreground break-words">
+                    <p className="text-xs text-muted-foreground wrap-break-words">
                       {event.courseCode || event.courseName || 'Course Event'}
                     </p>
                   </div>
@@ -129,7 +129,7 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
                     {event.type.replace('-', ' ')}
                   </Badge>
                 </div>
-                <div className="text-xs text-muted-foreground break-words">
+                <div className="text-xs text-muted-foreground wrap-break-words">
                   {event.date.toLocaleTimeString("en-US", {
                     hour: "numeric",
                     minute: "2-digit",
