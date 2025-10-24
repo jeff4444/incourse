@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     // Filter courses that have calendar URLs
     const coursesWithCalendar = enrollments
-      .filter(enrollment => enrollment.courses && enrollment.courses.calendar)
+      .filter(enrollment => enrollment.courses)
       .map(enrollment => {
         const course = Array.isArray(enrollment.courses) 
           ? enrollment.courses[0] 
