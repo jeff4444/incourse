@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
                             description: course.description,
                             semester: course.semester,
                             year: course.year,
+                            calendar: course.calendar,
                         };
                     });
 
