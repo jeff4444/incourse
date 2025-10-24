@@ -1,0 +1,19 @@
+{
+  "name": "authorizer",
+  "version": "1.0.0",
+  "description": "Lambda authorizer for JWT validation",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "dependencies": {
+    "@types/aws-lambda": "^8.10.156",
+    "@types/jsonwebtoken": "^9.0.5",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

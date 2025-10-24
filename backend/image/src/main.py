@@ -6,9 +6,10 @@ import tempfile
 import subprocess
 import aiohttp
 import json
+import jwt
 from pathlib import Path
 from typing import List, Dict, Optional, Any
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field, validator
@@ -82,11 +83,63 @@ app = FastAPI(
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure this properly for production
+    allow_origins=["https://incourse-three.vercel.app"],  # Only allow production frontend
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
+
+# JWT Validation
+def verify_supabase_token(authorization: str = Header(None)) -> Dict[str, Any]:
+    """Verify Supabase JWT token and extract user info"""
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+    
+    if not authorization.startswith('Bearer '):
+        raise HTTPException(status_code=401, detail="Invalid Authorization header format")
+    
+    token = authorization.split(' ')[1]
+    
+    try:
+        # Get Supabase JWT secret from environment
+        supabase_jwt_secret = os.getenv('SUPABASE_JWT_SECRET')
+        if not supabase_jwt_secret:
+            raise HTTPException(status_code=500, detail="JWT secret not configured")
+        
+        if os.getenv("RUNNING_LOCALLY"):
+            return {
+                "user_id": "123",
+                "email": "test@test.com",
+                "token": token
+            }
+        
+        # Decode and verify the token
+        payload = jwt.decode(
+            token, 
+            supabase_jwt_secret, 
+            algorithms=['HS256'],
+            options={"verify_exp": True}
+        )
+        
+        user_id = payload.get('sub')
+        email = payload.get('email')
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="Invalid token: no user ID found")
+        
+        return {
+            "user_id": user_id,
+            "email": email or "",
+            "token": token
+        }
+        
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError as e:
+        print(authorization)
+        raise HTTPException(status_code=401, detail=f"Invalid token: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Token validation error: {str(e)}")
 
 # Request/Response Models
 class FlashcardRequest(BaseModel):
@@ -216,11 +269,14 @@ async def health_check():
 
 # Flashcard Generation Endpoint
 @app.post("/generate-flashcards", response_model=FlashcardResponse)
-async def generate_flashcards(request: FlashcardRequest):
+async def generate_flashcards(request: FlashcardRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Generate flashcards based on course content and files, and store them in the database.
     """
     try:
+        # Validate that the user_id in the request matches the token
+        if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+            raise HTTPException(status_code=403, detail="User ID mismatch")
         # Pre-load dependencies to avoid refetching on every tool call
         course_info = await get_course(request.course_id)
         
@@ -298,11 +354,14 @@ async def generate_flashcards(request: FlashcardRequest):
 
 # Quiz Generation Endpoint
 @app.post("/generate-quiz", response_model=QuizResponse)
-async def generate_quiz(request: QuizRequest):
+async def generate_quiz(request: QuizRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Generate quiz questions based on course content and files, and store them in the database.
     """
     try:
+        # Validate that the user_id in the request matches the token
+        if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+            raise HTTPException(status_code=403, detail="User ID mismatch")
         # Pre-load dependencies to avoid refetching on every tool call
         course_info = await get_course(request.course_id)
         
@@ -381,11 +440,14 @@ async def generate_quiz(request: QuizRequest):
 
 # Nudge Generation Endpoint
 @app.post("/generate-nudges", response_model=NudgeResponse)
-async def generate_nudges(request: NudgeRequest):
+async def generate_nudges(request: NudgeRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Generate personalized nudges for the user.
     """
-    try:        
+    try:
+        # Validate that the user_id in the request matches the token
+        if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+            raise HTTPException(status_code=403, detail="User ID mismatch")
         deps = NudgeDeps(
             user_id=request.user_id,
         )
@@ -410,11 +472,14 @@ async def generate_nudges(request: NudgeRequest):
 
 # Take Action Endpoint
 @app.post("/take-action", response_model=TakeActionResponse)
-async def take_action(request: TakeActionRequest):
+async def take_action(request: TakeActionRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Process user input and determine the appropriate action to take.
     """
     try:
+        # Validate that the user_id in the request matches the token
+        if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+            raise HTTPException(status_code=403, detail="User ID mismatch")
         deps = TakeActionDeps(
             user_id=request.user_id,
         )
@@ -453,13 +518,16 @@ async def get_agents_status():
 
 # Chat Agent Endpoint
 @app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Chat with an AI assistant in the context of a course and selected files.
     The agent intelligently fetches context only when needed, making simple
     queries like "hi" much faster.
     """
     try:
+        # Validate that the user_id in the request matches the token
+        if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+            raise HTTPException(status_code=403, detail="User ID mismatch")
         # Create minimal dependencies - agent will fetch what it needs
         deps = ChatDeps(
             user_id=request.user_id,
@@ -567,7 +635,7 @@ async def chat(request: ChatRequest):
 
 # Chat Agent Streaming Endpoint
 @app.post("/chat/stream")
-async def chat_stream(request: ChatRequest):
+async def chat_stream(request: ChatRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Stream chat responses with token-by-token generation and real-time tool call visibility.
     Uses pydantic-ai's native streaming capabilities with agent.iter() and node.stream().
@@ -580,6 +648,9 @@ async def chat_stream(request: ChatRequest):
     """
     async def event_generator():
         try:
+            # Validate that the user_id in the request matches the token
+            if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+                raise HTTPException(status_code=403, detail="User ID mismatch")
             # Create minimal dependencies - agent will fetch what it needs
             deps = ChatDeps(
                 user_id=request.user_id,
@@ -717,7 +788,7 @@ class ConvertOfficeRequest(BaseModel):
     format: str  # pptx, xlsx, docx, ppt, xls, doc
 
 @app.post("/convert-office-to-pdf")
-async def convert_office_to_pdf(request: ConvertOfficeRequest):
+async def convert_office_to_pdf(request: ConvertOfficeRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Convert an Office file (PPTX, XLSX, DOCX, PPT, XLS, DOC) from a URL to PDF.
     Requires LibreOffice to be installed on the server.
@@ -860,6 +931,7 @@ class AutogradeResponse(BaseModel):
 @app.post("/grade-assignment", response_model=AutogradeResponse)
 async def grade_assignment(
     user_id: str = Form(...),
+    current_user: Dict[str, Any] = Depends(verify_supabase_token),
     course_id: str = Form(...),
     assignment_id: str = Form(...),
     files: List[UploadFile] = File(...)
@@ -876,6 +948,11 @@ async def grade_assignment(
     Returns:
         AI-generated feedback on the assignment
     """
+    # Validate that the user_id in the request matches the token
+    if user_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="User ID mismatch")
+    
+    
     temp_file_paths = []
     openai_file_ids = []
     assistant_id = None
@@ -974,12 +1051,15 @@ async def grade_assignment(
 
 # Add Chat Message to Notes Endpoint
 @app.post("/agents/notes/add-chat-message", response_model=AddToNotesResponse)
-async def add_chat_message_to_notes(request: AddToNotesRequest):
+async def add_chat_message_to_notes(request: AddToNotesRequest, current_user: Dict[str, Any] = Depends(verify_supabase_token)):
     """
     Add an AI chat message to one or more notes with proper formatting and source attribution.
     The agent analyzes the message and intelligently formats it for note-taking.
     """
     try:
+        # Validate that the user_id in the request matches the token
+        if request.user_id != current_user["user_id"] and not os.getenv("RUNNING_LOCALLY"):
+            raise HTTPException(status_code=403, detail="User ID mismatch")
         from datetime import datetime
         from tools.note_update_tools import append_content_to_note
         
