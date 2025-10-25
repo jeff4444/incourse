@@ -10,11 +10,13 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BookOpen, Clock } from "lucide-react";
+import { BookOpen, Clock, Bell } from "lucide-react";
 import { Navbar } from "@/components/navbar";
 import { useAuth } from "@/hooks/useAuth";
 import { useAllActivitiesByType } from "@/lib/hooks/useActivities";
 import { getActivityIcon, getActivityColor } from "@/lib/utils/activityUtils";
+import { useNudges } from "@/lib/hooks/useNudges";
+import { NudgeCard } from "@/components/nudge-card";
 import { useMemo } from "react";
 
 // Simple time ago formatter
@@ -42,6 +44,9 @@ function DashboardPage() {
   
   // Fetch all activity types once and cache them
   const { quizzes, flashcards, summaries, isLoading: activitiesLoading, refetchAll } = useAllActivitiesByType(5);
+  
+  // Fetch nudges
+  const { nudges, isLoading: nudgesLoading, isGenerating, completeNudge, dismissNudge } = useNudges();
   
   // Filter activities based on selected tab (client-side)
   const activities = useMemo(() => {
@@ -96,15 +101,14 @@ function DashboardPage() {
           </p>
         </div>
 
-        {/* Main Content - Full Width Layout */}
-        <div className="max-w-screen-3xl mx-auto">
-          {/* Recent Activity */}
+        {/* Main Content - Side by Side Layout */}
+        <div className="max-w-screen-3xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Activity - Left Side */}
           <div className="w-full">
-            <Card className="shadow-sm border-border/50 pb-0">
+            <Card className="shadow-sm border-border/50 pb-0 h-full">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
-
                 </div>
                 <Tabs 
                   value={activityFilter} 
@@ -119,7 +123,7 @@ function DashboardPage() {
                   </TabsList>
                 </Tabs>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardContent className="p-0 flex-1">
                 <div className="divide-y max-h-[60vh] overflow-y-auto">
                   {activitiesLoading ? (
                     <div className="p-4 text-center text-muted-foreground">
@@ -184,6 +188,40 @@ function DashboardPage() {
                   </Button>
                 </div>
               </CardFooter>
+            </Card>
+          </div>
+
+          {/* Smart Nudges - Right Side */}
+          <div className="w-full">
+            <Card className="shadow-sm border-border/50 h-full">
+              <CardHeader>
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Smart Nudges
+                </h2>
+              </CardHeader>
+              <CardContent className="flex-1 p-4">
+                {nudges.length > 0 ? (
+                  <div className="space-y-2">
+                    {nudges.map((nudge) => (
+                      <NudgeCard 
+                        key={nudge.id} 
+                        nudge={nudge} 
+                        onComplete={completeNudge}
+                        onDismiss={dismissNudge}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center text-muted-foreground py-8">
+                    <Bell className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
+                    <p className="text-sm">No nudges available.</p>
+                    <p className="text-xs mt-1">
+                      {isGenerating ? 'Generating personalized nudges...' : 'Nudges will appear here when generated.'}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
             </Card>
           </div>
         </div>

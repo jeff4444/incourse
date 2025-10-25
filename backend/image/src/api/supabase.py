@@ -1879,3 +1879,412 @@ async def get_file_details_with_temp_file_from_db(
             # Add temp file path to the details
             file_details['temp_file_path'] = temp_file_path
             return file_details, temp_file_path
+
+
+# =====================================================
+# Nudges Functions
+# =====================================================
+
+async def create_nudges(
+    user_id: str,
+    nudges_list: List[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    """
+    Create multiple nudges for a user, marking old active nudges as expired.
+    
+    Args:
+        user_id: User ID
+        nudges_list: List of nudge dictionaries with nudge_text, action, label, priority, course_id
+    
+    Returns:
+        List of created nudge data
+    """
+    print(f"calling create_nudges with user_id={user_id}, count={len(nudges_list)}")
+    
+    supabase = get_supabase_client()
+    
+    # First, mark all existing active nudges as expired
+    supabase.table("nudges").update({
+        "status": "expired",
+        "updated_at": "now()"
+    }).eq("user_id", user_id).eq("status", "active").execute()
+    
+    # Insert new nudges
+    nudge_data = []
+    for nudge in nudges_list:
+        nudge_data.append({
+            "user_id": user_id,
+            "course_id": nudge.get("course_id"),
+            "nudge_text": nudge["nudge_text"],
+            "action": nudge["action"],
+            "label": nudge["label"],
+            "priority": nudge.get("priority", "medium"),
+            "metadata": nudge.get("metadata", {}),
+            "status": "active"
+        })
+    
+    response = (
+        supabase.table("nudges")
+        .insert(nudge_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to create nudges")
+    
+    return response.data
+
+
+async def get_active_nudges(user_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all active nudges for a user with course information.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        List of active nudges with course info
+    """
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("nudges")
+        .select("""
+            id, nudge_text, action, label, priority, status, 
+            created_at, completed_at, dismissed_at,
+            courses(id, name, code)
+        """)
+        .eq("user_id", user_id)
+        .eq("status", "active")
+        .order("priority", desc=True)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data
+
+
+async def get_last_nudge_generation_time(user_id: str) -> Optional[str]:
+    """
+    Get the timestamp of the last nudge generation for a user.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        ISO timestamp string of last generation, or None if no nudges exist
+    """
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("nudges")
+        .select("created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    
+    if response.data:
+        return response.data[0]["created_at"]
+    return None
+
+
+async def update_nudge_status(
+    nudge_id: str,
+    status: str,
+    timestamp: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Update nudge status (completed/dismissed).
+    
+    Args:
+        nudge_id: Nudge ID
+        status: New status ('completed' or 'dismissed')
+        timestamp: Optional timestamp, defaults to now()
+    
+    Returns:
+        Updated nudge data
+    """
+    print(f"calling update_nudge_status with nudge_id={nudge_id}, status={status}")
+    
+    supabase = get_supabase_client()
+    
+    update_data = {
+        "status": status,
+        "updated_at": "now()"
+    }
+    
+    if status == "completed":
+        update_data["completed_at"] = timestamp or "now()"
+    elif status == "dismissed":
+        update_data["dismissed_at"] = timestamp or "now()"
+    
+    response = (
+        supabase.table("nudges")
+        .update(update_data)
+        .eq("id", nudge_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to update nudge status")
+    
+    return response.data[0]
+
+
+async def track_nudge_interaction(
+    nudge_id: str,
+    user_id: str,
+    interaction_type: str
+) -> Dict[str, Any]:
+    """
+    Log a nudge interaction for analytics.
+    
+    Args:
+        nudge_id: Nudge ID
+        user_id: User ID
+        interaction_type: Type of interaction ('viewed', 'clicked', 'completed', 'dismissed')
+    
+    Returns:
+        Created interaction data
+    """
+    print(f"calling track_nudge_interaction with nudge_id={nudge_id}, user_id={user_id}, type={interaction_type}")
+    
+    supabase = get_supabase_client()
+    
+    interaction_data = {
+        "nudge_id": nudge_id,
+        "user_id": user_id,
+        "interaction_type": interaction_type
+    }
+    
+    response = (
+        supabase.table("nudge_interactions")
+        .insert(interaction_data)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception("Failed to track nudge interaction")
+    
+    return response.data[0]
+
+
+async def get_nudge_interaction_stats(user_id: str) -> Dict[str, Any]:
+    """
+    Get aggregated stats on which nudge types user completes/dismisses for personalization.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        Dictionary with interaction statistics
+    """
+    supabase = get_supabase_client()
+    
+    # Get interaction stats by label
+    response = (
+        supabase.table("nudge_interactions")
+        .select("""
+            interaction_type,
+            nudges!inner(label)
+        """)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    
+    # Process the data
+    stats = {
+        "total_interactions": len(response.data),
+        "by_label": {},
+        "by_type": {}
+    }
+    
+    for interaction in response.data:
+        label = interaction["nudges"]["label"]
+        interaction_type = interaction["interaction_type"]
+        
+        # Count by label
+        if label not in stats["by_label"]:
+            stats["by_label"][label] = {"completed": 0, "dismissed": 0, "viewed": 0, "clicked": 0}
+        stats["by_label"][label][interaction_type] += 1
+        
+        # Count by type
+        if interaction_type not in stats["by_type"]:
+            stats["by_type"][interaction_type] = 0
+        stats["by_type"][interaction_type] += 1
+    
+    return stats
+
+
+# =====================================================
+# Additional Functions for Nudge Tracking
+# =====================================================
+
+async def get_user_flashcard_decks(user_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all flashcard decks for a user across all courses.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        List of flashcard deck dictionaries with course information
+    """
+    print(f"calling get_user_flashcard_decks with user_id={user_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("flashcard_decks")
+        .select("*, courses(id, name, code)")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data
+
+
+async def get_user_quizzes(user_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all quizzes for a user across all courses.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        List of quiz dictionaries with course information
+    """
+    print(f"calling get_user_quizzes with user_id={user_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("quizzes")
+        .select("*, courses(id, name, code)")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data
+
+
+async def get_user_quiz_attempts(user_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all quiz attempts for a user.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        List of quiz attempt dictionaries
+    """
+    print(f"calling get_user_quiz_attempts with user_id={user_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("quiz_attempts")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    
+    return response.data
+
+
+async def get_flashcard_analytics(deck_id: str) -> Dict[str, Any]:
+    """
+    Get analytics for a flashcard deck.
+    
+    Args:
+        deck_id: Flashcard deck ID
+    
+    Returns:
+        Dictionary with analytics data
+    """
+    print(f"calling get_flashcard_analytics with deck_id={deck_id}")
+    
+    supabase = get_supabase_client()
+    
+    # Get deck info
+    deck_response = (
+        supabase.table("flashcard_decks")
+        .select("card_count")
+        .eq("id", deck_id)
+        .execute()
+    )
+    
+    if not deck_response.data:
+        return {"total_cards": 0, "viewed_cards": 0, "last_viewed_at": None}
+    
+    deck = deck_response.data[0]
+    total_cards = deck.get("card_count", 0)
+    
+    # Get flashcard analytics
+    cards_response = (
+        supabase.table("flashcards")
+        .select("times_viewed, last_viewed_at")
+        .eq("deck_id", deck_id)
+        .execute()
+    )
+    
+    viewed_cards = 0
+    last_viewed_at = None
+    
+    for card in cards_response.data:
+        if card.get("times_viewed", 0) > 0:
+            viewed_cards += 1
+        
+        card_last_viewed = card.get("last_viewed_at")
+        if card_last_viewed:
+            if not last_viewed_at or card_last_viewed > last_viewed_at:
+                last_viewed_at = card_last_viewed
+    
+    return {
+        "total_cards": total_cards,
+        "viewed_cards": viewed_cards,
+        "last_viewed_at": last_viewed_at
+    }
+
+
+async def get_user_courses(user_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all courses for a user (alias for get_courses).
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        List of course dictionaries
+    """
+    return await get_courses(user_id)
+
+
+async def get_course_assignments(course_id: str) -> List[Dict[str, Any]]:
+    """
+    Get all assignments for a course.
+    
+    Args:
+        course_id: Course ID
+    
+    Returns:
+        List of assignment dictionaries
+    """
+    print(f"calling get_course_assignments with course_id={course_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("assignments")
+        .select("*, courses(id, name, code)")
+        .eq("course_id", course_id)
+        .order("due_at")
+        .execute()
+    )
+    
+    return response.data

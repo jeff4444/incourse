@@ -470,9 +470,28 @@ async def generate_quiz(request: QuizRequest):
 @app.post("/generate-nudges", response_model=NudgeResponse)
 async def generate_nudges(request: NudgeRequest):
     """
-    Generate personalized nudges for the user.
+    Generate personalized nudges for the user and store them in the database.
+    Only generates if no nudges exist or if last generation was 5+ hours ago.
     """
-    try:        
+    try:
+        from api import supabase as supabase_api
+        
+        # Check last nudge generation time
+        last_generation = await supabase_api.get_last_nudge_generation_time(request.user_id)
+        
+        if last_generation:
+            from datetime import datetime, timezone
+            last_gen_time = datetime.fromisoformat(last_generation.replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+            hours_since_generation = (now - last_gen_time).total_seconds() / 3600
+            
+            if hours_since_generation < 5:
+                return NudgeResponse(
+                    nudges=[],
+                    success=True,
+                    message=f"Nudges generated recently, skipping generation. Next generation in {5 - hours_since_generation:.1f} hours."
+                )
+        
         deps = NudgeDeps(
             user_id=request.user_id,
         )
@@ -481,15 +500,18 @@ async def generate_nudges(request: NudgeRequest):
         agent = get_nudge_agent_lazy()
         
         # Generate nudges
-        nudges = await agent.run(request.prompt or "Generate a nudge", deps=deps)
+        nudges = await agent.run(request.prompt or "Generate personalized nudges based on user activity and deadlines", deps=deps)
         
         # Convert to dictionary format
         nudge_dicts = [nudge.to_dict() for nudge in nudges.output]
         
+        # Store nudges in database (replaces old active nudges)
+        await supabase_api.create_nudges(request.user_id, nudge_dicts)
+        
         return NudgeResponse(
-            nudges=nudge_dicts,
+            nudges=[],  # Don't return nudges since they're stored in DB
             success=True,
-            message="Nudges generated successfully"
+            message="Nudges generated and stored successfully"
         )
         
     except Exception as e:
