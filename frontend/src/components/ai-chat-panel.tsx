@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Folder, Search } from "lucide-react"
 import { MessageSquare, Lightbulb, Send, X, Loader2, MessageCircle, Copy, FileText } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -67,12 +68,15 @@ export function ChatPanel({
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false)
+  const [provider, setProvider] = useState<"bedrock" | "openai">("bedrock")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   // Streaming state
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState("")
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([])
+  const [isStopRequested, setIsStopRequested] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Text selection state for messages
@@ -215,6 +219,33 @@ export function ChatPanel({
     }
   }
 
+  const handleStopGeneration = () => {
+    setIsStopRequested(true)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
+    // Immediately treat streaming message as final
+    if (streamingMessage) {
+      const finalMessages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[] = [
+        ...messages,
+        {
+          role: "assistant" as const,
+          content: streamingMessage,
+          timestamp: new Date(),
+        },
+      ]
+      setMessages(finalMessages)
+      onUpdateMessages?.(finalMessages)
+    }
+    
+    // Clear streaming state
+    setStreamingMessage("")
+    setActiveToolCalls([])
+    setIsStreaming(false)
+    setIsStopRequested(false)
+  }
+
   const handleSendMessage = async (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || isLoading || isLoadingHistory || isStreaming) return
@@ -244,6 +275,10 @@ export function ChatPanel({
     setIsStreaming(true)
     setStreamingMessage("")
     setActiveToolCalls([])
+    setIsStopRequested(false)
+
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController()
 
     try {
       // Optimistically clear the tagged context from the UI BEFORE the network call
@@ -260,7 +295,9 @@ export function ChatPanel({
           message: userMessage,
           context: contextText,
           sessionId: sessionId,
+          provider: provider,
         }),
+        signal: abortControllerRef.current.signal,
       })
 
       if (!response.ok) {
@@ -366,6 +403,14 @@ export function ChatPanel({
       setActiveToolCalls([])
     } catch (err) {
       console.error('Streaming error:', err)
+      
+      // Check if this was an abort error (user stopped generation)
+      if (err instanceof Error && err.name === 'AbortError') {
+        // User stopped generation - partial message already handled in handleStopGeneration
+        console.log('Generation stopped by user')
+        return
+      }
+      
       const errorMessages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[] = [
         ...newMessages,
         {
@@ -380,6 +425,8 @@ export function ChatPanel({
       setActiveToolCalls([])
     } finally {
       setIsStreaming(false)
+      setIsStopRequested(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -639,6 +686,21 @@ export function ChatPanel({
             Suggestions
           </TabsTrigger>
         </TabsList>
+
+        {/* Provider Selection */}
+        <div className="px-4">
+          <div className="flex items-end justify-end">
+            <Select value={provider} onValueChange={(value: "bedrock" | "openai") => setProvider(value)}>
+              <SelectTrigger id="provider-select" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bedrock">Claude 4.5 Sonnet</SelectItem>
+                <SelectItem value="openai">GPT-4o</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         
 
         <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 overflow-hidden">
@@ -651,7 +713,7 @@ export function ChatPanel({
           )}
           
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto px-6 py-2">
             {messages.map((message, index) => (
               <div key={index} className={`mb-6 ${message.role === "user" ? "flex justify-end" : ""}`}>
                 {message.role === "user" ? (
@@ -824,18 +886,29 @@ export function ChatPanel({
                 disabled={isLoading || isStreaming}
                 rows={1}
               />
-              <Button 
-                type="submit" 
-                size="icon" 
-                disabled={!inputValue.trim() || isLoading || isStreaming}
-                className="rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 mt-1"
-              >
-                {isLoading || isStreaming ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
+              {isStreaming ? (
+                <Button 
+                  type="button"
+                  size="icon" 
+                  onClick={handleStopGeneration}
+                  className="rounded-xl bg-red-500 hover:bg-red-600 mt-1"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button 
+                  type="submit" 
+                  size="icon" 
+                  disabled={!inputValue.trim() || isLoading}
+                  className="rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 mt-1"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
           </form>
         </TabsContent>

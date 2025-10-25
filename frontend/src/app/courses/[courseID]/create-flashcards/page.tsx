@@ -81,13 +81,19 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
         return
       }
 
-      // Navigate to the newly created flashcard deck
-      router.push(`/courses/${courseID}/flashcards/${response.deck_id}`)
+      // Redirect to course page with success message
+      router.push(`/courses/${courseID}?flashcard=generating`)
     } catch (error) {
       console.error('Error generating flashcards:', error)
       alert('Failed to generate flashcards. Please try again.')
       setIsGenerating(false)
     }
+  }
+
+  const handleDismiss = () => {
+    setIsGenerating(false)
+    // Navigate back to course page
+    router.push(`/courses/${courseID}`)
   }
 
   return (
@@ -202,6 +208,7 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
           </CardFooter>
         </Card>
       </div>
+
     </div>
   )
 }

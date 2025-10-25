@@ -37,7 +37,10 @@ from api.supabase import (
     create_activity,
     create_autograder_feedback,
     get_file_details_with_content_from_db,
-    get_file_details_with_temp_file_from_db
+    get_file_details_with_temp_file_from_db,
+    get_supabase_client,
+    update_flashcard_deck_status,
+    update_quiz_status
 )
 
 
@@ -65,13 +68,93 @@ def get_chat_agent_lazy(**kwargs):
     return get_chat_agent(**kwargs)
 
 
-def get_chat_agent_with_context_lazy(deps, **kwargs):
+def get_chat_agent_with_context_lazy(deps, provider="bedrock", **kwargs):
     from agents.chat_agent.agent import get_chat_agent_with_context
-    return get_chat_agent_with_context(deps, **kwargs)
+    return get_chat_agent_with_context(deps, provider=provider, **kwargs)
 
 def get_note_update_agent_lazy(**kwargs):
     from agents.note_update_agent.agent import get_note_update_agent
     return get_note_update_agent(**kwargs)
+
+async def save_partial_response(deps, request, partial_response):
+    """
+    Save partial response to database when client disconnects.
+    Performs the same session management as normal completion but with partial content.
+    """
+    try:
+        # 1. Ensure we have a chat_id
+        if not deps.chat_id:
+            from tools.supabase_tools import get_or_create_chat_session
+            
+            # Need document_id for chat session
+            if not deps.file_info:
+                try:
+                    file_info = await get_module_items_by_course_id(
+                        course_id=request.course_id,
+                        lms_id=request.file_ids[0]
+                    )
+                    document_id = file_info["id"]
+                    deps.file_info = file_info
+                    deps.is_file_from_lms = False
+                except Exception:
+                    document_id = request.file_ids[0]
+                    deps.is_file_from_lms = True
+            else:
+                document_id = deps.file_info["id"] if not deps.is_file_from_lms else request.file_ids[0]
+            
+            chat_session = await get_or_create_chat_session(
+                user_id=request.user_id,
+                document_id=document_id
+            )
+            deps.chat_id = chat_session["id"]
+        
+        # 2. Ensure we have minimal info for session manager
+        if not deps.course_info:
+            deps.course_info = await get_course(course_id=request.course_id)
+        
+        if not deps.file_info:
+            deps.file_info = await get_file_details_with_content_from_db(
+                file_id=request.file_ids[0],
+                course_id=deps.course_info["id"]
+            )
+            deps.is_file_from_lms = False
+        
+        # 3. Initialize session manager and save messages
+        session_manager = ChatSessionManager(
+            course_info=deps.course_info,
+            file_info=deps.file_info
+        )
+        
+        await session_manager.add_message_to_buffer(
+            chat_id=deps.chat_id,
+            sender="user",
+            content=request.message
+        )
+        
+        await session_manager.add_message_to_buffer(
+            chat_id=deps.chat_id,
+            sender="assistant",
+            content=partial_response
+        )
+        
+        # 4. Check if we should create a summary
+        await session_manager.check_and_create_summary(
+            chat_id=deps.chat_id,
+            user_message=request.message,
+            assistant_response=partial_response,
+            existing_chat_history=deps.chat_history,
+            existing_context_summary=deps.context_summary
+        )
+        
+        # 5. Flush any remaining messages in buffer
+        await session_manager.flush_buffer(chat_id=deps.chat_id)
+        
+        print(f"Partial response saved: {len(partial_response)} characters")
+        
+    except Exception as session_error:
+        print(f"Error saving partial response: {session_error}")
+        import traceback
+        print(traceback.format_exc())
 
 app = FastAPI(
     title="InCourse AI Agents API",
@@ -141,13 +224,13 @@ class TakeActionRequest(BaseModel):
 
 class FlashcardResponse(BaseModel):
     deck_id: str
-    deck: Dict[str, Any]
+    deck: Optional[Dict[str, Any]] = None
     success: bool
     message: str
 
 class QuizResponse(BaseModel):
     quiz_id: str
-    quiz: Dict[str, Any]
+    quiz: Optional[Dict[str, Any]] = None
     success: bool
     message: str
 
@@ -172,6 +255,13 @@ class ChatRequest(BaseModel):
     message: str
     prompt: Optional[str] = None
     session_id: Optional[str] = None
+    provider: Optional[str] = "bedrock"
+    
+    @validator('provider')
+    def validate_provider(cls, v):
+        if v is not None and v not in ["bedrock", "openai"]:
+            raise ValueError('Provider must be either "bedrock" or "openai"')
+        return v
 
 class ChatResponse(BaseModel):
     answer: str
@@ -219,6 +309,45 @@ async def health_check():
 async def generate_flashcards(request: FlashcardRequest):
     """
     Generate flashcards based on course content and files, and store them in the database.
+    Creates deck immediately and runs generation in background.
+    """
+    try:
+        # Create deck immediately with 'generating' status
+        deck_id = await create_flashcard_deck(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            name=request.name,
+            file_ids=request.file_ids,
+            card_count=0,  # Will be updated after generation
+            extra_context=request.extra_context,
+            card_type=request.card_type,
+            note_ids=request.note_ids,
+            status="generating"
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_flashcards_background(
+                deck_id=deck_id,
+                request=request
+            )
+        )
+        
+        # Return immediately with deck_id
+        return FlashcardResponse(
+            deck_id=deck_id,
+            deck=None,  # Will be populated after generation
+            success=True,
+            message="Flashcard generation started in background"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting flashcard generation: {str(e)}")
+
+
+async def _generate_flashcards_background(deck_id: str, request: FlashcardRequest):
+    """
+    Background task to generate flashcards.
     """
     try:
         # Pre-load dependencies to avoid refetching on every tool call
@@ -248,26 +377,30 @@ async def generate_flashcards(request: FlashcardRequest):
         # Generate flashcards
         flashcards_result = await agent.run(prompt, deps=deps)
         
+        # Check if deck still exists and is in generating status (not stopped/deleted)
+        try:
+            deck = await get_flashcard_deck(deck_id)
+            if deck.get("status") != "generating":
+                print(f"Deck {deck_id} is no longer in generating status, discarding results")
+                return
+        except Exception as check_error:
+            print(f"Deck {deck_id} no longer exists or error checking status: {str(check_error)}")
+            return
+        
         # Convert to dictionary format
         flashcard_dicts = [flashcard.to_dict() for flashcard in flashcards_result.output]
-        
-        # Create deck in database
-        deck_id = await create_flashcard_deck(
-            user_id=request.user_id,
-            course_id=request.course_id,
-            name=request.name,
-            file_ids=request.file_ids,
-            card_count=len(flashcard_dicts),
-            extra_context=request.extra_context,
-            card_type=request.card_type,
-            note_ids=request.note_ids
-        )
         
         # Store flashcards in database
         await create_flashcards(deck_id, flashcard_dicts)
         
-        # Fetch complete deck with flashcards
-        deck = await get_flashcard_deck(deck_id)
+        # Update deck status to completed and card count
+        await update_flashcard_deck_status(deck_id, "completed")
+        
+        # Update card count in deck
+        supabase = get_supabase_client()
+        supabase.table("flashcard_decks").update({
+            "card_count": len(flashcard_dicts)
+        }).eq("id", deck_id).execute()
         
         # Log activity asynchronously (fire-and-forget)
         asyncio.create_task(
@@ -286,21 +419,55 @@ async def generate_flashcards(request: FlashcardRequest):
             )
         )
         
-        return FlashcardResponse(
-            deck_id=deck_id,
-            deck=deck,
-            success=True,
-            message="Flashcards generated and saved successfully"
-        )
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating flashcards: {str(e)}")
+        # Update deck status to failed
+        await update_flashcard_deck_status(deck_id, "failed", str(e))
+        print(f"Error in background flashcard generation for deck {deck_id}: {str(e)}")
 
 # Quiz Generation Endpoint
 @app.post("/generate-quiz", response_model=QuizResponse)
 async def generate_quiz(request: QuizRequest):
     """
     Generate quiz questions based on course content and files, and store them in the database.
+    Creates quiz immediately and runs generation in background.
+    """
+    try:
+        # Create quiz immediately with 'generating' status
+        quiz_id = await create_quiz(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            name=request.name,
+            file_ids=request.file_ids,
+            question_count=0,  # Will be updated after generation
+            extra_context=request.extra_context,
+            difficulty=request.difficulty,
+            note_ids=request.note_ids,
+            status="generating"
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_quiz_background(
+                quiz_id=quiz_id,
+                request=request
+            )
+        )
+        
+        # Return immediately with quiz_id
+        return QuizResponse(
+            quiz_id=quiz_id,
+            quiz=None,  # Will be populated after generation
+            success=True,
+            message="Quiz generation started in background"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting quiz generation: {str(e)}")
+
+
+async def _generate_quiz_background(quiz_id: str, request: QuizRequest):
+    """
+    Background task to generate quiz questions.
     """
     try:
         # Pre-load dependencies to avoid refetching on every tool call
@@ -331,26 +498,30 @@ async def generate_quiz(request: QuizRequest):
         # Generate quiz questions
         quizzes_result = await agent.run(prompt, deps=deps)
         
+        # Check if quiz still exists and is in generating status (not stopped/deleted)
+        try:
+            quiz = await get_quiz(quiz_id)
+            if quiz.get("status") != "generating":
+                print(f"Quiz {quiz_id} is no longer in generating status, discarding results")
+                return
+        except Exception as check_error:
+            print(f"Quiz {quiz_id} no longer exists or error checking status: {str(check_error)}")
+            return
+        
         # Convert to dictionary format
         quiz_dicts = [quiz.to_dict() for quiz in quizzes_result.output]
-        
-        # Create quiz in database
-        quiz_id = await create_quiz(
-            user_id=request.user_id,
-            course_id=request.course_id,
-            name=request.name,
-            file_ids=request.file_ids,
-            question_count=len(quiz_dicts),
-            extra_context=request.extra_context,
-            difficulty=request.difficulty,
-            note_ids=request.note_ids
-        )
         
         # Store quiz questions in database
         await create_quiz_questions(quiz_id, quiz_dicts)
         
-        # Fetch complete quiz with questions
-        quiz = await get_quiz(quiz_id)
+        # Update quiz status to completed and question count
+        await update_quiz_status(quiz_id, "completed")
+        
+        # Update question count in quiz
+        supabase = get_supabase_client()
+        supabase.table("quizzes").update({
+            "question_count": len(quiz_dicts)
+        }).eq("id", quiz_id).execute()
         
         # Log activity asynchronously (fire-and-forget)
         asyncio.create_task(
@@ -369,23 +540,37 @@ async def generate_quiz(request: QuizRequest):
             )
         )
         
-        return QuizResponse(
-            quiz_id=quiz_id,
-            quiz=quiz,
-            success=True,
-            message="Quiz generated and saved successfully"
-        )
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating quiz: {str(e)}")
+        # Update quiz status to failed
+        await update_quiz_status(quiz_id, "failed", str(e))
+        print(f"Error in background quiz generation for quiz {quiz_id}: {str(e)}")
 
 # Nudge Generation Endpoint
 @app.post("/generate-nudges", response_model=NudgeResponse)
 async def generate_nudges(request: NudgeRequest):
     """
-    Generate personalized nudges for the user.
+    Generate personalized nudges for the user and store them in the database.
+    Only generates if no nudges exist or if last generation was 5+ hours ago.
     """
-    try:        
+    try:
+        from api import supabase as supabase_api
+        
+        # Check last nudge generation time
+        last_generation = await supabase_api.get_last_nudge_generation_time(request.user_id)
+        
+        if last_generation:
+            from datetime import datetime, timezone
+            last_gen_time = datetime.fromisoformat(last_generation.replace('Z', '+00:00'))
+            now = datetime.now(timezone.utc)
+            hours_since_generation = (now - last_gen_time).total_seconds() / 3600
+            
+            if hours_since_generation < 5:
+                return NudgeResponse(
+                    nudges=[],
+                    success=True,
+                    message=f"Nudges generated recently, skipping generation. Next generation in {5 - hours_since_generation:.1f} hours."
+                )
+        
         deps = NudgeDeps(
             user_id=request.user_id,
         )
@@ -394,15 +579,18 @@ async def generate_nudges(request: NudgeRequest):
         agent = get_nudge_agent_lazy()
         
         # Generate nudges
-        nudges = await agent.run(request.prompt or "Generate a nudge", deps=deps)
+        nudges = await agent.run(request.prompt or "Generate personalized nudges based on user activity and deadlines", deps=deps)
         
         # Convert to dictionary format
         nudge_dicts = [nudge.to_dict() for nudge in nudges.output]
         
+        # Store nudges in database (replaces old active nudges)
+        await supabase_api.create_nudges(request.user_id, nudge_dicts)
+        
         return NudgeResponse(
-            nudges=nudge_dicts,
+            nudges=[],  # Don't return nudges since they're stored in DB
             success=True,
-            message="Nudges generated successfully"
+            message="Nudges generated and stored successfully"
         )
         
     except Exception as e:
@@ -473,7 +661,7 @@ async def chat(request: ChatRequest):
 
         # Let the agent handle the query - it will fetch context as needed
         user_prompt = request.prompt or request.message
-        agent = get_chat_agent_with_context_lazy(deps)
+        agent = get_chat_agent_with_context_lazy(deps, provider=request.provider)
         result = await agent.run(user_prompt, deps=deps)
         
         # Always do session management - we need to save all messages
@@ -579,6 +767,7 @@ async def chat_stream(request: ChatRequest):
     - done: Stream finished with full response
     """
     async def event_generator():
+        full_response = ""
         try:
             # Create minimal dependencies - agent will fetch what it needs
             deps = ChatDeps(
@@ -595,21 +784,35 @@ async def chat_stream(request: ChatRequest):
             user_prompt = request.prompt or request.message
             
             # Get agent and stream response
-            agent = get_chat_agent_with_context_lazy(deps)
+            agent = get_chat_agent_with_context_lazy(deps, provider=request.provider)
             
             # Buffer to collect full response for session management
             full_response = ""
             
-            async for event in stream_chat_agent(agent, user_prompt, deps):
-                # Send event to client
-                print("Sending event to client: ", event.to_sse())
-                yield event.to_sse()
-                
-                # Buffer text content for session management
-                if event.type.value == "text_delta":
-                    full_response += event.content
-                elif event.type.value == "done" and event.content:
-                    full_response = event.content
+            try:
+                async for event in stream_chat_agent(agent, user_prompt, deps):
+                    # Send event to client
+                    print("Sending event to client: ", event.to_sse())
+                    yield event.to_sse()
+                    
+                    # Buffer text content for session management
+                    if event.type.value == "text_delta":
+                        full_response += event.content
+                    elif event.type.value == "done" and event.content:
+                        full_response = event.content
+            except asyncio.CancelledError:
+                # Client disconnected - save partial response
+                print("Client disconnected, saving partial response")
+                if full_response:
+                    await save_partial_response(deps, request, full_response)
+                raise
+            except Exception as e:
+                # Check if this is a client disconnect error
+                if "client disconnected" in str(e).lower() or "connection closed" in str(e).lower():
+                    print("Client disconnected, saving partial response")
+                    if full_response:
+                        await save_partial_response(deps, request, full_response)
+                raise
             
             if full_response:
                 # Save chat session directly in the main flow
@@ -1054,6 +1257,95 @@ Analyze the message, decide whether to expand it with additional context, format
         print(traceback.format_exc())
         print("=" * 80)
         raise HTTPException(status_code=500, detail=f"Error adding chat message to notes: {str(e)}")
+
+
+# Retry Endpoints
+# =====================================================
+
+@app.post("/retry-flashcard-generation/{deck_id}")
+async def retry_flashcard_generation(deck_id: str):
+    """
+    Retry flashcard generation for a failed deck.
+    """
+    try:
+        # Get the deck details
+        deck = await get_flashcard_deck(deck_id)
+        if not deck:
+            raise HTTPException(status_code=404, detail="Flashcard deck not found")
+        
+        if deck.get("status") != "failed":
+            raise HTTPException(status_code=400, detail="Deck is not in failed status")
+        
+        # Update status to generating
+        await update_flashcard_deck_status(deck_id, "generating")
+        
+        # Create a new request object from the deck data
+        request = FlashcardRequest(
+            user_id=deck["user_id"],
+            course_id=deck["course_id"],
+            name=deck["name"],
+            file_ids=deck["file_ids"],
+            note_ids=deck.get("note_ids", []),
+            num_flashcards=deck.get("card_count", 10),
+            card_type=deck.get("card_type", "term-definition"),
+            extra_context=deck.get("extra_context")
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_flashcards_background(
+                deck_id=deck_id,
+                request=request
+            )
+        )
+        
+        return {"success": True, "message": "Flashcard generation retry started"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrying flashcard generation: {str(e)}")
+
+
+@app.post("/retry-quiz-generation/{quiz_id}")
+async def retry_quiz_generation(quiz_id: str):
+    """
+    Retry quiz generation for a failed quiz.
+    """
+    try:
+        # Get the quiz details
+        quiz = await get_quiz(quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        if quiz.get("status") != "failed":
+            raise HTTPException(status_code=400, detail="Quiz is not in failed status")
+        
+        # Update status to generating
+        await update_quiz_status(quiz_id, "generating")
+        
+        # Create a new request object from the quiz data
+        request = QuizRequest(
+            user_id=quiz["user_id"],
+            course_id=quiz["course_id"],
+            name=quiz["name"],
+            file_ids=quiz["file_ids"],
+            note_ids=quiz.get("note_ids", []),
+            num_questions=quiz.get("question_count", 5),
+            difficulty=quiz.get("difficulty", "medium"),
+            extra_context=quiz.get("extra_context")
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_quiz_background(
+                quiz_id=quiz_id,
+                request=request
+            )
+        )
+        
+        return {"success": True, "message": "Quiz generation retry started"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrying quiz generation: {str(e)}")
 
 
 if __name__ == "__main__":

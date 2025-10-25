@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUserFromRequest } from "@/lib/utils/userCredentials";
 
 export async function POST(request: NextRequest) {
-  let courseId, fileIds, message, context, sessionId;
+  let courseId, fileIds, message, context, sessionId, provider;
   
   try {
     const body = await request.json();
-    ({ courseId, fileIds, message, context, sessionId } = body as {
+    ({ courseId, fileIds, message, context, sessionId, provider } = body as {
       courseId: string;
       fileIds: string[];
       message: string;
       context?: string;
       sessionId?: string;
+      provider?: string;
     });
 
     // Get user id from request
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
         message,
         ...(prompt ? { prompt } : {}),
         ...(sessionId ? { session_id: sessionId } : {}),
+        ...(provider ? { provider: provider } : {}),
       }),
     });
 
@@ -69,6 +71,7 @@ export async function POST(request: NextRequest) {
           message,
           ...(prompt ? { prompt } : {}),
           ...(sessionId ? { session_id: sessionId } : {}),
+          ...(provider ? { provider: provider } : {}),
         },
         response: {
           status: resp.status,

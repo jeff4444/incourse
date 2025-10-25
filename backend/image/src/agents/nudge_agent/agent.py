@@ -4,15 +4,21 @@ from typing import List, Dict
 from pydantic_ai import Agent, Tool
 from prompts.nudge_agent_prompt import NUDGE_AGENT_PROMPT
 from shared.model import get_model
-from tools.canvas_tools import get_chat_history_summary, get_course_grade_details, get_course_quiz_history, get_file_content_summaries, get_overall_course_performance
+from tools.nudge_tracking_tools import (
+    get_user_quiz_status,
+    get_flashcard_study_status,
+    get_upcoming_deadlines,
+    get_study_patterns,
+    get_nudge_preferences
+)
 
 class Nudge(BaseModel):
     """
     A class representing a nudge.
     """
-    nudge: str = Field(
+    nudge_text: str = Field(
         ...,
-        description="The nudge to be sent to the user."
+        description="The nudge message to be sent to the user."
     )
     action: str = Field(
         ...,
@@ -21,15 +27,25 @@ class Nudge(BaseModel):
     label: str = Field(
         description="The label for the nudge, used for categorization and testing purposes.",
     )
+    priority: str = Field(
+        default="medium",
+        description="The priority level of the nudge: high, medium, or low."
+    )
+    course_id: str = Field(
+        default=None,
+        description="The course ID if the nudge is course-specific, null otherwise."
+    )
     
     def to_dict(self) -> Dict[str, str]:
         """
         Convert the Nudge object to a dictionary.
         """
         return {
-            "nudge": self.nudge,
+            "nudge_text": self.nudge_text,
             "action": self.action,
-            "label": self.label
+            "label": self.label,
+            "priority": self.priority,
+            "course_id": self.course_id
         }
         
 @dataclass
@@ -54,11 +70,11 @@ def get_nudge_agent(**kwargs) -> Agent[Deps, List[Nudge]]:
         model,
         output_type=List[Nudge],
         system_prompt=system_prompt,
-        tools=[  
-            Tool(get_overall_course_performance, takes_ctx=True),
-            Tool(get_chat_history_summary, takes_ctx=True),
-            Tool(get_course_quiz_history, takes_ctx=True),
-            Tool(get_course_grade_details, takes_ctx=True),
-            Tool(get_file_content_summaries, takes_ctx=True),
+        tools=[
+            Tool(get_user_quiz_status, takes_ctx=True),
+            Tool(get_flashcard_study_status, takes_ctx=True),
+            Tool(get_upcoming_deadlines, takes_ctx=True),
+            Tool(get_study_patterns, takes_ctx=True),
+            Tool(get_nudge_preferences, takes_ctx=True),
         ],
     )

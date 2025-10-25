@@ -240,6 +240,14 @@ async def stream_chat_agent(
             async with agent.iter(user_prompt, deps=deps) as run:
                 print("Agent iteration started successfully")
                 async for node in run:
+                    # Check for cancellation before processing each node
+                    try:
+                        await asyncio.sleep(0)  # Allow cancellation to be detected
+                    except asyncio.CancelledError:
+                        print("Streaming cancelled, stopping gracefully")
+                        should_stop = True
+                        break
+                    
                     if should_stop:
                         print("Should stop flag is True, breaking from node loop")
                         break
@@ -266,6 +274,14 @@ async def stream_chat_agent(
                         debug_messages.append("ModelRequestNode: streaming response")
                         async with node.stream(run.ctx) as request_stream:
                             async for event in request_stream:
+                                # Check for cancellation during streaming
+                                try:
+                                    await asyncio.sleep(0)
+                                except asyncio.CancelledError:
+                                    print("Model streaming cancelled, stopping gracefully")
+                                    should_stop = True
+                                    break
+                                
                                 parsed = parse_event(event)
                                 
                                 # Only yield display events (text deltas)
@@ -294,6 +310,14 @@ async def stream_chat_agent(
                         debug_messages.append(f"CallToolsNode: executing tools (call {tool_call_count}/{max_tool_calls})")
                         async with node.stream(run.ctx) as tool_stream:
                             async for event in tool_stream:
+                                # Check for cancellation during tool execution
+                                try:
+                                    await asyncio.sleep(0)
+                                except asyncio.CancelledError:
+                                    print("Tool execution cancelled, stopping gracefully")
+                                    should_stop = True
+                                    break
+                                
                                 parsed = parse_event(event)
                                 
                                 # Yield tool call and result events
@@ -344,6 +368,17 @@ async def stream_chat_agent(
                 print("===========================\n")
             
             # Success - break out of retry loop
+            break
+            
+        except asyncio.CancelledError:
+            # Client disconnected - yield partial response if we have any
+            print("Streaming cancelled by client")
+            if full_response:
+                yield StreamEvent(
+                    type=EventType.DONE,
+                    content=full_response,
+                    data={"cancelled": True, "partial": True}
+                )
             break
             
         except Exception as e:
