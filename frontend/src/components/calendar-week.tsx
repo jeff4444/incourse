@@ -11,12 +11,14 @@ interface CalendarWeekProps {
     type: string;
   }>;
   getCourseColor: (courseId: string) => string;
+  onEventClick?: (event: any, clickEvent: React.MouseEvent) => void;
 }
 
 export function CalendarWeek({
   currentDate,
   events,
   getCourseColor,
+  onEventClick,
 }: CalendarWeekProps) {
   // Get the start of the week (Sunday)
   const startOfWeek = new Date(currentDate);
@@ -120,6 +122,7 @@ export function CalendarWeek({
                         className={`text-xs p-2 rounded-md ${getCourseColor(
                           event.courseId
                         )} text-white shadow-sm hover:shadow-md transition-all cursor-pointer`}
+                        onClick={(e) => onEventClick?.(event, e)}
                       >
                         <div className="font-medium mb-1">
                           {event.date.toLocaleTimeString([], {
