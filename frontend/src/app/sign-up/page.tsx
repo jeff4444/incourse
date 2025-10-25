@@ -14,12 +14,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/utils/supabase/client";
-import { FcGoogle } from "react-icons/fc";
 import {
   Select,
   SelectContent,
@@ -33,7 +31,6 @@ import { isAllowedUser } from "@/constants/allowed_users";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +40,6 @@ export default function SignUpPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
   const [selectedSchool, setSelectedSchool] = useState<string>("");
 
   // Check if user is already authenticated and redirect to dashboard
@@ -125,107 +121,6 @@ export default function SignUpPage() {
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!magicLinkSent) {
-      // Check if user is in allowed users list
-      if (!isAllowedUser(email)) {
-        setError("Access is currently limited to invited users only.");
-        return;
-      }
-      
-      // Validate school selection
-      if (!selectedSchool) {
-        setError("Please select your school");
-        return;
-      }
-      
-      const isSuper = isSuperUser(email);
-      
-      // Validate email domain matches selected school (skip for super users)
-      if (!isSuper && !validateEmailForSchool(email, selectedSchool)) {
-        const schoolConfig = SUPPORTED_SCHOOLS[selectedSchool];
-        const domains = schoolConfig.acceptable_domains.join(", ");
-        setError(`Please use a valid ${selectedSchool} email address (${domains})`);
-        return;
-      }
-      
-      setLoading(true);
-      setError(null);
-      try {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-            data: {
-              school_name: selectedSchool,
-            },
-          },
-        });
-
-        if (error) {
-          setError(error.message);
-        } else {
-          setMagicLinkSent(true);
-        }
-      } catch (e) {
-        if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError("An unexpected error occurred.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setLoading(true);
-      setError(null);
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.verifyOtp({
-          email,
-          token,
-          type: "email",
-        });
-
-        if (error) {
-          setError(error.message);
-        } else if (session) {
-          router.push("/dashboard");
-        }
-      } catch (e) {
-        if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError("An unexpected error occurred.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleGoogleSignUp = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-      if (error) setError(error.message);
-    } catch (e) {
-      if (e instanceof Error) setError(e.message);
-      else setError("An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Static sample data for dashboard preview
   const sampleActivity = [
@@ -459,207 +354,88 @@ export default function SignUpPage() {
                   {error}
                 </motion.div>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full flex items-center gap-2"
-                onClick={handleGoogleSignUp}
-                disabled={loading}
-              >
-                <FcGoogle className="h-5 w-5" />
-                {loading ? "Signing up..." : "Sign up with Google"}
-              </Button>
-              <Tabs defaultValue="email" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="magic">Magic Link</TabsTrigger>
-                </TabsList>
-                <TabsContent value="email">
-                  <form onSubmit={handleEmailSignUp}>
-                    <div className="grid gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="fullname">Full Name</Label>
-                        <Input
-                          id="fullname"
-                          type="text"
-                          placeholder="John Doe"
-                          required
-                          value={fullName}
-                          onChange={(e) => setFullName(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="school">School</Label>
-                        <Select
-                          value={selectedSchool}
-                          onValueChange={setSelectedSchool}
-                          disabled={loading}
-                        >
-                          <SelectTrigger id="school">
-                            <SelectValue placeholder="Select your school" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.keys(SUPPORTED_SCHOOLS).map((school) => (
-                              <SelectItem key={school} value={school}>
-                                {school}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="email">School Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="firstname.lastname@college.edu"
-                          required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={loading}
-                        />
-                        {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
-                          <p className="text-xs text-green-600 font-medium">
-                            ✓ Valid {selectedSchool} email
-                          </p>
-                        )}
-                        {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
-                          <p className="text-xs text-muted-foreground">
-                            Use your {selectedSchool} email (
-                            {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
-                          </p>
-                        )}
-                        {isSuperUser(email) && (
-                          <p className="text-xs text-green-600 font-medium">
-                            ✓ Super user - can use any email domain
-                          </p>
-                        )}
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="Create a strong password"
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={loading}
-                      >
-                        {loading ? "Signing Up..." : "Sign Up"}
-                      </Button>
-                    </div>
-                  </form>
-                </TabsContent>
-                <TabsContent value="magic">
-                  <form onSubmit={handleMagicLink}>
-                    <div className="grid gap-4">
-                      {error && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-sm"
-                        >
-                          {error}
-                        </motion.div>
-                      )}
-                      {magicLinkSent && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-green-50 text-green-700 p-3 rounded-lg border border-green-200 text-sm"
-                        >
-                          Check your email for the magic link or enter the
-                          6-digit code below.
-                        </motion.div>
-                      )}
-                      <div className="grid gap-2">
-                        <Label htmlFor="magic-school">School</Label>
-                        <Select
-                          value={selectedSchool}
-                          onValueChange={setSelectedSchool}
-                          disabled={loading || magicLinkSent}
-                        >
-                          <SelectTrigger id="magic-school">
-                            <SelectValue placeholder="Select your school" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Object.keys(SUPPORTED_SCHOOLS).map((school) => (
-                              <SelectItem key={school} value={school}>
-                                {school}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor="magic-email">School Email</Label>
-                        <Input
-                          id="magic-email"
-                          type="email"
-                          placeholder="firstname.lastname@college.edu"
-                          required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={loading || magicLinkSent}
-                        />
-                        {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
-                          <p className="text-xs text-green-600 font-medium">
-                            ✓ Valid {selectedSchool} email
-                          </p>
-                        )}
-                        {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
-                          <p className="text-xs text-muted-foreground">
-                            Use your {selectedSchool} email (
-                            {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
-                          </p>
-                        )}
-                        {isSuperUser(email) && (
-                          <p className="text-xs text-green-600 font-medium">
-                            ✓ Super user - can use any email domain
-                          </p>
-                        )}
-                      </div>
-                      {magicLinkSent && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="grid gap-2 overflow-hidden"
-                        >
-                          <Label htmlFor="magic-otp">One-Time Code</Label>
-                          <Input
-                            id="magic-otp"
-                            type="text"
-                            placeholder="123456"
-                            required
-                            value={token}
-                            onChange={(e) => setToken(e.target.value)}
-                            disabled={loading}
-                          />
-                        </motion.div>
-                      )}
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={loading}
-                      >
-                        {loading
-                          ? "..."
-                          : magicLinkSent
-                          ? "Sign Up with Code"
-                          : "Send Magic Link"}
-                      </Button>
-                    </div>
-                  </form>
-                </TabsContent>
-              </Tabs>
+              <form onSubmit={handleEmailSignUp}>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="fullname">Full Name</Label>
+                    <Input
+                      id="fullname"
+                      type="text"
+                      placeholder="John Doe"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="school">School</Label>
+                    <Select
+                      value={selectedSchool}
+                      onValueChange={setSelectedSchool}
+                      disabled={loading}
+                    >
+                      <SelectTrigger id="school">
+                        <SelectValue placeholder="Select your school" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.keys(SUPPORTED_SCHOOLS).map((school) => (
+                          <SelectItem key={school} value={school}>
+                            {school}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">School Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="firstname.lastname@college.edu"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={loading}
+                    />
+                    {selectedSchool && !isSuperUser(email) && email && validateEmailForSchool(email, selectedSchool) && (
+                      <p className="text-xs text-green-600 font-medium">
+                        ✓ Valid {selectedSchool} email
+                      </p>
+                    )}
+                    {selectedSchool && !isSuperUser(email) && (!email || !validateEmailForSchool(email, selectedSchool)) && (
+                      <p className="text-xs text-muted-foreground">
+                        Use your {selectedSchool} email (
+                        {SUPPORTED_SCHOOLS[selectedSchool].acceptable_domains.join(", ")})
+                      </p>
+                    )}
+                    {isSuperUser(email) && (
+                      <p className="text-xs text-green-600 font-medium">
+                        ✓ Super user - can use any email domain
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Create a strong password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
+                  >
+                    {loading ? "Signing Up..." : "Sign Up"}
+                  </Button>
+                </div>
+              </form>
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
               <div className="text-sm text-center text-muted-foreground">

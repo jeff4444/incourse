@@ -12,7 +12,6 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BookOpen, Clock } from "lucide-react";
 import { Navbar } from "@/components/navbar";
-import { NudgeCard } from "@/components/nudge-card";
 import { useAuth } from "@/hooks/useAuth";
 import { useAllActivitiesByType } from "@/lib/hooks/useActivities";
 import { getActivityIcon, getActivityColor } from "@/lib/utils/activityUtils";
@@ -81,30 +80,6 @@ function DashboardPage() {
     return 'there';
   };
 
-  // Sample nudges
-  const nudges = [
-    {
-      id: 1,
-      course: "CS 101",
-      message: "Time to review Arrays and Linked Lists",
-      dueDate: "Quiz in 2 days",
-      priority: "high" as const,
-    },
-    {
-      id: 2,
-      course: "ECON 201",
-      message: "New lecture summary available",
-      dueDate: "Posted yesterday",
-      priority: "medium" as const,
-    },
-    {
-      id: 3,
-      course: "MATH 220",
-      message: "Problem Set 8 is now available",
-      dueDate: "Due in 5 days",
-      priority: "medium" as const,
-    },
-  ];
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-linear-to-br from-orange-50 to-pink-50">
@@ -121,17 +96,15 @@ function DashboardPage() {
           </p>
         </div>
 
-        {/* Main Content - Side by Side Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-screen-3xl mx-auto">
+        {/* Main Content - Full Width Layout */}
+        <div className="max-w-screen-3xl mx-auto">
           {/* Recent Activity */}
           <div className="w-full">
             <Card className="shadow-sm border-border/50 pb-0">
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-semibold">Recent Activity</h2>
-                  <Button variant="ghost" size="sm">
-                    View All
-                  </Button>
+
                 </div>
                 <Tabs 
                   value={activityFilter} 
@@ -211,38 +184,6 @@ function DashboardPage() {
                   </Button>
                 </div>
               </CardFooter>
-            </Card>
-          </div>
-
-          {/* Smart Nudges */}
-          <div className="w-full">
-            <Card className="shadow-sm border-border/50 h-fit">
-              <CardHeader className="pb-3">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Smart Nudges</h2>
-                  <Button variant="ghost" size="sm">
-                    Mark All Read
-                  </Button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Your personalized learning recommendations
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {nudges.length > 0 ? (
-                  nudges.map((nudge) => (
-                    <NudgeCard key={nudge.id} nudge={nudge} />
-                  ))
-                ) : (
-                  <div className="text-center text-muted-foreground py-8">
-                    <BookOpen className="h-12 w-12 mx-auto mb-3 text-muted-foreground/50" />
-                    <p className="text-sm">No nudges at this time.</p>
-                    <p className="text-xs mt-1">
-                      Keep learning to get personalized recommendations!
-                    </p>
-                  </div>
-                )}
-              </CardContent>
             </Card>
           </div>
         </div>
