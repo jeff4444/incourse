@@ -11,12 +11,14 @@ interface CalendarMonthProps {
     type: string;
   }>;
   getCourseColor: (courseId: string) => string;
+  onEventClick?: (event: any, clickEvent: React.MouseEvent) => void;
 }
 
 export function CalendarMonth({
   currentDate,
   events,
   getCourseColor,
+  onEventClick,
 }: CalendarMonthProps) {
   const daysInMonth = new Date(
     currentDate.getFullYear(),
@@ -123,6 +125,7 @@ export function CalendarMonth({
                             className={`text-xs truncate px-2 py-1 rounded-md ${getCourseColor(
                               event.courseId
                             )} text-white shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
+                            onClick={(e) => onEventClick?.(event, e)}
                           >
                             <span className="font-medium">
                               {event.date.toLocaleTimeString([], {

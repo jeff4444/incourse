@@ -35,6 +35,8 @@ export function CalendarEvent({ event, getCourseColor }: CalendarEventProps) {
         return <Users className="h-4 w-4" />;
       case "reading":
         return <BookOpen className="h-4 w-4" />;
+      case "course-event":
+        return <BookOpen className="h-4 w-4" />;
       default:
         return <Clock className="h-4 w-4" />;
     }
@@ -54,6 +56,8 @@ export function CalendarEvent({ event, getCourseColor }: CalendarEventProps) {
         return "AI Suggestion";
       case "reading":
         return "Reading";
+      case "course-event":
+        return "Course Event";
       default:
         return "Event";
     }
@@ -66,6 +70,8 @@ export function CalendarEvent({ event, getCourseColor }: CalendarEventProps) {
         return "destructive";
       case "ai-suggestion":
         return "default";
+      case "course-event":
+        return "secondary";
       default:
         return "secondary";
     }
