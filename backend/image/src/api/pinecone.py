@@ -81,13 +81,23 @@ def create_and_populate_namespace(
         }
         records.append(record)
     
-    # Upsert records to Pinecone (embeddings generated automatically)
-    print(f"Upserting {len(records)} records to namespace '{namespace}'...")
-    index.upsert_records(
-        namespace=namespace,
-        records=records
-    )
-    print(f"Successfully populated namespace '{namespace}' with {len(records)} chunks")
+    # Upsert records to Pinecone in batches (max 96 records per batch)
+    batch_size = 96
+    total_records = len(records)
+    print(f"Upserting {total_records} records to namespace '{namespace}' in batches of {batch_size}...")
+    
+    for i in range(0, total_records, batch_size):
+        batch = records[i:i + batch_size]
+        batch_num = (i // batch_size) + 1
+        total_batches = (total_records + batch_size - 1) // batch_size
+        
+        print(f"Upserting batch {batch_num}/{total_batches} ({len(batch)} records)...")
+        index.upsert_records(
+            namespace=namespace,
+            records=batch
+        )
+    
+    print(f"Successfully populated namespace '{namespace}' with {total_records} chunks in {total_batches} batches")
     
 
 async def set_index_and_namespace(

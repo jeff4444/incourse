@@ -18,9 +18,10 @@ interface FlashcardViewProps {
   cards: Flashcard[]
   courseID: string
   onStudySessionEnd?: (reviewedCards: Record<number, "easy" | "hard" | null>) => void
+  returnTab?: string
 }
 
-export function FlashcardView({ title, cards, courseID, onStudySessionEnd }: FlashcardViewProps) {
+export function FlashcardView({ title, cards, courseID, onStudySessionEnd, returnTab }: FlashcardViewProps) {
   const [currentCardIndex, setCurrentCardIndex] = useState(0)
   const [flipped, setFlipped] = useState(false)
   const [reviewedCards, setReviewedCards] = useState<Record<number, "easy" | "hard" | null>>({})
@@ -90,7 +91,7 @@ export function FlashcardView({ title, cards, courseID, onStudySessionEnd }: Fla
       <CardHeader>
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <Link href={`/courses/${courseID}`}>
+            <Link href={`/courses/${courseID}${returnTab ? `?tab=${returnTab}` : ''}`}>
               <Button variant="ghost" size="sm" className="gap-1">
                 <ChevronLeft className="h-4 w-4" />
                 Back to Decks

@@ -25,10 +25,6 @@ interface NudgeCardProps {
 }
 
 export function NudgeCard({ nudge, onComplete, onDismiss }: NudgeCardProps) {
-  const getPriorityStyles = () => {
-    return "bg-gray-50 border-gray-200 hover:border-gray-300 hover:bg-gray-100";
-  };
-
   const getPriorityIconStyles = () => {
     switch (nudge.priority) {
       case "high":
@@ -82,13 +78,13 @@ export function NudgeCard({ nudge, onComplete, onDismiss }: NudgeCardProps) {
               {formatTimeAgo(nudge.created_at)}
             </p>
             <div className="flex gap-2">
-              <Button 
+              {/* <Button 
                 size="sm" 
                 onClick={handleAction}
                 className="bg-gray-800 hover:bg-gray-700 text-white text-xs px-3 py-1 h-6 rounded-md"
               >
                 {nudge.label}
-              </Button>
+              </Button> */}
               {onDismiss && (
                 <Button 
                   variant="ghost" 

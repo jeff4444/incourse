@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +55,7 @@ function AssignmentDetailPage({
 }: {
   params: Promise<{ assignmentID: string, courseID: string }>;
 }) {
+  const searchParams = useSearchParams();
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -259,7 +261,7 @@ function AssignmentDetailPage({
 
           {/* Action Buttons */}
           <div className="mt-6 flex items-center justify-end gap-4">
-            <Link href={`/courses/${courseID}`}>
+            <Link href={`/courses/${courseID}${searchParams.get('returnTab') ? `?tab=${searchParams.get('returnTab')}` : ''}`}>
               <Button variant="outline">
                 Back to Course
               </Button>

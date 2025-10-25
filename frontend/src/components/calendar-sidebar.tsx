@@ -2,6 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Calendar,
   AlertTriangle,
@@ -18,9 +19,10 @@ interface CalendarSidebarProps {
     courseName?: string;
     courseCode?: string;
   }>;
+  loading?: boolean;
 }
 
-export function CalendarSidebar({ events }: CalendarSidebarProps) {
+export function CalendarSidebar({ events, loading = false }: CalendarSidebarProps) {
 
   // Get upcoming events (next 3 events from today onwards)
   const now = new Date();
@@ -62,7 +64,20 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {upcomingEvents.length > 0 ? (
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-lg border border-border/50">
+                <div className="flex justify-between items-start mb-2 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Skeleton className="h-4 w-3/4 mb-1" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <Skeleton className="h-3 w-24" />
+              </div>
+            ))
+          ) : upcomingEvents.length > 0 ? (
             upcomingEvents.map((event) => (
               <div
                 key={event.id}
@@ -110,7 +125,20 @@ export function CalendarSidebar({ events }: CalendarSidebarProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {todayEvents.length > 0 ? (
+          {loading ? (
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="p-3 rounded-lg border border-border/50">
+                <div className="flex justify-between items-start mb-1 gap-2">
+                  <div className="flex-1 min-w-0">
+                    <Skeleton className="h-4 w-3/4 mb-1" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </div>
+                  <Skeleton className="h-5 w-16" />
+                </div>
+                <Skeleton className="h-3 w-20" />
+              </div>
+            ))
+          ) : todayEvents.length > 0 ? (
             todayEvents.map((event) => (
               <div
                 key={event.id}

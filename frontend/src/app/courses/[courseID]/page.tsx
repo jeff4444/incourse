@@ -33,6 +33,7 @@ function CoursePage({
   const searchParams = useSearchParams();
   const [courseID, setCourseID] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<string>('modules');
   const [deletingFlashcards, setDeletingFlashcards] = useState<Set<string>>(new Set());
   const [deletingQuizzes, setDeletingQuizzes] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<{ type: 'flashcard' | 'quiz'; message: string } | null>(null);
@@ -56,19 +57,36 @@ function CoursePage({
     getUserId();
   }, []);
 
+  // Initialize tab from URL
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['modules', 'notes', 'quizzes', 'flashcards', 'assignments'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    router.push(`/courses/${courseID}?tab=${value}`, { scroll: false });
+  };
+
   // Check for toast messages from URL params
   useEffect(() => {
     const flashcard = searchParams.get('flashcard');
     const quiz = searchParams.get('quiz');
+    const tab = searchParams.get('tab');
     
     if (flashcard === 'generating') {
       setToastMessage({ type: 'flashcard', message: 'Flashcard deck is being generated in the background!' });
-      // Clear the URL param
-      router.replace(`/courses/${courseID}`, { scroll: false });
+      // Clear the URL param but preserve tab
+      const url = tab ? `/courses/${courseID}?tab=${tab}` : `/courses/${courseID}`;
+      router.replace(url, { scroll: false });
     } else if (quiz === 'generating') {
       setToastMessage({ type: 'quiz', message: 'Quiz is being generated in the background!' });
-      // Clear the URL param
-      router.replace(`/courses/${courseID}`, { scroll: false });
+      // Clear the URL param but preserve tab
+      const url = tab ? `/courses/${courseID}?tab=${tab}` : `/courses/${courseID}`;
+      router.replace(url, { scroll: false });
     }
   }, [searchParams, courseID, router]);
 
@@ -248,7 +266,7 @@ function CoursePage({
 
         {/* Course Content */}
         <div className="grid grid-cols-1 gap-6">
-          <Tabs defaultValue="modules" className="w-full">
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
             <TabsList className="mb-6">
               <TabsTrigger value="modules">Modules</TabsTrigger>
               <TabsTrigger value="notes">Notes</TabsTrigger>
@@ -371,7 +389,7 @@ function CoursePage({
                               );
                             } else {
                               return (
-                                <Link href={`/courses/${courseID}/quiz/${quiz.id}`}>
+                                <Link href={`/courses/${courseID}/quiz/${quiz.id}?returnTab=quizzes`}>
                                   <Button size="sm">Start Quiz</Button>
                                 </Link>
                               );
@@ -498,7 +516,7 @@ function CoursePage({
                               );
                             } else {
                               return (
-                                <Link href={`/courses/${courseID}/flashcards/${deck.id}`}>
+                                <Link href={`/courses/${courseID}/flashcards/${deck.id}?returnTab=flashcards`}>
                                   <Button size="sm">Practice</Button>
                                 </Link>
                               );

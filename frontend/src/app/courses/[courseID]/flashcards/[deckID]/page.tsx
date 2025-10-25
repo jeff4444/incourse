@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { FlashcardView } from "@/components/flashcard-view"
 import { Navbar } from "@/components/navbar"
 import { useFlashcardDeck } from "@/lib/hooks/useFlashcards"
@@ -9,6 +9,7 @@ import { useLogFlashcardStudy } from "@/lib/hooks/useActivities"
 
 export default function FlashcardPage({ params }: { params: Promise<{ courseID: string; deckID: string }> }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [courseID, setCourseID] = useState<string>("")
   const [deckID, setDeckID] = useState<string>("")
   const logStudySession = useLogFlashcardStudy()
@@ -48,9 +49,10 @@ export default function FlashcardPage({ params }: { params: Promise<{ courseID: 
   useEffect(() => {
     // If deck not found after loading, redirect back to course page
     if (!isLoading && !deck && deckID && courseID) {
-      router.push(`/courses/${courseID}`)
+      const currentTab = searchParams.get('tab') || 'flashcards'
+      router.push(`/courses/${courseID}?tab=${currentTab}`)
     }
-  }, [deck, isLoading, deckID, courseID, router])
+  }, [deck, isLoading, deckID, courseID, router, searchParams])
 
   if (isLoading) {
     return (
@@ -94,6 +96,7 @@ export default function FlashcardPage({ params }: { params: Promise<{ courseID: 
           cards={transformedCards} 
           courseID={courseID}
           onStudySessionEnd={handleStudySessionEnd}
+          returnTab={searchParams.get('tab') || 'flashcards'}
         />
       </div>
     </div>

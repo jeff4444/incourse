@@ -20,9 +20,10 @@ interface QuizViewProps {
   questions: QuizQuestion[]
   onComplete?: (score: number, selectedAnswers: Record<number, string>) => void
   courseID: string
+  returnTab?: string
 }
 
-export function QuizView({ title, questions, onComplete, courseID }: QuizViewProps) {
+export function QuizView({ title, questions, onComplete, courseID, returnTab }: QuizViewProps) {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({})
   const [showResults, setShowResults] = useState(false)
@@ -95,7 +96,7 @@ export function QuizView({ title, questions, onComplete, courseID }: QuizViewPro
               >
                 Retry Quiz
               </Button>
-              <Link href={`/courses/${courseID}`}>
+              <Link href={`/courses/${courseID}${returnTab ? `?tab=${returnTab}` : ''}`}>
                 <Button variant="outline">Return to Course</Button>
               </Link>
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,71 +15,28 @@ import { CalendarHeader } from "@/components/calendar-header";
 import { CalendarMonth } from "@/components/calendar-month";
 import { CalendarWeek } from "@/components/calendar-week";
 import { CalendarDay } from "@/components/calendar-day";
-import { CalendarEvent } from "@/components/calendar-event";
+import { CalendarEvent as CalendarEventComponent } from "@/components/calendar-event";
 import { CalendarSidebar } from "@/components/calendar-sidebar";
 import { EventPopup } from "@/components/event-popup";
-import { CalendarSkeleton } from "@/components/calendar-skeleton";
+import { CalendarGridSkeleton } from "@/components/calendar-grid-skeleton";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
-import { Course } from "@/lib/types/course";
 import { getCourseColor } from "@/lib/utils/courseColors";
-import { authenticatedFetchJson } from "@/lib/utils/apiClient";
-
-interface CalendarEvent {
-  id: string;
-  title: string;
-  date: Date;
-  endDate: Date;
-  courseId: string;
-  type: string;
-  courseName?: string;
-  courseCode?: string;
-  description?: string;
-  location?: string;
-}
+import { useCalendarEvents, CalendarEvent } from "@/lib/hooks/useCalendar";
+import { useCourses } from "@/lib/hooks/useCourses";
 
 const CalendarPage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [view, setView] = useState<"month" | "week" | "day">("month");
   const [showSidebar, setShowSidebar] = useState(true);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [popupPosition, setPopupPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
 
-  // Fetch courses and events data
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch courses
-        const coursesData: Course[] = await authenticatedFetchJson<Course[]>('/api/courses');
-        setCourses(coursesData);
-
-        // Fetch events
-        const eventsData = await authenticatedFetchJson<{ events: any[]; errors?: string[] }>('/api/calendar/events');
-        
-        // Transform events to include proper Date objects
-        const transformedEvents: CalendarEvent[] = eventsData.events.map((event: any) => ({
-          ...event,
-          date: new Date(event.date),
-          endDate: new Date(event.endDate),
-        }));
-        
-        setEvents(transformedEvents);
-      } catch (err) {
-        console.error('Error fetching calendar data:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load calendar data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, []);
+  // Fetch courses and events data using TanStack Query hooks
+  const { data: courses = [], isLoading: coursesLoading, error: coursesError } = useCourses();
+  const { data: events = [], isLoading: eventsLoading, error: eventsError } = useCalendarEvents();
+  
+  const loading = coursesLoading || eventsLoading;
+  const error = coursesError || eventsError;
 
   const handlePrevious = () => {
     const newDate = new Date(currentDate);
@@ -126,9 +83,7 @@ const CalendarPage = () => {
     setSelectedEvent(null);
   };
 
-  if (loading) {
-    return <CalendarSkeleton />;
-  }
+  // Remove the early return for loading - we'll render the full structure with conditional skeletons
 
   if (error) {
     return (
@@ -138,7 +93,7 @@ const CalendarPage = () => {
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
               <h2 className="text-xl font-semibold text-red-600 mb-2">Error Loading Calendar</h2>
-              <p className="text-muted-foreground">{error}</p>
+              <p className="text-muted-foreground">{error instanceof Error ? error.message : 'Failed to load calendar data'}</p>
             </div>
           </div>
         </main>
@@ -182,8 +137,8 @@ const CalendarPage = () => {
         <div className="flex flex-col lg:flex-row gap-8">
           {/* Main Calendar */}
           <div className="flex-1">
-            <Card className="mb-8 shadow-md border-border/50">
-              <CardHeader className="pb-4">
+            <Card className="shadow-md border-border/50">
+              <CardHeader>
                 <CalendarHeader
                   currentDate={currentDate}
                   view={view}
@@ -194,29 +149,35 @@ const CalendarPage = () => {
                 />
               </CardHeader>
               <CardContent className="p-0">
-                {view === "month" && (
-                  <CalendarMonth
-                    currentDate={currentDate}
-                    events={events}
-                    getCourseColor={getCourseColorForEvent}
-                    onEventClick={handleEventClick}
-                  />
-                )}
-                {view === "week" && (
-                  <CalendarWeek
-                    currentDate={currentDate}
-                    events={events}
-                    getCourseColor={getCourseColorForEvent}
-                    onEventClick={handleEventClick}
-                  />
-                )}
-                {view === "day" && (
-                  <CalendarDay
-                    currentDate={currentDate}
-                    events={events}
-                    getCourseColor={getCourseColorForEvent}
-                    onEventClick={handleEventClick}
-                  />
+                {loading ? (
+                  <CalendarGridSkeleton view={view} />
+                ) : (
+                  <>
+                    {view === "month" && (
+                      <CalendarMonth
+                        currentDate={currentDate}
+                        events={events}
+                        getCourseColor={getCourseColorForEvent}
+                        onEventClick={handleEventClick}
+                      />
+                    )}
+                    {view === "week" && (
+                      <CalendarWeek
+                        currentDate={currentDate}
+                        events={events}
+                        getCourseColor={getCourseColorForEvent}
+                        onEventClick={handleEventClick}
+                      />
+                    )}
+                    {view === "day" && (
+                      <CalendarDay
+                        currentDate={currentDate}
+                        events={events}
+                        getCourseColor={getCourseColorForEvent}
+                        onEventClick={handleEventClick}
+                      />
+                    )}
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -226,7 +187,7 @@ const CalendarPage = () => {
           {/* Sidebar */}
           {showSidebar && (
             <div className="w-full lg:w-80">
-              <CalendarSidebar events={events} />
+              <CalendarSidebar events={events} loading={loading} />
             </div>
           )}
         </div>

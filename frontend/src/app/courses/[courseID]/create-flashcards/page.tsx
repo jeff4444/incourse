@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { authenticatedFetchJson } from "@/lib/utils/apiClient"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -19,6 +19,7 @@ import { createClient } from "@/lib/utils/supabase/client"
 
 export default function CreateFlashcardsPage({ params }: { params: Promise<{ courseID: string }> }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [courseID, setCourseID] = useState<string>("")
   const [isGenerating, setIsGenerating] = useState(false)
   const [title, setTitle] = useState("")
@@ -82,7 +83,8 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
       }
 
       // Redirect to course page with success message
-      router.push(`/courses/${courseID}?flashcard=generating`)
+      const currentTab = searchParams.get('tab') || 'flashcards'
+      router.push(`/courses/${courseID}?flashcard=generating&tab=${currentTab}`)
     } catch (error) {
       console.error('Error generating flashcards:', error)
       alert('Failed to generate flashcards. Please try again.')
@@ -93,7 +95,8 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
   const handleDismiss = () => {
     setIsGenerating(false)
     // Navigate back to course page
-    router.push(`/courses/${courseID}`)
+    const currentTab = searchParams.get('tab') || 'flashcards'
+    router.push(`/courses/${courseID}?tab=${currentTab}`)
   }
 
   return (

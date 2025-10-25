@@ -92,7 +92,7 @@ export function AssignmentTile({ assignment, courseID }: AssignmentTileProps) {
         </div>
       </div>
       <div className="flex items-center gap-2 justify-end">
-        <Link href={`/courses/${courseID}/assignments/${assignment.id}`}>
+        <Link href={`/courses/${courseID}/assignments/${assignment.id}?returnTab=assignments`}>
           <Button size="sm">
             {getButtonText(assignment)}
           </Button>

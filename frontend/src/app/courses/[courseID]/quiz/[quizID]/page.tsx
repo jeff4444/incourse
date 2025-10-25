@@ -1,13 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { QuizView } from "@/components/quiz-view"
 import { Navbar } from "@/components/navbar"
 import { useQuiz, useRecordQuizAttempt } from "@/lib/hooks/useQuizzes"
 
 export default function QuizPage({ params }: { params: Promise<{ courseID: string; quizID: string }> }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [courseID, setCourseID] = useState<string>("")
   const [quizID, setQuizID] = useState<string>("")
 
@@ -27,9 +28,10 @@ export default function QuizPage({ params }: { params: Promise<{ courseID: strin
   useEffect(() => {
     // If quiz not found after loading, redirect back to course page
     if (!isLoading && !quiz && quizID && courseID) {
-      router.push(`/courses/${courseID}`)
+      const currentTab = searchParams.get('tab') || 'quizzes'
+      router.push(`/courses/${courseID}?tab=${currentTab}`)
     }
-  }, [quiz, isLoading, quizID, courseID, router])
+  }, [quiz, isLoading, quizID, courseID, router, searchParams])
 
   const handleQuizComplete = async (score: number, selectedAnswers: Record<number, string>) => {
     if (!quiz) return;
@@ -95,6 +97,7 @@ export default function QuizPage({ params }: { params: Promise<{ courseID: strin
           questions={transformedQuestions} 
           onComplete={handleQuizComplete}
           courseID={courseID}
+          returnTab={searchParams.get('tab') || 'quizzes'}
         />
       </div>
     </div>
