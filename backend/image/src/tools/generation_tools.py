@@ -88,7 +88,8 @@ async def generate_quiz_from_chat(
             question_count=len(quiz_dicts),
             extra_context=extra_context,
             difficulty=difficulty,
-            note_ids=[]
+            note_ids=[],
+            status="completed"
         )
         
         # Store quiz questions in database
@@ -96,7 +97,7 @@ async def generate_quiz_from_chat(
         
         # Get frontend URL from environment
         frontend_url = os.getenv("NEXT_PUBLIC_API_BASE_URL", "https://app.incourse.com")
-        quiz_url = f"{frontend_url}/courses/{ctx.deps.course_id}/quizzes/{quiz_id}"
+        quiz_url = f"{frontend_url}/courses/{ctx.deps.course_id}/quiz/{quiz_id}"
         
         # Build response with quiz summary
         response = f"✅ I've created a {num_questions}-question {difficulty} quiz!\n\n"
@@ -191,7 +192,8 @@ async def generate_flashcard_from_chat(
             card_count=len(flashcard_dicts),
             extra_context=extra_context,
             card_type=card_type,
-            note_ids=[]
+            note_ids=[],
+            status="completed"
         )
         
         # Store flashcards in database
