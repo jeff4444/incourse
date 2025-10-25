@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,12 +56,18 @@ export function Navbar() {
             <span className="sr-only">Toggle menu</span>
           </Button>
           <Link href="/dashboard" className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-pink-500" />
-            <span className="text-xl font-bold hidden md:inline-block bg-gradient-to-r from-orange-600 to-pink-600 bg-clip-text text-transparent">
+            <Image 
+              src="/incourse_logo.png" 
+              alt="InCourse Logo" 
+              width={24} 
+              height={24} 
+              className="h-10 w-10"
+            />
+            <span className="text-xl font-bold hidden md:inline-block bg-gradient-to-rtext-transparent">
               InCourse
             </span>
           </Link>
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className="hidden md:flex items-center gap-1 pl-8">
             <Button
               variant={isActive("/dashboard") ? "secondary" : "ghost"}
               size="sm"

@@ -132,9 +132,13 @@ export default function LandingPage() {
       >
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-pink-500 rounded-xl flex items-center justify-center">
-              <Library className="w-5 h-5 text-white" />
-            </div>
+            <Image 
+              src="/incourse_logo.png" 
+              alt="InCourse Logo" 
+              width={32} 
+              height={32} 
+              className="w-8 h-8"
+            />
             <span className="text-xl font-bold text-gray-800 tracking-tight">InCourse</span>
           </div>
 
@@ -898,9 +902,13 @@ export default function LandingPage() {
       <footer className="py-8 px-4 bg-gray-900 text-white">
         <div className="container mx-auto max-w-6xl text-center">
           <div className="flex items-center justify-center space-x-2 mb-4">
-            <div className="w-8 h-8 bg-gradient-to-br from-orange-400 to-pink-500 rounded-xl flex items-center justify-center">
-              <Library className="w-5 h-5 text-white" />
-            </div>
+            <Image 
+              src="/incourse_logo.png" 
+              alt="InCourse Logo" 
+              width={32} 
+              height={32} 
+              className="w-8 h-8"
+            />
             <span className="text-xl font-bold tracking-tight">InCourse</span>
           </div>
           <p className="text-gray-400 font-normal">© 2025 InCourse. Built with ❤️ by students, for students.</p>
