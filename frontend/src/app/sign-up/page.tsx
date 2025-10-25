@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createClient } from "@/lib/utils/supabase/client";
 import { FcGoogle } from "react-icons/fc";
 import {
@@ -45,6 +45,25 @@ export default function SignUpPage() {
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
   const [selectedSchool, setSelectedSchool] = useState<string>("");
+
+  // Check if user is already authenticated and redirect to dashboard
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Check if user has completed onboarding
+        const passedOnboarding = user.user_metadata?.passed_onboarding;
+        
+        if (passedOnboarding === false) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
+      }
+    };
+
+    checkAuth();
+  }, [router, supabase]);
 
   const handleEmailSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
