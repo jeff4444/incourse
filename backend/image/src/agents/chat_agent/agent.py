@@ -110,12 +110,12 @@ def build_system_prompt_with_context(deps: Deps) -> str:
     return base_prompt
 
 
-def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
+def get_chat_agent(provider="bedrock", **kwargs) -> Agent[Deps, ChatAnswer]:
     """
     Create a chat agent for file Q&A with history and context support.
     The agent can intelligently fetch context only when needed.
     """
-    model = get_model()
+    model = get_model(provider)
 
     return Agent[
         Deps,
@@ -137,12 +137,12 @@ def get_chat_agent(**kwargs) -> Agent[Deps, ChatAnswer]:
     )
 
 
-def get_chat_agent_with_context(deps: Deps, **kwargs) -> Agent[Deps, ChatAnswer]:
+def get_chat_agent_with_context(deps: Deps, provider="bedrock", **kwargs) -> Agent[Deps, ChatAnswer]:
     """
     Create a chat agent with preloaded context included in the system prompt.
     This provides immediate access to conversation history and summary.
     """
-    model = get_model()
+    model = get_model(provider)
     system_prompt = build_system_prompt_with_context(deps)
 
     return Agent[

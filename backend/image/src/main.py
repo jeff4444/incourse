@@ -65,9 +65,9 @@ def get_chat_agent_lazy(**kwargs):
     return get_chat_agent(**kwargs)
 
 
-def get_chat_agent_with_context_lazy(deps, **kwargs):
+def get_chat_agent_with_context_lazy(deps, provider="bedrock", **kwargs):
     from agents.chat_agent.agent import get_chat_agent_with_context
-    return get_chat_agent_with_context(deps, **kwargs)
+    return get_chat_agent_with_context(deps, provider=provider, **kwargs)
 
 def get_note_update_agent_lazy(**kwargs):
     from agents.note_update_agent.agent import get_note_update_agent
@@ -172,6 +172,13 @@ class ChatRequest(BaseModel):
     message: str
     prompt: Optional[str] = None
     session_id: Optional[str] = None
+    provider: Optional[str] = "bedrock"
+    
+    @validator('provider')
+    def validate_provider(cls, v):
+        if v is not None and v not in ["bedrock", "openai"]:
+            raise ValueError('Provider must be either "bedrock" or "openai"')
+        return v
 
 class ChatResponse(BaseModel):
     answer: str
@@ -473,7 +480,7 @@ async def chat(request: ChatRequest):
 
         # Let the agent handle the query - it will fetch context as needed
         user_prompt = request.prompt or request.message
-        agent = get_chat_agent_with_context_lazy(deps)
+        agent = get_chat_agent_with_context_lazy(deps, provider=request.provider)
         result = await agent.run(user_prompt, deps=deps)
         
         # Always do session management - we need to save all messages
@@ -595,7 +602,7 @@ async def chat_stream(request: ChatRequest):
             user_prompt = request.prompt or request.message
             
             # Get agent and stream response
-            agent = get_chat_agent_with_context_lazy(deps)
+            agent = get_chat_agent_with_context_lazy(deps, provider=request.provider)
             
             # Buffer to collect full response for session management
             full_response = ""

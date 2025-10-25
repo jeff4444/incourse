@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Folder, Search } from "lucide-react"
 import { MessageSquare, Lightbulb, Send, X, Loader2, MessageCircle, Copy, FileText } from "lucide-react"
 import ReactMarkdown from "react-markdown"
@@ -67,6 +68,7 @@ export function ChatPanel({
   const [sessionId, setSessionId] = useState<string | null>(initialSessionId || null)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [hasAttemptedLoad, setHasAttemptedLoad] = useState(false)
+  const [provider, setProvider] = useState<"bedrock" | "openai">("bedrock")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   // Streaming state
@@ -260,6 +262,7 @@ export function ChatPanel({
           message: userMessage,
           context: contextText,
           sessionId: sessionId,
+          provider: provider,
         }),
       })
 
@@ -639,6 +642,21 @@ export function ChatPanel({
             Suggestions
           </TabsTrigger>
         </TabsList>
+
+        {/* Provider Selection */}
+        <div className="px-4">
+          <div className="flex items-end justify-end">
+            <Select value={provider} onValueChange={(value: "bedrock" | "openai") => setProvider(value)}>
+              <SelectTrigger id="provider-select" className="w-48">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="bedrock">Claude 4.5 Sonnet</SelectItem>
+                <SelectItem value="openai">GPT-4o</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         
 
         <TabsContent value="chat" className="flex-1 flex flex-col p-0 m-0 overflow-hidden">
@@ -651,7 +669,7 @@ export function ChatPanel({
           )}
           
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto px-6 py-2">
             {messages.map((message, index) => (
               <div key={index} className={`mb-6 ${message.role === "user" ? "flex justify-end" : ""}`}>
                 {message.role === "user" ? (
