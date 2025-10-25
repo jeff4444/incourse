@@ -75,6 +75,8 @@ export function ChatPanel({
   const [isStreaming, setIsStreaming] = useState(false)
   const [streamingMessage, setStreamingMessage] = useState("")
   const [activeToolCalls, setActiveToolCalls] = useState<ToolCall[]>([])
+  const [isStopRequested, setIsStopRequested] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Text selection state for messages
@@ -217,6 +219,33 @@ export function ChatPanel({
     }
   }
 
+  const handleStopGeneration = () => {
+    setIsStopRequested(true)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+    
+    // Immediately treat streaming message as final
+    if (streamingMessage) {
+      const finalMessages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[] = [
+        ...messages,
+        {
+          role: "assistant" as const,
+          content: streamingMessage,
+          timestamp: new Date(),
+        },
+      ]
+      setMessages(finalMessages)
+      onUpdateMessages?.(finalMessages)
+    }
+    
+    // Clear streaming state
+    setStreamingMessage("")
+    setActiveToolCalls([])
+    setIsStreaming(false)
+    setIsStopRequested(false)
+  }
+
   const handleSendMessage = async (e: React.FormEvent | React.KeyboardEvent) => {
     e.preventDefault()
     if (!inputValue.trim() || isLoading || isLoadingHistory || isStreaming) return
@@ -246,6 +275,10 @@ export function ChatPanel({
     setIsStreaming(true)
     setStreamingMessage("")
     setActiveToolCalls([])
+    setIsStopRequested(false)
+
+    // Create abort controller for this request
+    abortControllerRef.current = new AbortController()
 
     try {
       // Optimistically clear the tagged context from the UI BEFORE the network call
@@ -264,6 +297,7 @@ export function ChatPanel({
           sessionId: sessionId,
           provider: provider,
         }),
+        signal: abortControllerRef.current.signal,
       })
 
       if (!response.ok) {
@@ -369,6 +403,14 @@ export function ChatPanel({
       setActiveToolCalls([])
     } catch (err) {
       console.error('Streaming error:', err)
+      
+      // Check if this was an abort error (user stopped generation)
+      if (err instanceof Error && err.name === 'AbortError') {
+        // User stopped generation - partial message already handled in handleStopGeneration
+        console.log('Generation stopped by user')
+        return
+      }
+      
       const errorMessages: { role: "user" | "assistant"; content: string; timestamp: Date; contextPreview?: string }[] = [
         ...newMessages,
         {
@@ -383,6 +425,8 @@ export function ChatPanel({
       setActiveToolCalls([])
     } finally {
       setIsStreaming(false)
+      setIsStopRequested(false)
+      abortControllerRef.current = null
     }
   }
 
@@ -842,18 +886,29 @@ export function ChatPanel({
                 disabled={isLoading || isStreaming}
                 rows={1}
               />
-              <Button 
-                type="submit" 
-                size="icon" 
-                disabled={!inputValue.trim() || isLoading || isStreaming}
-                className="rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 mt-1"
-              >
-                {isLoading || isStreaming ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-              </Button>
+              {isStreaming ? (
+                <Button 
+                  type="button"
+                  size="icon" 
+                  onClick={handleStopGeneration}
+                  className="rounded-xl bg-red-500 hover:bg-red-600 mt-1"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              ) : (
+                <Button 
+                  type="submit" 
+                  size="icon" 
+                  disabled={!inputValue.trim() || isLoading}
+                  className="rounded-xl bg-blue-500 hover:bg-blue-600 disabled:bg-gray-300 mt-1"
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
             </div>
           </form>
         </TabsContent>
