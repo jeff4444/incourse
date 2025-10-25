@@ -42,6 +42,25 @@ function SignInContent() {
     }
   }, [searchParams]);
 
+  // Check if user is already authenticated and redirect to dashboard
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        // Check if user has completed onboarding
+        const passedOnboarding = user.user_metadata?.passed_onboarding;
+        
+        if (passedOnboarding === false) {
+          router.push("/onboarding");
+        } else {
+          router.push("/dashboard");
+        }
+      }
+    };
+
+    checkAuth();
+  }, [router]);
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
