@@ -65,13 +65,93 @@ def get_chat_agent_lazy(**kwargs):
     return get_chat_agent(**kwargs)
 
 
-def get_chat_agent_with_context_lazy(deps, **kwargs):
+def get_chat_agent_with_context_lazy(deps, provider="bedrock", **kwargs):
     from agents.chat_agent.agent import get_chat_agent_with_context
-    return get_chat_agent_with_context(deps, **kwargs)
+    return get_chat_agent_with_context(deps, provider=provider, **kwargs)
 
 def get_note_update_agent_lazy(**kwargs):
     from agents.note_update_agent.agent import get_note_update_agent
     return get_note_update_agent(**kwargs)
+
+async def save_partial_response(deps, request, partial_response):
+    """
+    Save partial response to database when client disconnects.
+    Performs the same session management as normal completion but with partial content.
+    """
+    try:
+        # 1. Ensure we have a chat_id
+        if not deps.chat_id:
+            from tools.supabase_tools import get_or_create_chat_session
+            
+            # Need document_id for chat session
+            if not deps.file_info:
+                try:
+                    file_info = await get_module_items_by_course_id(
+                        course_id=request.course_id,
+                        lms_id=request.file_ids[0]
+                    )
+                    document_id = file_info["id"]
+                    deps.file_info = file_info
+                    deps.is_file_from_lms = False
+                except Exception:
+                    document_id = request.file_ids[0]
+                    deps.is_file_from_lms = True
+            else:
+                document_id = deps.file_info["id"] if not deps.is_file_from_lms else request.file_ids[0]
+            
+            chat_session = await get_or_create_chat_session(
+                user_id=request.user_id,
+                document_id=document_id
+            )
+            deps.chat_id = chat_session["id"]
+        
+        # 2. Ensure we have minimal info for session manager
+        if not deps.course_info:
+            deps.course_info = await get_course(course_id=request.course_id)
+        
+        if not deps.file_info:
+            deps.file_info = await get_file_details_with_content_from_db(
+                file_id=request.file_ids[0],
+                course_id=deps.course_info["id"]
+            )
+            deps.is_file_from_lms = False
+        
+        # 3. Initialize session manager and save messages
+        session_manager = ChatSessionManager(
+            course_info=deps.course_info,
+            file_info=deps.file_info
+        )
+        
+        await session_manager.add_message_to_buffer(
+            chat_id=deps.chat_id,
+            sender="user",
+            content=request.message
+        )
+        
+        await session_manager.add_message_to_buffer(
+            chat_id=deps.chat_id,
+            sender="assistant",
+            content=partial_response
+        )
+        
+        # 4. Check if we should create a summary
+        await session_manager.check_and_create_summary(
+            chat_id=deps.chat_id,
+            user_message=request.message,
+            assistant_response=partial_response,
+            existing_chat_history=deps.chat_history,
+            existing_context_summary=deps.context_summary
+        )
+        
+        # 5. Flush any remaining messages in buffer
+        await session_manager.flush_buffer(chat_id=deps.chat_id)
+        
+        print(f"Partial response saved: {len(partial_response)} characters")
+        
+    except Exception as session_error:
+        print(f"Error saving partial response: {session_error}")
+        import traceback
+        print(traceback.format_exc())
 
 app = FastAPI(
     title="InCourse AI Agents API",
@@ -172,6 +252,13 @@ class ChatRequest(BaseModel):
     message: str
     prompt: Optional[str] = None
     session_id: Optional[str] = None
+    provider: Optional[str] = "bedrock"
+    
+    @validator('provider')
+    def validate_provider(cls, v):
+        if v is not None and v not in ["bedrock", "openai"]:
+            raise ValueError('Provider must be either "bedrock" or "openai"')
+        return v
 
 class ChatResponse(BaseModel):
     answer: str
@@ -473,7 +560,7 @@ async def chat(request: ChatRequest):
 
         # Let the agent handle the query - it will fetch context as needed
         user_prompt = request.prompt or request.message
-        agent = get_chat_agent_with_context_lazy(deps)
+        agent = get_chat_agent_with_context_lazy(deps, provider=request.provider)
         result = await agent.run(user_prompt, deps=deps)
         
         # Always do session management - we need to save all messages
@@ -579,6 +666,7 @@ async def chat_stream(request: ChatRequest):
     - done: Stream finished with full response
     """
     async def event_generator():
+        full_response = ""
         try:
             # Create minimal dependencies - agent will fetch what it needs
             deps = ChatDeps(
@@ -595,21 +683,35 @@ async def chat_stream(request: ChatRequest):
             user_prompt = request.prompt or request.message
             
             # Get agent and stream response
-            agent = get_chat_agent_with_context_lazy(deps)
+            agent = get_chat_agent_with_context_lazy(deps, provider=request.provider)
             
             # Buffer to collect full response for session management
             full_response = ""
             
-            async for event in stream_chat_agent(agent, user_prompt, deps):
-                # Send event to client
-                print("Sending event to client: ", event.to_sse())
-                yield event.to_sse()
-                
-                # Buffer text content for session management
-                if event.type.value == "text_delta":
-                    full_response += event.content
-                elif event.type.value == "done" and event.content:
-                    full_response = event.content
+            try:
+                async for event in stream_chat_agent(agent, user_prompt, deps):
+                    # Send event to client
+                    print("Sending event to client: ", event.to_sse())
+                    yield event.to_sse()
+                    
+                    # Buffer text content for session management
+                    if event.type.value == "text_delta":
+                        full_response += event.content
+                    elif event.type.value == "done" and event.content:
+                        full_response = event.content
+            except asyncio.CancelledError:
+                # Client disconnected - save partial response
+                print("Client disconnected, saving partial response")
+                if full_response:
+                    await save_partial_response(deps, request, full_response)
+                raise
+            except Exception as e:
+                # Check if this is a client disconnect error
+                if "client disconnected" in str(e).lower() or "connection closed" in str(e).lower():
+                    print("Client disconnected, saving partial response")
+                    if full_response:
+                        await save_partial_response(deps, request, full_response)
+                raise
             
             if full_response:
                 # Save chat session directly in the main flow
