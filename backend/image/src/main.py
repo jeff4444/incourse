@@ -37,7 +37,10 @@ from api.supabase import (
     create_activity,
     create_autograder_feedback,
     get_file_details_with_content_from_db,
-    get_file_details_with_temp_file_from_db
+    get_file_details_with_temp_file_from_db,
+    get_supabase_client,
+    update_flashcard_deck_status,
+    update_quiz_status
 )
 
 
@@ -221,13 +224,13 @@ class TakeActionRequest(BaseModel):
 
 class FlashcardResponse(BaseModel):
     deck_id: str
-    deck: Dict[str, Any]
+    deck: Optional[Dict[str, Any]] = None
     success: bool
     message: str
 
 class QuizResponse(BaseModel):
     quiz_id: str
-    quiz: Dict[str, Any]
+    quiz: Optional[Dict[str, Any]] = None
     success: bool
     message: str
 
@@ -306,6 +309,45 @@ async def health_check():
 async def generate_flashcards(request: FlashcardRequest):
     """
     Generate flashcards based on course content and files, and store them in the database.
+    Creates deck immediately and runs generation in background.
+    """
+    try:
+        # Create deck immediately with 'generating' status
+        deck_id = await create_flashcard_deck(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            name=request.name,
+            file_ids=request.file_ids,
+            card_count=0,  # Will be updated after generation
+            extra_context=request.extra_context,
+            card_type=request.card_type,
+            note_ids=request.note_ids,
+            status="generating"
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_flashcards_background(
+                deck_id=deck_id,
+                request=request
+            )
+        )
+        
+        # Return immediately with deck_id
+        return FlashcardResponse(
+            deck_id=deck_id,
+            deck=None,  # Will be populated after generation
+            success=True,
+            message="Flashcard generation started in background"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting flashcard generation: {str(e)}")
+
+
+async def _generate_flashcards_background(deck_id: str, request: FlashcardRequest):
+    """
+    Background task to generate flashcards.
     """
     try:
         # Pre-load dependencies to avoid refetching on every tool call
@@ -335,26 +377,30 @@ async def generate_flashcards(request: FlashcardRequest):
         # Generate flashcards
         flashcards_result = await agent.run(prompt, deps=deps)
         
+        # Check if deck still exists and is in generating status (not stopped/deleted)
+        try:
+            deck = await get_flashcard_deck(deck_id)
+            if deck.get("status") != "generating":
+                print(f"Deck {deck_id} is no longer in generating status, discarding results")
+                return
+        except Exception as check_error:
+            print(f"Deck {deck_id} no longer exists or error checking status: {str(check_error)}")
+            return
+        
         # Convert to dictionary format
         flashcard_dicts = [flashcard.to_dict() for flashcard in flashcards_result.output]
-        
-        # Create deck in database
-        deck_id = await create_flashcard_deck(
-            user_id=request.user_id,
-            course_id=request.course_id,
-            name=request.name,
-            file_ids=request.file_ids,
-            card_count=len(flashcard_dicts),
-            extra_context=request.extra_context,
-            card_type=request.card_type,
-            note_ids=request.note_ids
-        )
         
         # Store flashcards in database
         await create_flashcards(deck_id, flashcard_dicts)
         
-        # Fetch complete deck with flashcards
-        deck = await get_flashcard_deck(deck_id)
+        # Update deck status to completed and card count
+        await update_flashcard_deck_status(deck_id, "completed")
+        
+        # Update card count in deck
+        supabase = get_supabase_client()
+        supabase.table("flashcard_decks").update({
+            "card_count": len(flashcard_dicts)
+        }).eq("id", deck_id).execute()
         
         # Log activity asynchronously (fire-and-forget)
         asyncio.create_task(
@@ -373,21 +419,55 @@ async def generate_flashcards(request: FlashcardRequest):
             )
         )
         
-        return FlashcardResponse(
-            deck_id=deck_id,
-            deck=deck,
-            success=True,
-            message="Flashcards generated and saved successfully"
-        )
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating flashcards: {str(e)}")
+        # Update deck status to failed
+        await update_flashcard_deck_status(deck_id, "failed", str(e))
+        print(f"Error in background flashcard generation for deck {deck_id}: {str(e)}")
 
 # Quiz Generation Endpoint
 @app.post("/generate-quiz", response_model=QuizResponse)
 async def generate_quiz(request: QuizRequest):
     """
     Generate quiz questions based on course content and files, and store them in the database.
+    Creates quiz immediately and runs generation in background.
+    """
+    try:
+        # Create quiz immediately with 'generating' status
+        quiz_id = await create_quiz(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            name=request.name,
+            file_ids=request.file_ids,
+            question_count=0,  # Will be updated after generation
+            extra_context=request.extra_context,
+            difficulty=request.difficulty,
+            note_ids=request.note_ids,
+            status="generating"
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_quiz_background(
+                quiz_id=quiz_id,
+                request=request
+            )
+        )
+        
+        # Return immediately with quiz_id
+        return QuizResponse(
+            quiz_id=quiz_id,
+            quiz=None,  # Will be populated after generation
+            success=True,
+            message="Quiz generation started in background"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting quiz generation: {str(e)}")
+
+
+async def _generate_quiz_background(quiz_id: str, request: QuizRequest):
+    """
+    Background task to generate quiz questions.
     """
     try:
         # Pre-load dependencies to avoid refetching on every tool call
@@ -418,26 +498,30 @@ async def generate_quiz(request: QuizRequest):
         # Generate quiz questions
         quizzes_result = await agent.run(prompt, deps=deps)
         
+        # Check if quiz still exists and is in generating status (not stopped/deleted)
+        try:
+            quiz = await get_quiz(quiz_id)
+            if quiz.get("status") != "generating":
+                print(f"Quiz {quiz_id} is no longer in generating status, discarding results")
+                return
+        except Exception as check_error:
+            print(f"Quiz {quiz_id} no longer exists or error checking status: {str(check_error)}")
+            return
+        
         # Convert to dictionary format
         quiz_dicts = [quiz.to_dict() for quiz in quizzes_result.output]
-        
-        # Create quiz in database
-        quiz_id = await create_quiz(
-            user_id=request.user_id,
-            course_id=request.course_id,
-            name=request.name,
-            file_ids=request.file_ids,
-            question_count=len(quiz_dicts),
-            extra_context=request.extra_context,
-            difficulty=request.difficulty,
-            note_ids=request.note_ids
-        )
         
         # Store quiz questions in database
         await create_quiz_questions(quiz_id, quiz_dicts)
         
-        # Fetch complete quiz with questions
-        quiz = await get_quiz(quiz_id)
+        # Update quiz status to completed and question count
+        await update_quiz_status(quiz_id, "completed")
+        
+        # Update question count in quiz
+        supabase = get_supabase_client()
+        supabase.table("quizzes").update({
+            "question_count": len(quiz_dicts)
+        }).eq("id", quiz_id).execute()
         
         # Log activity asynchronously (fire-and-forget)
         asyncio.create_task(
@@ -456,15 +540,10 @@ async def generate_quiz(request: QuizRequest):
             )
         )
         
-        return QuizResponse(
-            quiz_id=quiz_id,
-            quiz=quiz,
-            success=True,
-            message="Quiz generated and saved successfully"
-        )
-        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generating quiz: {str(e)}")
+        # Update quiz status to failed
+        await update_quiz_status(quiz_id, "failed", str(e))
+        print(f"Error in background quiz generation for quiz {quiz_id}: {str(e)}")
 
 # Nudge Generation Endpoint
 @app.post("/generate-nudges", response_model=NudgeResponse)
@@ -1178,6 +1257,95 @@ Analyze the message, decide whether to expand it with additional context, format
         print(traceback.format_exc())
         print("=" * 80)
         raise HTTPException(status_code=500, detail=f"Error adding chat message to notes: {str(e)}")
+
+
+# Retry Endpoints
+# =====================================================
+
+@app.post("/retry-flashcard-generation/{deck_id}")
+async def retry_flashcard_generation(deck_id: str):
+    """
+    Retry flashcard generation for a failed deck.
+    """
+    try:
+        # Get the deck details
+        deck = await get_flashcard_deck(deck_id)
+        if not deck:
+            raise HTTPException(status_code=404, detail="Flashcard deck not found")
+        
+        if deck.get("status") != "failed":
+            raise HTTPException(status_code=400, detail="Deck is not in failed status")
+        
+        # Update status to generating
+        await update_flashcard_deck_status(deck_id, "generating")
+        
+        # Create a new request object from the deck data
+        request = FlashcardRequest(
+            user_id=deck["user_id"],
+            course_id=deck["course_id"],
+            name=deck["name"],
+            file_ids=deck["file_ids"],
+            note_ids=deck.get("note_ids", []),
+            num_flashcards=deck.get("card_count", 10),
+            card_type=deck.get("card_type", "term-definition"),
+            extra_context=deck.get("extra_context")
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_flashcards_background(
+                deck_id=deck_id,
+                request=request
+            )
+        )
+        
+        return {"success": True, "message": "Flashcard generation retry started"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrying flashcard generation: {str(e)}")
+
+
+@app.post("/retry-quiz-generation/{quiz_id}")
+async def retry_quiz_generation(quiz_id: str):
+    """
+    Retry quiz generation for a failed quiz.
+    """
+    try:
+        # Get the quiz details
+        quiz = await get_quiz(quiz_id)
+        if not quiz:
+            raise HTTPException(status_code=404, detail="Quiz not found")
+        
+        if quiz.get("status") != "failed":
+            raise HTTPException(status_code=400, detail="Quiz is not in failed status")
+        
+        # Update status to generating
+        await update_quiz_status(quiz_id, "generating")
+        
+        # Create a new request object from the quiz data
+        request = QuizRequest(
+            user_id=quiz["user_id"],
+            course_id=quiz["course_id"],
+            name=quiz["name"],
+            file_ids=quiz["file_ids"],
+            note_ids=quiz.get("note_ids", []),
+            num_questions=quiz.get("question_count", 5),
+            difficulty=quiz.get("difficulty", "medium"),
+            extra_context=quiz.get("extra_context")
+        )
+        
+        # Start background generation task
+        asyncio.create_task(
+            _generate_quiz_background(
+                quiz_id=quiz_id,
+                request=request
+            )
+        )
+        
+        return {"success": True, "message": "Quiz generation retry started"}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error retrying quiz generation: {str(e)}")
 
 
 if __name__ == "__main__":

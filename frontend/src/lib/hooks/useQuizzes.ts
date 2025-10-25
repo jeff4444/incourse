@@ -1,4 +1,4 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 
 export interface Quiz {
@@ -11,6 +11,8 @@ export interface Quiz {
   extra_context: string | null;
   difficulty: string;
   question_count: number;
+  status: 'generating' | 'completed' | 'failed';
+  error_message: string | null;
   created_at: string;
   updated_at: string;
   questions: QuizQuestion[];
@@ -122,6 +124,41 @@ export function useRecordQuizAttempt() {
           }),
         }
       );
+    },
+  });
+}
+
+// Hook to retry quiz generation
+export function useRetryQuizGeneration() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (quizId: string) => {
+      return authenticatedFetchJson(`/api/agents/quizzes/${quizId}/retry`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (_, quizId) => {
+      // Invalidate and refetch quiz data to show updated status
+      queryClient.invalidateQueries({ queryKey: quizKeys.all });
+      queryClient.invalidateQueries({ queryKey: quizKeys.quiz(quizId) });
+    },
+  });
+}
+
+// Hook to delete a quiz
+export function useDeleteQuiz() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (quizId: string) => {
+      return authenticatedFetchJson(`/api/quizzes/${quizId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      // Invalidate and refetch quizzes to remove deleted quiz
+      queryClient.invalidateQueries({ queryKey: quizKeys.all });
     },
   });
 }

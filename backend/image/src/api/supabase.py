@@ -838,7 +838,8 @@ async def create_flashcard_deck(
     card_count: int,
     extra_context: str = None,
     card_type: str = "term-definition",
-    note_ids: List[str] = None
+    note_ids: List[str] = None,
+    status: str = "generating"
 ) -> str:
     """
     Create a new flashcard deck.
@@ -851,11 +852,13 @@ async def create_flashcard_deck(
         card_count: Number of cards in the deck
         extra_context: User's additional instructions
         card_type: Type of cards (term-definition, question-answer, concept-example)
+        note_ids: List of note IDs used for generation
+        status: Generation status (generating, completed, failed)
     
     Returns:
         Created deck ID
     """
-    print(f"calling create_flashcard_deck with user_id={user_id}, course_id={course_id}, name={name}, card_count={card_count}")
+    print(f"calling create_flashcard_deck with user_id={user_id}, course_id={course_id}, name={name}, card_count={card_count}, status={status}")
     
     supabase = get_supabase_client()
     
@@ -866,7 +869,8 @@ async def create_flashcard_deck(
         "file_ids": file_ids,
         "card_type": card_type,
         "card_count": card_count,
-        "note_ids": note_ids or []
+        "note_ids": note_ids or [],
+        "status": status
     }
     
     if extra_context:
@@ -1068,7 +1072,8 @@ async def create_quiz(
     question_count: int,
     extra_context: str = None,
     difficulty: str = "medium",
-    note_ids: List[str] = None
+    note_ids: List[str] = None,
+    status: str = "generating"
 ) -> str:
     """
     Create a new quiz.
@@ -1081,11 +1086,13 @@ async def create_quiz(
         question_count: Number of questions in the quiz
         extra_context: User's additional instructions
         difficulty: Difficulty level (easy, medium, hard)
+        note_ids: List of note IDs used for generation
+        status: Generation status (generating, completed, failed)
     
     Returns:
         Created quiz ID
     """
-    print(f"calling create_quiz with user_id={user_id}, course_id={course_id}, name={name}, question_count={question_count}")
+    print(f"calling create_quiz with user_id={user_id}, course_id={course_id}, name={name}, question_count={question_count}, status={status}")
     
     supabase = get_supabase_client()
     
@@ -1096,7 +1103,8 @@ async def create_quiz(
         "file_ids": file_ids,
         "difficulty": difficulty,
         "question_count": question_count,
-        "note_ids": note_ids or []
+        "note_ids": note_ids or [],
+        "status": status
     }
     
     if extra_context:
@@ -2288,3 +2296,125 @@ async def get_course_assignments(course_id: str) -> List[Dict[str, Any]]:
     )
     
     return response.data
+
+
+# =====================================================
+# Status Update Functions
+# =====================================================
+
+async def update_flashcard_deck_status(
+    deck_id: str,
+    status: str,
+    error_message: str = None
+) -> None:
+    """
+    Update the status of a flashcard deck.
+    
+    Args:
+        deck_id: Deck ID
+        status: New status (generating, completed, failed)
+        error_message: Error message if status is failed
+    """
+    print(f"calling update_flashcard_deck_status with deck_id={deck_id}, status={status}")
+    
+    supabase = get_supabase_client()
+    
+    update_data = {"status": status}
+    if error_message:
+        update_data["error_message"] = error_message
+    
+    response = (
+        supabase.table("flashcard_decks")
+        .update(update_data)
+        .eq("id", deck_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception(f"Failed to update flashcard deck status for deck {deck_id}")
+
+
+async def update_quiz_status(
+    quiz_id: str,
+    status: str,
+    error_message: str = None
+) -> None:
+    """
+    Update the status of a quiz.
+    
+    Args:
+        quiz_id: Quiz ID
+        status: New status (generating, completed, failed)
+        error_message: Error message if status is failed
+    """
+    print(f"calling update_quiz_status with quiz_id={quiz_id}, status={status}")
+    
+    supabase = get_supabase_client()
+    
+    update_data = {"status": status}
+    if error_message:
+        update_data["error_message"] = error_message
+    
+    response = (
+        supabase.table("quizzes")
+        .update(update_data)
+        .eq("id", quiz_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception(f"Failed to update quiz status for quiz {quiz_id}")
+
+
+async def get_flashcard_deck_status(deck_id: str) -> Dict[str, Any]:
+    """
+    Get the status of a flashcard deck.
+    
+    Args:
+        deck_id: Deck ID
+    
+    Returns:
+        Dictionary with status and error_message
+    """
+    print(f"calling get_flashcard_deck_status with deck_id={deck_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("flashcard_decks")
+        .select("status, error_message")
+        .eq("id", deck_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception(f"Flashcard deck not found: {deck_id}")
+    
+    return response.data[0]
+
+
+async def get_quiz_status(quiz_id: str) -> Dict[str, Any]:
+    """
+    Get the status of a quiz.
+    
+    Args:
+        quiz_id: Quiz ID
+    
+    Returns:
+        Dictionary with status and error_message
+    """
+    print(f"calling get_quiz_status with quiz_id={quiz_id}")
+    
+    supabase = get_supabase_client()
+    
+    response = (
+        supabase.table("quizzes")
+        .select("status, error_message")
+        .eq("id", quiz_id)
+        .execute()
+    )
+    
+    if not response.data:
+        raise Exception(f"Quiz not found: {quiz_id}")
+    
+    return response.data[0]

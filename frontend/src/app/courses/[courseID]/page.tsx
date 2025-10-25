@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import { BookOpen, ChevronLeft, Clock, Download, Play, Plus, ThumbsUp, Brain, FlaskConical, ClipboardList, StickyNote } from "lucide-react"
+import { BookOpen, ChevronLeft, Clock, Download, Play, Plus, ThumbsUp, Brain, FlaskConical, ClipboardList, StickyNote, CheckCircle2, X } from "lucide-react"
 import { Navbar } from "@/components/navbar"
 import { ModuleList } from "@/components/module-list"
 import { AssignmentList } from "@/components/assignment-list"
@@ -15,20 +16,26 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute"
 import { useCourse } from "@/lib/hooks/useCourses"
 import { useModules } from "@/lib/hooks/useModules"
 import { useAllFiles } from "@/lib/hooks/useAllFiles"
-import { useFlashcardDecks } from "@/lib/hooks/useFlashcards"
-import { useQuizzes } from "@/lib/hooks/useQuizzes"
+import { useFlashcardDecks, useRetryFlashcardGeneration, useDeleteFlashcardDeck } from "@/lib/hooks/useFlashcards"
+import { useQuizzes, useRetryQuizGeneration, useDeleteQuiz } from "@/lib/hooks/useQuizzes"
 import { useAssignments } from "@/lib/hooks/useAssignments"
 import { useNoteFolders, useNotes } from "@/lib/hooks/useNotes"
 import { NoteList } from "@/components/note-list"
 import { createClient } from "@/lib/utils/supabase/client"
+import { motion, AnimatePresence } from "framer-motion"
 
 function CoursePage({
   params,
 }: {
   params: Promise<{ courseID: string }>
 }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [courseID, setCourseID] = useState<string>("");
   const [userId, setUserId] = useState<string>("");
+  const [deletingFlashcards, setDeletingFlashcards] = useState<Set<string>>(new Set());
+  const [deletingQuizzes, setDeletingQuizzes] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<{ type: 'flashcard' | 'quiz'; message: string } | null>(null);
 
   useEffect(() => {
     const getParams = async () => {
@@ -49,11 +56,88 @@ function CoursePage({
     getUserId();
   }, []);
 
+  // Check for toast messages from URL params
+  useEffect(() => {
+    const flashcard = searchParams.get('flashcard');
+    const quiz = searchParams.get('quiz');
+    
+    if (flashcard === 'generating') {
+      setToastMessage({ type: 'flashcard', message: 'Flashcard deck is being generated in the background!' });
+      // Clear the URL param
+      router.replace(`/courses/${courseID}`, { scroll: false });
+    } else if (quiz === 'generating') {
+      setToastMessage({ type: 'quiz', message: 'Quiz is being generated in the background!' });
+      // Clear the URL param
+      router.replace(`/courses/${courseID}`, { scroll: false });
+    }
+  }, [searchParams, courseID, router]);
+
+  // Auto-hide toast after 5 seconds
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => {
+        setToastMessage(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
   const { data: course, isLoading: courseLoading, error: courseError } = useCourse(courseID);
   const { data: modules = [], isLoading: modulesLoading, error: modulesError } = useModules(courseID);
   const { data: allFiles = [], isLoading: allFilesLoading } = useAllFiles(courseID, true);
-  const { data: flashcardDecks = [], isLoading: flashcardsLoading } = useFlashcardDecks(courseID, userId);
-  const { data: quizzes = [], isLoading: quizzesLoading } = useQuizzes(courseID, userId);
+  const { data: flashcardDecks = [], isLoading: flashcardsLoading, refetch: refetchFlashcards } = useFlashcardDecks(courseID, userId);
+  const { data: quizzes = [], isLoading: quizzesLoading, refetch: refetchQuizzes } = useQuizzes(courseID, userId);
+  
+  // Retry hooks
+  const retryFlashcardGeneration = useRetryFlashcardGeneration();
+  const retryQuizGeneration = useRetryQuizGeneration();
+  
+  // Delete hooks
+  const deleteFlashcardDeckMutation = useDeleteFlashcardDeck();
+  const deleteQuizMutation = useDeleteQuiz();
+  
+  // Wrapper functions to track individual item deletion state
+  const handleDeleteFlashcard = async (deckId: string) => {
+    setDeletingFlashcards(prev => new Set(prev).add(deckId));
+    try {
+      await deleteFlashcardDeckMutation.mutateAsync(deckId);
+    } finally {
+      setDeletingFlashcards(prev => {
+        const next = new Set(prev);
+        next.delete(deckId);
+        return next;
+      });
+    }
+  };
+  
+  const handleDeleteQuiz = async (quizId: string) => {
+    setDeletingQuizzes(prev => new Set(prev).add(quizId));
+    try {
+      await deleteQuizMutation.mutateAsync(quizId);
+    } finally {
+      setDeletingQuizzes(prev => {
+        const next = new Set(prev);
+        next.delete(quizId);
+        return next;
+      });
+    }
+  };
+
+  // Polling logic for generating items
+  useEffect(() => {
+    const hasGeneratingItems = 
+      flashcardDecks.some(deck => deck.status === 'generating') ||
+      quizzes.some(quiz => quiz.status === 'generating');
+
+    if (hasGeneratingItems) {
+      const interval = setInterval(() => {
+        refetchFlashcards();
+        refetchQuizzes();
+      }, 5000); // Poll every 5 seconds
+
+      return () => clearInterval(interval);
+    }
+  }, [flashcardDecks, quizzes, refetchFlashcards, refetchQuizzes]);
   const { data: assignments = [], isLoading: assignmentsLoading } = useAssignments(courseID);
   const { data: noteFolders = [], isLoading: noteFoldersLoading } = useNoteFolders(courseID, userId);
   const { data: notes = [], isLoading: notesLoading } = useNotes(courseID, userId);
@@ -106,6 +190,39 @@ function CoursePage({
   return (
     <div className="min-h-screen bg-linear-to-br from-orange-50 to-pink-50">
       <Navbar />
+      
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 w-full max-w-md"
+          >
+            <div className="mx-4 bg-white rounded-lg shadow-lg border border-gray-200 p-4 flex items-start gap-3">
+              <div className={`rounded-full p-2 ${toastMessage.type === 'flashcard' ? 'bg-purple-100' : 'bg-blue-100'}`}>
+                {toastMessage.type === 'flashcard' ? (
+                  <Brain className="h-5 w-5 text-purple-600" />
+                ) : (
+                  <FlaskConical className="h-5 w-5 text-blue-600" />
+                )}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-gray-900">{toastMessage.message}</p>
+                <p className="text-xs text-gray-500 mt-1">You can continue working while it generates.</p>
+              </div>
+              <button
+                onClick={() => setToastMessage(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      
       <div className="container mx-auto py-6 px-4 md:px-6">
         {/* Course Header */}
         <div className="mb-6">
@@ -200,6 +317,67 @@ function CoursePage({
                             year: 'numeric' 
                           });
 
+                          const getStatusBadge = () => {
+                            switch (quiz.status) {
+                              case 'generating':
+                                return <Badge variant="secondary" className="flex items-center gap-1">
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-500"></div>
+                                  Generating...
+                                </Badge>;
+                              case 'failed':
+                                return <Badge variant="destructive">Failed</Badge>;
+                              case 'completed':
+                              default:
+                                return <Badge variant="default">Ready</Badge>;
+                            }
+                          };
+
+                          const isDeleting = deletingQuizzes.has(quiz.id);
+                          
+                          const getActionButton = () => {
+                            if (quiz.status === 'generating') {
+                              return (
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleDeleteQuiz(quiz.id)}
+                                    disabled={isDeleting}
+                                  >
+                                    {isDeleting ? 'Stopping...' : 'Stop Generation'}
+                                  </Button>
+                                </div>
+                              );
+                            } else if (quiz.status === 'failed') {
+                              return (
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => retryQuizGeneration.mutate(quiz.id)}
+                                    disabled={retryQuizGeneration.isPending}
+                                  >
+                                    {retryQuizGeneration.isPending ? 'Retrying...' : 'Retry'}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleDeleteQuiz(quiz.id)}
+                                    disabled={isDeleting}
+                                  >
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
+                                  </Button>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <Link href={`/courses/${courseID}/quiz/${quiz.id}`}>
+                                  <Button size="sm">Start Quiz</Button>
+                                </Link>
+                              );
+                            }
+                          };
+
                           return (
                             <div
                               key={quiz.id}
@@ -210,16 +388,20 @@ function CoursePage({
                                   <Play className="h-5 w-5" />
                                 </div>
                                 <div>
-                                  <p className="font-medium">{quiz.name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{quiz.name}</p>
+                                    {getStatusBadge()}
+                                  </div>
                                   <p className="text-sm text-muted-foreground">
                                     {quiz.question_count} questions • {formattedDate}
+                                    {quiz.status === 'failed' && quiz.error_message && (
+                                      <span className="text-red-500"> • {quiz.error_message}</span>
+                                    )}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-4">
-                                <Link href={`/courses/${courseID}/quiz/${quiz.id}`}>
-                                  <Button size="sm">Start Quiz</Button>
-                                </Link>
+                                {getActionButton()}
                               </div>
                             </div>
                           );
@@ -262,6 +444,67 @@ function CoursePage({
                             year: 'numeric' 
                           });
 
+                          const getStatusBadge = () => {
+                            switch (deck.status) {
+                              case 'generating':
+                                return <Badge variant="secondary" className="flex items-center gap-1">
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-purple-500"></div>
+                                  Generating...
+                                </Badge>;
+                              case 'failed':
+                                return <Badge variant="destructive">Failed</Badge>;
+                              case 'completed':
+                              default:
+                                return <Badge variant="default">Ready</Badge>;
+                            }
+                          };
+
+                          const isDeleting = deletingFlashcards.has(deck.id);
+                          
+                          const getActionButton = () => {
+                            if (deck.status === 'generating') {
+                              return (
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleDeleteFlashcard(deck.id)}
+                                    disabled={isDeleting}
+                                  >
+                                    {isDeleting ? 'Stopping...' : 'Stop Generation'}
+                                  </Button>
+                                </div>
+                              );
+                            } else if (deck.status === 'failed') {
+                              return (
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => retryFlashcardGeneration.mutate(deck.id)}
+                                    disabled={retryFlashcardGeneration.isPending}
+                                  >
+                                    {retryFlashcardGeneration.isPending ? 'Retrying...' : 'Retry'}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleDeleteFlashcard(deck.id)}
+                                    disabled={isDeleting}
+                                  >
+                                    {isDeleting ? 'Deleting...' : 'Delete'}
+                                  </Button>
+                                </div>
+                              );
+                            } else {
+                              return (
+                                <Link href={`/courses/${courseID}/flashcards/${deck.id}`}>
+                                  <Button size="sm">Practice</Button>
+                                </Link>
+                              );
+                            }
+                          };
+
                           return (
                             <div
                               key={deck.id}
@@ -272,16 +515,20 @@ function CoursePage({
                                   <BookOpen className="h-5 w-5" />
                                 </div>
                                 <div>
-                                  <p className="font-medium">{deck.name}</p>
+                                  <div className="flex items-center gap-2">
+                                    <p className="font-medium">{deck.name}</p>
+                                    {getStatusBadge()}
+                                  </div>
                                   <p className="text-sm text-muted-foreground">
                                     {deck.card_count} cards • Created {formattedDate}
+                                    {deck.status === 'failed' && deck.error_message && (
+                                      <span className="text-red-500"> • {deck.error_message}</span>
+                                    )}
                                   </p>
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <Link href={`/courses/${courseID}/flashcards/${deck.id}`}>
-                                  <Button size="sm">Practice</Button>
-                                </Link>
+                                {getActionButton()}
                               </div>
                             </div>
                           );

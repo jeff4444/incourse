@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { authenticatedFetchJson } from "@/lib/utils/apiClient";
 
 export interface FlashcardDeck {
@@ -11,6 +11,8 @@ export interface FlashcardDeck {
   extra_context: string | null;
   card_type: string;
   card_count: number;
+  status: 'generating' | 'completed' | 'failed';
+  error_message: string | null;
   created_at: string;
   updated_at: string;
   flashcards: Flashcard[];
@@ -63,6 +65,41 @@ export function useFlashcardDecks(courseId: string, userId: string) {
     enabled: !!courseId && !!userId,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+  });
+}
+
+// Hook to retry flashcard generation
+export function useRetryFlashcardGeneration() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (deckId: string) => {
+      return authenticatedFetchJson(`/api/agents/flashcards/${deckId}/retry`, {
+        method: 'POST',
+      });
+    },
+    onSuccess: (_, deckId) => {
+      // Invalidate and refetch flashcard decks to show updated status
+      queryClient.invalidateQueries({ queryKey: flashcardKeys.all });
+      queryClient.invalidateQueries({ queryKey: flashcardKeys.deck(deckId) });
+    },
+  });
+}
+
+// Hook to delete a flashcard deck
+export function useDeleteFlashcardDeck() {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (deckId: string) => {
+      return authenticatedFetchJson(`/api/flashcards/${deckId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      // Invalidate and refetch flashcard decks to remove deleted deck
+      queryClient.invalidateQueries({ queryKey: flashcardKeys.all });
+    },
   });
 }
 
