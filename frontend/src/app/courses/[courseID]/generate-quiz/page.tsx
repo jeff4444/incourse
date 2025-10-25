@@ -81,13 +81,19 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
         return
       }
 
-      // Navigate to the newly created quiz
-      router.push(`/courses/${courseID}/quiz/${response.quiz_id}`)
+      // Redirect to course page with success message
+      router.push(`/courses/${courseID}?quiz=generating`)
     } catch (error) {
       console.error('Error generating quiz:', error)
       alert('Failed to generate quiz. Please try again.')
       setIsGenerating(false)
     }
+  }
+
+  const handleDismiss = () => {
+    setIsGenerating(false)
+    // Navigate back to course page
+    router.push(`/courses/${courseID}`)
   }
 
   return (
@@ -202,6 +208,7 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
           </CardFooter>
         </Card>
       </div>
+
     </div>
   )
 }

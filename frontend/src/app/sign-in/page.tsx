@@ -14,12 +14,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/utils/supabase/client";
-import { FcGoogle } from "react-icons/fc";
 
 const supabase = createClient();
 
@@ -28,12 +26,10 @@ function SignInContent() {
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
   const [showConfirmMessage, setShowConfirmMessage] = useState(false);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
 
   useEffect(() => {
     const message = searchParams.get('message');
@@ -96,89 +92,6 @@ function SignInContent() {
     }
   };
 
-  const handleMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!magicLinkSent) {
-      setLoading(true);
-      setError(null);
-      try {
-        const { error } = await supabase.auth.signInWithOtp({
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/dashboard`,
-          },
-        });
-
-        if (error) {
-          setError(error.message);
-        } else {
-          setMagicLinkSent(true);
-        }
-      } catch (e) {
-        if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError("An unexpected error occurred.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    } else {
-      setLoading(true);
-      setError(null);
-      try {
-        const {
-          data: { session },
-          error,
-        } = await supabase.auth.verifyOtp({
-          email,
-          token,
-          type: "email",
-        });
-
-        if (error) {
-          setError(error.message);
-        } else if (session) {
-          // Check if user has completed onboarding
-          const passedOnboarding = session.user?.user_metadata?.passed_onboarding;
-          
-          if (passedOnboarding === false) {
-            router.push("/onboarding");
-          } else {
-            router.push("/dashboard");
-          }
-        }
-      } catch (e) {
-        if (e instanceof Error) {
-          setError(e.message);
-        } else {
-          setError("An unexpected error occurred.");
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-      if (error) setError(error.message);
-    } catch (e) {
-      if (e instanceof Error) setError(e.message);
-      else setError("An unexpected error occurred.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Static sample data for dashboard preview
   const sampleActivity = [
@@ -431,133 +344,49 @@ function SignInContent() {
                   {error}
                 </motion.div>
               )}
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full flex items-center gap-2"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-              >
-                <FcGoogle className="h-5 w-5" />
-                {loading ? "Signing in..." : "Sign in with Google"}
-              </Button>
-              <Tabs defaultValue="email" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="email">Email</TabsTrigger>
-                  <TabsTrigger value="magic">Magic Link</TabsTrigger>
-                </TabsList>
-                <TabsContent value="email">
-                  <form onSubmit={handleSignIn}>
-                    <div className="grid gap-4">
-                      <div className="grid gap-2">
-                        <Label htmlFor="email">School Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="firstname.lastname@college.edu"
-                          required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <div className="flex items-center">
-                          <Label htmlFor="password">Password</Label>
-                          <Link
-                            href="/forgot-password"
-                            className="ml-auto inline-block text-sm underline"
-                          >
-                            Forgot your password?
-                          </Link>
-                        </div>
-                        <Input
-                          id="password"
-                          type="password"
-                          placeholder="Enter your password"
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          disabled={loading}
-                        />
-                      </div>
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={loading}
+              <form onSubmit={handleSignIn}>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="email">School Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="firstname.lastname@college.edu"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <div className="flex items-center">
+                      <Label htmlFor="password">Password</Label>
+                      <Link
+                        href="/forgot-password"
+                        className="ml-auto inline-block text-sm underline"
                       >
-                        {loading ? "Signing In..." : "Sign In"}
-                      </Button>
+                        Forgot your password?
+                      </Link>
                     </div>
-                  </form>
-                </TabsContent>
-                <TabsContent value="magic">
-                  <form onSubmit={handleMagicLink}>
-                    <div className="grid gap-4">
-                      {error && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-sm"
-                        >
-                          {error}
-                        </motion.div>
-                      )}
-                      {magicLinkSent && (
-                        <motion.div
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-green-50 text-green-700 p-3 rounded-lg border border-green-200 text-sm"
-                        >
-                          Check your email for the magic link or enter the
-                          6-digit code below.
-                        </motion.div>
-                      )}
-                      <div className="grid gap-2">
-                        <Label htmlFor="magic-email">School Email</Label>
-                        <Input
-                          id="magic-email"
-                          type="email"
-                          placeholder="firstname.lastname@college.edu"
-                          required
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          disabled={loading || magicLinkSent}
-                        />
-                      </div>
-                      {magicLinkSent && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: "auto" }}
-                          className="grid gap-2 overflow-hidden"
-                        >
-                          <Label htmlFor="magic-otp">One-Time Code</Label>
-                          <Input
-                            id="magic-otp"
-                            type="text"
-                            placeholder="123456"
-                            required
-                            value={token}
-                            onChange={(e) => setToken(e.target.value)}
-                            disabled={loading}
-                          />
-                        </motion.div>
-                      )}
-                      <Button
-                        type="submit"
-                        className="w-full"
-                        disabled={loading}
-                      >
-                        {loading
-                          ? "..."
-                          : magicLinkSent
-                          ? "Sign In with Code"
-                          : "Send Magic Link"}
-                      </Button>
-                    </div>
-                  </form>
-                </TabsContent>
-              </Tabs>
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Enter your password"
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      disabled={loading}
+                    />
+                  </div>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={loading}
+                  >
+                    {loading ? "Signing In..." : "Sign In"}
+                  </Button>
+                </div>
+              </form>
 
             </CardContent>
             <CardFooter className="flex flex-col gap-4">
