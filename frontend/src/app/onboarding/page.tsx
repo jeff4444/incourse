@@ -21,12 +21,22 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
   Sparkles,
   Lock,
   Loader2,
+  Download,
+  X,
 } from "lucide-react";
 
 const supabase = createClient();
@@ -55,6 +65,11 @@ export default function OnboardingPage() {
     total: number;
     courseName?: string;
   }>({ current: 0, total: 0 });
+  
+  // Download dialog state
+  const [showDownloadDialog, setShowDownloadDialog] = useState(false);
+  const [pendingApiKey, setPendingApiKey] = useState<string>("");
+  const [pendingSchoolName, setPendingSchoolName] = useState<string>("");
   
   // Ref for auto-scrolling sync progress
   const syncProgressRef = useRef<HTMLDivElement>(null);
@@ -257,39 +272,30 @@ export default function OnboardingPage() {
         // Continue with onboarding even if course sync fails
       }
 
-      // Download token file after successful sync
+      // Store API key info for download dialog after sync completes
       if (syncResult.success) {
-        const schoolConfig = SUPPORTED_SCHOOLS[schoolName];
-        if (schoolConfig) {
-          downloadTokenFile(apiKey, `${schoolConfig.api_url}/api/v1`, schoolName);
-        }
+        setPendingApiKey(apiKey);
+        setPendingSchoolName(schoolName);
       }
       
       // Wait a moment to show completion state
       await new Promise(resolve => setTimeout(resolve, 1000));
       setIsSyncing(false);
+      
+      // Show download dialog after sync completes
+      if (syncResult.success) {
+        setShowDownloadDialog(true);
+        return; // Don't proceed to next step yet
+      }
     }
 
-    setDirection(1);
-    if (step < totalSteps) {
-      setStep(step + 1);
-    } else {
-      // Complete onboarding and update user metadata
-      try {
-        const { error } = await supabase.auth.updateUser({
-          data: { passed_onboarding: true }
-        });
-        
-        if (error) {
-          console.error('Error updating user metadata:', error);
-        }
-        
-        // Navigate to dashboard when completed
-        window.location.href = "/dashboard";
-      } catch (error) {
-        console.error('Error completing onboarding:', error);
-        // Still navigate to dashboard even if metadata update fails
-        window.location.href = "/dashboard";
+    // Only proceed if not in step 1 (which handles sync and shows dialog)
+    if (step !== 1) {
+      setDirection(1);
+      if (step < totalSteps) {
+        setStep(step + 1);
+      } else {
+        completeOnboarding();
       }
     }
   };
@@ -298,6 +304,53 @@ export default function OnboardingPage() {
     setDirection(-1);
     if (step > 1) {
       setStep(step - 1);
+    }
+  };
+
+  const handleDownloadToken = () => {
+    if (pendingApiKey && pendingSchoolName) {
+      const schoolConfig = SUPPORTED_SCHOOLS[pendingSchoolName];
+      if (schoolConfig) {
+        downloadTokenFile(pendingApiKey, `${schoolConfig.api_url}/api/v1`, pendingSchoolName);
+      }
+    }
+    setShowDownloadDialog(false);
+    setDirection(1);
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
+      // Complete onboarding and update user metadata
+      completeOnboarding();
+    }
+  };
+
+  const handleSkipDownload = () => {
+    setShowDownloadDialog(false);
+    setDirection(1);
+    if (step < totalSteps) {
+      setStep(step + 1);
+    } else {
+      // Complete onboarding and update user metadata
+      completeOnboarding();
+    }
+  };
+
+  const completeOnboarding = async () => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: { passed_onboarding: true }
+      });
+      
+      if (error) {
+        console.error('Error updating user metadata:', error);
+      }
+      
+      // Navigate to dashboard when completed
+      window.location.href = "/dashboard";
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      // Still navigate to dashboard even if metadata update fails
+      window.location.href = "/dashboard";
     }
   };
 
@@ -480,6 +533,58 @@ export default function OnboardingPage() {
         )}
       </AnimatePresence>
 
+      {/* Download Token Dialog */}
+      <Dialog open={showDownloadDialog} onOpenChange={setShowDownloadDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Download Your Canvas Token?</DialogTitle>
+            <DialogDescription>
+              Would you like to download your Canvas API token for future resyncing?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-3">
+            <div className="flex items-start space-x-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <Lock className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-blue-900">
+                  Why download your token?
+                </p>
+                <p className="text-sm text-blue-700">
+                  You&apos;ll need your Canvas API token to resync your courses later if you want to update your materials or add new enrollments.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <CheckCircle2 className="h-5 w-5 text-gray-600 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-gray-900">
+                  Your API key is safe
+                </p>
+                <p className="text-sm text-gray-700">
+                  We do NOT store your API key. It&apos;s only used for this one-time sync. Download it to keep a secure copy for yourself.
+                </p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSkipDownload}
+              className="flex-1"
+            >
+              Skip
+            </Button>
+            <Button
+              onClick={handleDownloadToken}
+              className="flex-1 bg-linear-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download Token
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="w-full max-w-3xl">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -613,6 +718,20 @@ export default function OnboardingPage() {
                           </div>
                         </motion.div>
                         <motion.div variants={itemVariants}>
+                          <div className="space-y-2">
+                            <Label>How to Generate Your API Token</Label>
+                            <div className="relative w-full aspect-video rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                              <iframe
+                                src="https://www.youtube.com/embed/C_ytgz1_G84"
+                                title="How to Generate Canvas API Token"
+                                className="absolute top-0 left-0 w-full h-full"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                              />
+                            </div>
+                          </div>
+                        </motion.div>
+                        <motion.div variants={itemVariants}>
                           <div className="flex items-start space-x-2 p-4 bg-gray-50 rounded-lg">
                             <Lock className="h-5 w-5 text-gray-400 mt-0.5" />
                             <div className="space-y-1">
@@ -620,11 +739,7 @@ export default function OnboardingPage() {
                                 Privacy & Security
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                We only access the course materials you
-                                explicitly share. Your data is encrypted and
-                                never shared with third parties. After syncing,
-                                we'll download your Canvas token file - keep it
-                                safe for future resyncing.
+                                Your Canvas API key is used only for this one-time sync. <strong>We do NOT store your API key</strong> in our database. Your data is encrypted and never shared with third parties. You can optionally download your API token after syncing if you want to resync your courses in the future.
                               </p>
                             </div>
                           </div>
