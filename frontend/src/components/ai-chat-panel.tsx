@@ -16,6 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Folder, Search } from "lucide-react"
 import { MessageSquare, Lightbulb, Send, X, Loader2, MessageCircle, Copy, FileText } from "lucide-react"
 import ReactMarkdown from "react-markdown"
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 import type { ContextItem } from "./pdf-viewer"
 import { authenticatedFetchJson, authenticatedFetch } from "@/lib/utils/apiClient"
 import { useCreateNote, useCreateFolder, useNotes, useNoteFolders } from "@/lib/hooks/useNotes"
@@ -750,6 +752,8 @@ export function ChatPanel({
                       onMouseUp={(e) => handleMessageTextSelection(e, index)}
                     >
                       <ReactMarkdown
+                        remarkPlugins={[remarkMath]}
+                        rehypePlugins={[rehypeKatex]}
                         components={{
                           p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
                           ul: ({ children }: any) => <ul className="mb-3 list-disc list-inside space-y-1.5 pl-2">{children}</ul>,

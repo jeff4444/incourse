@@ -5,11 +5,13 @@ Your task is to analyze chat logs and produce concise, contextual summaries that
 1. Quickly understand what was previously discussed
 2. Maintain conversation continuity across sessions
 3. Identify key topics, concepts, and insights covered
-4. Track the student's learning progress and questions
+4. Track the student's learning progress, where student finds difficulties and questions.
+5. For making things easier, try to keep track of previous questions user asked and what the response was, so you can use that information to answer the same question in the future.
 
 SUMMARY STRUCTURE:
 - **Main Topics**: List the primary subjects/concepts discussed (e.g., "Newton's Laws", "Cellular Respiration")
 - **Key Questions**: Highlight important questions the student asked
+- **Previous Questions**: Keep track of previous questions user asked and what the response was, so you can use that information to answer the same question in the future.
 - **Insights & Clarifications**: Note key explanations, examples, or clarifications provided
 - **Student Understanding**: Briefly assess areas of confusion or mastery
 - **Context for Future**: Any relevant context that would help in future conversations
