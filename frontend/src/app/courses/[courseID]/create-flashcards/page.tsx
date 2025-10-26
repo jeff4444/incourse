@@ -58,38 +58,30 @@ export default function CreateFlashcardsPage({ params }: { params: Promise<{ cou
 
     setIsGenerating(true)
 
-    try {
-      const response = await authenticatedFetchJson<{ deck_id: string; deck: any }>(
-        '/api/agents/flashcards',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            courseId: courseID,
-            name: title,
-            fileIds: selectedFiles,
-            noteIds: selectedNotes,
-            numFlashcards: cardCount,
-            cardType,
-            extraContext: extraContext || undefined,
-          }),
-        }
-      )
-
-      if (!response.deck_id) {
-        console.error('Failed to generate flashcards: ' + JSON.stringify(response))
-        alert('Failed to generate flashcards. Please try again.')
-        setIsGenerating(false)
-        return
+    // Fire the request but don't wait for it
+    authenticatedFetchJson<{ deck_id: string; deck: any; success: boolean; message: string }>(
+      '/api/agents/flashcards',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId: courseID,
+          name: title,
+          fileIds: selectedFiles,
+          noteIds: selectedNotes,
+          numFlashcards: cardCount,
+          cardType,
+          extraContext: extraContext || undefined,
+        }),
       }
+    )
+      .catch(error => {
+        console.error('Error generating flashcards:', error)
+        // Error logged but user has already navigated away
+      })
 
-      // Redirect to course page with success message
-      const currentTab = searchParams.get('tab') || 'flashcards'
-      router.push(`/courses/${courseID}?flashcard=generating&tab=${currentTab}`)
-    } catch (error) {
-      console.error('Error generating flashcards:', error)
-      alert('Failed to generate flashcards. Please try again.')
-      setIsGenerating(false)
-    }
+    // Navigate immediately with generating message
+    const currentTab = searchParams.get('tab') || 'flashcards'
+    router.push(`/courses/${courseID}?flashcard=generating&tab=${currentTab}`)
   }
 
   const handleDismiss = () => {

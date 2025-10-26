@@ -78,12 +78,12 @@ function CoursePage({
     const tab = searchParams.get('tab');
     
     if (flashcard === 'generating') {
-      setToastMessage({ type: 'flashcard', message: 'Flashcard deck is being generated in the background!' });
+      setToastMessage({ type: 'flashcard', message: 'Flashcard generation started! It may take a few minutes.' });
       // Clear the URL param but preserve tab
       const url = tab ? `/courses/${courseID}?tab=${tab}` : `/courses/${courseID}`;
       router.replace(url, { scroll: false });
     } else if (quiz === 'generating') {
-      setToastMessage({ type: 'quiz', message: 'Quiz is being generated in the background!' });
+      setToastMessage({ type: 'quiz', message: 'Quiz generation started! It may take a few minutes.' });
       // Clear the URL param but preserve tab
       const url = tab ? `/courses/${courseID}?tab=${tab}` : `/courses/${courseID}`;
       router.replace(url, { scroll: false });

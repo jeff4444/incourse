@@ -58,38 +58,30 @@ export default function GenerateQuizPage({ params }: { params: Promise<{ courseI
 
     setIsGenerating(true)
 
-    try {
-      const response = await authenticatedFetchJson<{ quiz_id: string; quiz: any }>(
-        '/api/agents/quizzes',
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            courseId: courseID,
-            name: title,
-            fileIds: selectedFiles,
-            noteIds: selectedNotes,
-            numQuestions: questionCount,
-            difficulty,
-            extraContext: extraContext || undefined,
-          }),
-        }
-      )
-
-      if (!response.quiz_id) {
-        console.error('Failed to generate quiz: ' + JSON.stringify(response))
-        alert('Failed to generate quiz. Please try again.')
-        setIsGenerating(false)
-        return
+    // Fire the request but don't wait for it
+    authenticatedFetchJson<{ quiz_id: string; quiz: any; success: boolean; message: string }>(
+      '/api/agents/quizzes',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          courseId: courseID,
+          name: title,
+          fileIds: selectedFiles,
+          noteIds: selectedNotes,
+          numQuestions: questionCount,
+          difficulty,
+          extraContext: extraContext || undefined,
+        }),
       }
+    )
+      .catch(error => {
+        console.error('Error generating quiz:', error)
+        // Error logged but user has already navigated away
+      })
 
-      // Redirect to course page with success message
-      const currentTab = searchParams.get('tab') || 'quizzes'
-      router.push(`/courses/${courseID}?quiz=generating&tab=${currentTab}`)
-    } catch (error) {
-      console.error('Error generating quiz:', error)
-      alert('Failed to generate quiz. Please try again.')
-      setIsGenerating(false)
-    }
+    // Navigate immediately with generating message
+    const currentTab = searchParams.get('tab') || 'quizzes'
+    router.push(`/courses/${courseID}?quiz=generating&tab=${currentTab}`)
   }
 
   const handleDismiss = () => {

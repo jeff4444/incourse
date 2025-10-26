@@ -309,10 +309,10 @@ async def health_check():
 async def generate_flashcards(request: FlashcardRequest):
     """
     Generate flashcards based on course content and files, and store them in the database.
-    Creates deck immediately and runs generation in background.
+    Waits for completion before returning.
     """
     try:
-        # Create deck immediately with 'generating' status
+        # Create deck with 'generating' status
         deck_id = await create_flashcard_deck(
             user_id=request.user_id,
             course_id=request.course_id,
@@ -325,21 +325,29 @@ async def generate_flashcards(request: FlashcardRequest):
             status="generating"
         )
         
-        # Start background generation task
-        asyncio.create_task(
-            _generate_flashcards_background(
+        try:
+            # Run generation synchronously (await instead of background task)
+            await _generate_flashcards_background(deck_id=deck_id, request=request)
+            
+            # Get the completed deck
+            deck = await get_flashcard_deck(deck_id)
+            
+            # Return with completed deck
+            return FlashcardResponse(
                 deck_id=deck_id,
-                request=request
+                deck=deck,
+                success=True,
+                message="Flashcard generation completed"
             )
-        )
-        
-        # Return immediately with deck_id
-        return FlashcardResponse(
-            deck_id=deck_id,
-            deck=None,  # Will be populated after generation
-            success=True,
-            message="Flashcard generation started in background"
-        )
+        except Exception as gen_error:
+            # If generation fails, deck will already be marked as failed
+            deck = await get_flashcard_deck(deck_id)
+            return FlashcardResponse(
+                deck_id=deck_id,
+                deck=deck,
+                success=False,
+                message=f"Flashcard generation failed: {str(gen_error)}"
+            )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error starting flashcard generation: {str(e)}")
@@ -402,21 +410,19 @@ async def _generate_flashcards_background(deck_id: str, request: FlashcardReques
             "card_count": len(flashcard_dicts)
         }).eq("id", deck_id).execute()
         
-        # Log activity asynchronously (fire-and-forget)
-        asyncio.create_task(
-            create_activity(
-                user_id=request.user_id,
-                course_id=request.course_id,
-                activity_type="flashcard_generation",
-                activity_summary=f"Generated {len(flashcard_dicts)} flashcards for {request.name}",
-                feedback="neutral",
-                metadata={
-                    "deck_id": deck_id,
-                    "deck_name": request.name,
-                    "card_count": len(flashcard_dicts),
-                    "card_type": request.card_type
-                }
-            )
+        # Log activity (await since we're already waiting synchronously)
+        await create_activity(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            activity_type="flashcard_generation",
+            activity_summary=f"Generated {len(flashcard_dicts)} flashcards for {request.name}",
+            feedback="neutral",
+            metadata={
+                "deck_id": deck_id,
+                "deck_name": request.name,
+                "card_count": len(flashcard_dicts),
+                "card_type": request.card_type
+            }
         )
         
     except Exception as e:
@@ -429,10 +435,10 @@ async def _generate_flashcards_background(deck_id: str, request: FlashcardReques
 async def generate_quiz(request: QuizRequest):
     """
     Generate quiz questions based on course content and files, and store them in the database.
-    Creates quiz immediately and runs generation in background.
+    Waits for completion before returning.
     """
     try:
-        # Create quiz immediately with 'generating' status
+        # Create quiz with 'generating' status
         quiz_id = await create_quiz(
             user_id=request.user_id,
             course_id=request.course_id,
@@ -445,21 +451,29 @@ async def generate_quiz(request: QuizRequest):
             status="generating"
         )
         
-        # Start background generation task
-        asyncio.create_task(
-            _generate_quiz_background(
+        try:
+            # Run generation synchronously (await instead of background task)
+            await _generate_quiz_background(quiz_id=quiz_id, request=request)
+            
+            # Get the completed quiz
+            quiz = await get_quiz(quiz_id)
+            
+            # Return with completed quiz
+            return QuizResponse(
                 quiz_id=quiz_id,
-                request=request
+                quiz=quiz,
+                success=True,
+                message="Quiz generation completed"
             )
-        )
-        
-        # Return immediately with quiz_id
-        return QuizResponse(
-            quiz_id=quiz_id,
-            quiz=None,  # Will be populated after generation
-            success=True,
-            message="Quiz generation started in background"
-        )
+        except Exception as gen_error:
+            # If generation fails, quiz will already be marked as failed
+            quiz = await get_quiz(quiz_id)
+            return QuizResponse(
+                quiz_id=quiz_id,
+                quiz=quiz,
+                success=False,
+                message=f"Quiz generation failed: {str(gen_error)}"
+            )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error starting quiz generation: {str(e)}")
@@ -523,21 +537,19 @@ async def _generate_quiz_background(quiz_id: str, request: QuizRequest):
             "question_count": len(quiz_dicts)
         }).eq("id", quiz_id).execute()
         
-        # Log activity asynchronously (fire-and-forget)
-        asyncio.create_task(
-            create_activity(
-                user_id=request.user_id,
-                course_id=request.course_id,
-                activity_type="quiz_generation",
-                activity_summary=f"Generated {request.difficulty.capitalize()} Quiz: {request.name}",
-                feedback="neutral",
-                metadata={
-                    "quiz_id": quiz_id,
-                    "quiz_name": request.name,
-                    "question_count": len(quiz_dicts),
-                    "difficulty": request.difficulty
-                }
-            )
+        # Log activity (await since we're already waiting synchronously)
+        await create_activity(
+            user_id=request.user_id,
+            course_id=request.course_id,
+            activity_type="quiz_generation",
+            activity_summary=f"Generated {request.difficulty.capitalize()} Quiz: {request.name}",
+            feedback="neutral",
+            metadata={
+                "quiz_id": quiz_id,
+                "quiz_name": request.name,
+                "question_count": len(quiz_dicts),
+                "difficulty": request.difficulty
+            }
         )
         
     except Exception as e:
