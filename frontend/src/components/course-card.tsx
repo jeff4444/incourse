@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Calendar, TrendingUp } from "lucide-react";
+import { BookOpen, Calendar } from "lucide-react";
 import { Course } from "@/lib/types/course";
 
 function calculateSemesterProgress(
@@ -46,19 +46,16 @@ export function CourseCard({ course }: { course: Course }) {
         pathname: `/courses/${course.id}`,
       }}
     >
-      <Card className="h-full overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-blue-500/10 hover:-translate-y-1 group cursor-pointer">
+      <Card className="h-full overflow-hidden transition-all duration-200 hover:shadow-md cursor-pointer">
         <CardContent className="h-full flex flex-col">
           {/* Header with icon and term */}
           <div className="flex items-start justify-between mb-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl blur-sm opacity-50 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 rounded-xl">
-                <BookOpen className="h-6 w-6" />
-              </div>
+            <div className="bg-blue-100 text-blue-600 p-3 rounded-xl">
+              <BookOpen className="h-6 w-6" />
             </div>
             <Badge
               variant="secondary"
-              className="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border-0 shadow-sm"
+              className="bg-gray-100 text-gray-700 border-0"
             >
               <Calendar className="h-3 w-3 mr-1" />
               {course.year} {course.semester}
@@ -67,7 +64,7 @@ export function CourseCard({ course }: { course: Course }) {
 
           {/* Course information */}
           <div className="flex-1 space-y-3">
-            <h3 className="font-bold text-xl text-foreground line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+            <h3 className="font-bold text-xl text-foreground line-clamp-2 leading-tight">
               {course.name}
             </h3>
             {course.code && (
@@ -87,14 +84,7 @@ export function CourseCard({ course }: { course: Course }) {
                 {Math.round(progress)}%
               </span>
             </div>
-            <div className="relative">
-              <Progress value={progress} className="h-2 bg-gray-200" />
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full opacity-0 group-hover:opacity-20 transition-opacity"></div>
-            </div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              <span>On track for completion</span>
-            </div>
+            <Progress value={progress} className="h-2 bg-gray-200" />
           </div>
         </CardContent>
       </Card>

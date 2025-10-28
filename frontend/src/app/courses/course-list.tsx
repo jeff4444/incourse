@@ -6,13 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { BookOpen, Search } from "lucide-react";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { BookOpen, Search, ChevronDown } from "lucide-react";
 import { useCourses } from "@/lib/hooks/useCourses";
 
 export function CourseList() {
@@ -73,37 +72,43 @@ export function CourseList() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-3xl font-bold">Your Courses</h1>
-        {/* <Button>
-          <BookOpen className="h-4 w-4 mr-2" />
-          Add Course
-        </Button> */}
       </div>
 
       <div className="mb-6 flex gap-4">
         <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             type="search"
             placeholder="Search courses..."
-            className="pl-10"
+            className="pl-9 h-10 shadow-sm! focus:shadow-sm! active:shadow-sm! hover:shadow-sm!"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Select value={selectedSemester} onValueChange={setSelectedSemester}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Filter by semester" />
-          </SelectTrigger>
-          <SelectContent>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-[200px] justify-between h-10 shadow-sm! focus:shadow-sm! active:shadow-sm! hover:shadow-sm!"
+            >
+              {selectedSemester}
+              <ChevronDown className="h-4 w-4 opacity-50" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[200px] bg-[#fefef8]">
             {semesterOptions.map((semester) => (
-              <SelectItem key={semester} value={semester}>
+              <DropdownMenuItem
+                key={semester}
+                onClick={() => setSelectedSemester(semester)}
+                className="cursor-pointer"
+              >
                 {semester}
-              </SelectItem>
+              </DropdownMenuItem>
             ))}
-          </SelectContent>
-        </Select>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {loading ? (
