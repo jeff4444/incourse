@@ -895,3 +895,8 @@ body {
 .animate-slide-out-right {
   animation: slideOutRight 0.5s ease-in forwards;
 }
+
+/* Nav User Dropdown Background */
+.nav-user-dropdown {
+  background-color: #fbfcf8 !important;
+}

@@ -97,7 +97,7 @@ export function CourseList() {
               <ChevronDown className="h-4 w-4 opacity-50" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent className="w-[200px] bg-[#fefef8]">
+          <DropdownMenuContent className="w-[200px] bg-[#fbfcf8]">
             {semesterOptions.map((semester) => (
               <DropdownMenuItem
                 key={semester}
