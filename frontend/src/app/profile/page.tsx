@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { SidebarLayout } from "@/components/layout/sidebar-layout";
 import {
   Card,
   CardContent,
@@ -13,7 +14,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAuth } from "@/hooks/useAuth";
@@ -23,14 +23,12 @@ import {
   User,
   Key,
   Bell,
-  BookOpen,
   Loader2,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
   Lock,
   Mail,
-  Calendar,
   School,
 } from "lucide-react";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
@@ -39,6 +37,7 @@ const supabase = createClient();
 
 function ProfilePage() {
   const { user } = useAuth();
+  const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [message, setMessage] = useState<{
@@ -366,10 +365,13 @@ function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-pink-50">
-      <Navbar />
-      <main className="container mx-auto py-6 px-4 md:px-6">
-        <div className="max-w-4xl mx-auto">
+    <SidebarLayout breadcrumbs={[{ label: "Profile & Settings" }]}>
+      <Separator
+        orientation="horizontal"
+        className="w-full mb-1 -mt-2 bg-gray-200"
+      />
+      <div className="container mx-auto px-4 md:px-6 flex flex-col">
+        <div className="max-w-4xl">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -402,24 +404,51 @@ function ProfilePage() {
             </motion.div>
           )}
 
-          <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="profile">
-                <User className="h-4 w-4 mr-2" />
+          <div className="space-y-6">
+            <div className="flex items-center gap-3 text-sm">
+              <button
+                onClick={() => setActiveTab("profile")}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  activeTab === "profile"
+                    ? "font-semibold text-foreground bg-gray-100"
+                    : "text-muted-foreground hover:bg-gray-100"
+                }`}
+              >
+                <User className="h-4 w-4 inline-block mr-2" />
                 Profile
-              </TabsTrigger>
-              <TabsTrigger value="lms">
-                <Key className="h-4 w-4 mr-2" />
+              </button>
+              <Separator orientation="vertical" className="h-5" />
+              <button
+                onClick={() => setActiveTab("lms")}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  activeTab === "lms"
+                    ? "font-semibold text-foreground bg-gray-100"
+                    : "text-muted-foreground hover:bg-gray-100"
+                }`}
+              >
+                <Key className="h-4 w-4 inline-block mr-2" />
                 LMS Settings
-              </TabsTrigger>
-              <TabsTrigger value="preferences">
-                <Bell className="h-4 w-4 mr-2" />
+              </button>
+              <Separator orientation="vertical" className="h-5" />
+              <button
+                onClick={() => setActiveTab("preferences")}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  activeTab === "preferences"
+                    ? "font-semibold text-foreground bg-gray-100"
+                    : "text-muted-foreground hover:bg-gray-100"
+                }`}
+              >
+                <Bell className="h-4 w-4 inline-block mr-2" />
                 Preferences
-              </TabsTrigger>
-            </TabsList>
+              </button>
+            </div>
+            <Separator
+              orientation="horizontal"
+              className="w-full mt-2 bg-gray-200"
+            />
 
             {/* Profile Tab */}
-            <TabsContent value="profile">
+            {activeTab === "profile" && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -484,7 +513,7 @@ function ProfilePage() {
                       <Button
                         onClick={handleUpdateProfile}
                         disabled={isLoading}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-gray-200 hover:bg-gray-400 text-gray-800"
                       >
                         {isLoading ? (
                           <>
@@ -499,10 +528,10 @@ function ProfilePage() {
                   </CardContent>
                 </Card>
               </motion.div>
-            </TabsContent>
+            )}
 
             {/* LMS Settings Tab */}
-            <TabsContent value="lms">
+            {activeTab === "lms" && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -593,7 +622,7 @@ function ProfilePage() {
                       <Button
                         onClick={handleUpdateLMSToken}
                         disabled={isLoading || isSyncing || !newApiKey.trim()}
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-gray-200 hover:bg-gray-400 text-gray-800"
                       >
                         {isLoading || isSyncing ? (
                           <>
@@ -823,10 +852,10 @@ function ProfilePage() {
                   </Card>
                 )}
               </motion.div>
-            </TabsContent>
+            )}
 
             {/* Preferences Tab */}
-            <TabsContent value="preferences">
+            {activeTab === "preferences" && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -954,7 +983,7 @@ function ProfilePage() {
                             text: "Preferences saved!",
                           })
                         }
-                        className="bg-gradient-to-r from-orange-500 to-pink-500 hover:from-orange-600 hover:to-pink-600"
+                        className="bg-gray-200 hover:bg-gray-400 text-gray-800"
                       >
                         Save Preferences
                       </Button>
@@ -962,11 +991,11 @@ function ProfilePage() {
                   </CardContent>
                 </Card>
               </motion.div>
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </SidebarLayout>
   );
 }
 
